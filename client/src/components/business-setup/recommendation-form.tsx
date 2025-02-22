@@ -15,20 +15,61 @@ const formSchema = z.object({
   budget: z.coerce.number().min(5000, "Budget must be at least 5,000 AED"),
   industry: z.string().min(1, "Please select an industry"),
   employees: z.coerce.number().min(1, "Must have at least 1 employee"),
-  activities: z.array(z.string()).min(1, "At least one business activity is required"),
-  businessActivity: z.string().min(3, "Business activity description is required"),
+  businessActivity: z.string().min(1, "Please select a business activity"),
 });
 
 type FormData = z.infer<typeof formSchema>;
 
-const industries = [
-  "Technology",
-  "Trading",
-  "Consulting",
-  "Manufacturing",
-  "E-commerce",
-  "Media",
-];
+const industriesWithActivities = {
+  "Technology": [
+    "Software Development",
+    "IT Consulting",
+    "Digital Marketing",
+    "Cloud Services",
+    "Cybersecurity",
+    "Mobile App Development"
+  ],
+  "Trading": [
+    "Import/Export General Trading",
+    "E-commerce Trading",
+    "Consumer Electronics",
+    "Textiles & Garments",
+    "Building Materials",
+    "Auto Parts"
+  ],
+  "Consulting": [
+    "Business Strategy",
+    "Management Consulting",
+    "HR Consulting",
+    "Financial Advisory",
+    "Legal Consulting",
+    "Project Management"
+  ],
+  "Manufacturing": [
+    "Food & Beverages",
+    "Cosmetics & Personal Care",
+    "Electronics Assembly",
+    "Packaging Solutions",
+    "Metal Fabrication",
+    "Textile Manufacturing"
+  ],
+  "E-commerce": [
+    "Online Retail",
+    "Dropshipping",
+    "Marketplace Platform",
+    "Digital Products",
+    "Subscription Services",
+    "Online Food Delivery"
+  ],
+  "Media": [
+    "Digital Content Creation",
+    "Advertising Agency",
+    "Video Production",
+    "Social Media Management",
+    "Publishing",
+    "Gaming & Entertainment"
+  ]
+};
 
 export default function RecommendationForm() {
   const { toast } = useToast();
@@ -39,7 +80,6 @@ export default function RecommendationForm() {
       budget: 50000,
       industry: "",
       employees: 1,
-      activities: [],
       businessActivity: "",
     },
   });
@@ -47,7 +87,6 @@ export default function RecommendationForm() {
   const recommendationMutation = useMutation({
     mutationFn: async (data: FormData) => {
       console.log("Submitting form data:", data);
-      // Transform the data to include the business activity in the activities array
       const payload = {
         ...data,
         activities: [data.businessActivity],
@@ -99,12 +138,8 @@ export default function RecommendationForm() {
     }
   };
 
-  console.log("Current form state:", {
-    values: form.getValues(),
-    errors: form.formState.errors,
-    isSubmitting: form.formState.isSubmitting,
-    isDirty: form.formState.isDirty
-  });
+  const selectedIndustry = form.watch("industry");
+  const availableActivities = selectedIndustry ? industriesWithActivities[selectedIndustry as keyof typeof industriesWithActivities] : [];
 
   return (
     <Card>
@@ -147,6 +182,8 @@ export default function RecommendationForm() {
                   <Select 
                     onValueChange={(value) => {
                       console.log("Industry selected:", value);
+                      // Reset business activity when industry changes
+                      form.setValue("businessActivity", "");
                       field.onChange(value);
                     }} 
                     value={field.value}
@@ -157,7 +194,7 @@ export default function RecommendationForm() {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {industries.map((industry) => (
+                      {Object.keys(industriesWithActivities).map((industry) => (
                         <SelectItem key={industry} value={industry}>
                           {industry}
                         </SelectItem>
@@ -195,17 +232,28 @@ export default function RecommendationForm() {
               name="businessActivity"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Business Activity Description</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="e.g., Software development services, Import/Export of electronics"
-                      {...field}
-                      onChange={(e) => {
-                        console.log("Business activity changed:", e.target.value);
-                        field.onChange(e.target.value);
-                      }}
-                    />
-                  </FormControl>
+                  <FormLabel>Business Activity</FormLabel>
+                  <Select
+                    disabled={!selectedIndustry}
+                    onValueChange={(value) => {
+                      console.log("Business activity selected:", value);
+                      field.onChange(value);
+                    }}
+                    value={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder={selectedIndustry ? "Select business activity" : "Select an industry first"} />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {availableActivities.map((activity) => (
+                        <SelectItem key={activity} value={activity}>
+                          {activity}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
@@ -215,9 +263,6 @@ export default function RecommendationForm() {
               type="submit"
               className="w-full"
               disabled={recommendationMutation.isPending}
-              onClick={() => {
-                console.log("Submit button clicked");
-              }}
             >
               {recommendationMutation.isPending ? (
                 <>
