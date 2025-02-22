@@ -8,12 +8,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2 } from "lucide-react";
 
 const formSchema = z.object({
-  budget: z.number().min(5000),
-  industry: z.string().min(1),
-  employees: z.number().min(1),
-  activities: z.array(z.string()).min(1),
+  budget: z.number().min(5000, "Budget must be at least 5,000 AED"),
+  industry: z.string().min(1, "Please select an industry"),
+  employees: z.number().min(1, "Must have at least 1 employee"),
+  activities: z.array(z.string()).min(1, "At least one business activity is required"),
+  businessActivity: z.string().min(3, "Business activity description is required"),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -28,6 +31,8 @@ const industries = [
 ];
 
 export default function RecommendationForm() {
+  const { toast } = useToast();
+
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -35,16 +40,33 @@ export default function RecommendationForm() {
       industry: "",
       employees: 1,
       activities: [],
+      businessActivity: "",
     },
   });
 
   const recommendationMutation = useMutation({
     mutationFn: async (data: FormData) => {
-      const res = await apiRequest("POST", "/api/recommendations", data);
+      // Transform the data to include the business activity in the activities array
+      const payload = {
+        ...data,
+        activities: [data.businessActivity],
+      };
+      const res = await apiRequest("POST", "/api/recommendations", payload);
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/business-setup"] });
+      toast({
+        title: "Success",
+        description: "Business setup recommendations generated successfully.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 
@@ -120,12 +142,36 @@ export default function RecommendationForm() {
               )}
             />
 
+            <FormField
+              control={form.control}
+              name="businessActivity"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Business Activity Description</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="e.g., Software development services, Import/Export of electronics"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <Button
               type="submit"
               className="w-full"
               disabled={recommendationMutation.isPending}
             >
-              Get Recommendations
+              {recommendationMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Getting Recommendations...
+                </>
+              ) : (
+                "Get Recommendations"
+              )}
             </Button>
           </form>
         </Form>
