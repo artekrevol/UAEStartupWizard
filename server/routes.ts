@@ -4,6 +4,7 @@ import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { getBusinessRecommendations, generateDocumentRequirements } from "./openai";
 import { BusinessSetup } from "@shared/schema";
+import { calculateBusinessScore } from "./scoring";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
@@ -39,9 +40,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       const setup = await storage.createBusinessSetup(setupData);
-      await storage.updateUserProgress(req.user!.id, 25);
+
+      // Calculate the business score
+      const score = calculateBusinessScore({
+        ...setup,
+        budget: req.body.budget,
+        employees: req.body.employees
+      });
+
+      // Update user progress based on the calculated score
+      await storage.updateUserProgress(req.user!.id, score.progress);
+
       console.log("Created business setup:", setup);
-      res.json(setup);
+      console.log("Calculated business score:", score);
+
+      res.json({
+        ...setup,
+        score
+      });
     } catch (error: unknown) {
       console.error("Error processing recommendation request:", error);
       const message = error instanceof Error ? error.message : 'Unknown error occurred';

@@ -8,9 +8,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 
+interface BusinessSetupWithScore extends BusinessSetup {
+  score?: {
+    total: number;
+    components: Array<{
+      score: number;
+      maxScore: number;
+      label: string;
+      description: string;
+    }>;
+    progress: number;
+  };
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
-  const { data: setup, isLoading } = useQuery<BusinessSetup>({
+  const { data: setup, isLoading } = useQuery<BusinessSetupWithScore>({
     queryKey: ["/api/business-setup"],
   });
 
@@ -36,7 +49,10 @@ export default function Dashboard() {
           </p>
         </div>
 
-        <ProgressTracker progress={user?.progress || 0} />
+        <ProgressTracker 
+          progress={user?.progress || 0} 
+          score={setup?.score}
+        />
 
         {!setup ? (
           <RecommendationForm />
