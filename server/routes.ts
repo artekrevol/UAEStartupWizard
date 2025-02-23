@@ -37,17 +37,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Fetch business activities by category
   app.get("/api/business-activities/:categoryId", async (req, res) => {
     try {
-      console.log("Fetching activities for category:", req.params.categoryId);
+      const categoryId = parseInt(req.params.categoryId);
+      console.log("Fetching activities for category ID:", categoryId);
+
+      if (isNaN(categoryId)) {
+        return res.status(400).json({ message: "Invalid category ID" });
+      }
+
       const activities = await db
         .select()
         .from(businessActivities)
-        .where(eq(businessActivities.categoryId, parseInt(req.params.categoryId)));
+        .where(eq(businessActivities.categoryId, categoryId));
+
+      console.log("Found activities:", activities);
 
       if (!activities.length) {
         return res.status(404).json({ message: "No activities found for this category" });
       }
 
-      console.log("Found activities:", activities);
       res.json(activities);
     } catch (error: unknown) {
       console.error("Error fetching activities:", error);

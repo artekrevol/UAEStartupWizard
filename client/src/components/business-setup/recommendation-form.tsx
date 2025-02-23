@@ -68,7 +68,7 @@ export default function RecommendationForm() {
   const selectedCategory = categories.find(cat => cat.name === selectedIndustry);
 
   const { data: activities = [], isLoading: isActivitiesLoading } = useQuery<BusinessActivity[]>({
-    queryKey: ["/api/business-activities", selectedCategory?.id],
+    queryKey: [`/api/business-activities/${selectedCategory?.id}`],
     enabled: !!selectedCategory?.id,
     onError: (error) => {
       console.error("Failed to fetch activities:", error);
@@ -78,6 +78,13 @@ export default function RecommendationForm() {
         variant: "destructive",
       });
     },
+  });
+
+  console.log("Debug:", {
+    selectedIndustry,
+    selectedCategoryId: selectedCategory?.id,
+    activities,
+    isActivitiesLoading
   });
 
   const recommendationMutation = useMutation({
@@ -162,13 +169,13 @@ export default function RecommendationForm() {
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue 
+                          <SelectValue
                             placeholder={
                               isActivitiesLoading
                                 ? "Loading activities..."
                                 : !selectedCategory
-                                ? "Select an industry first"
-                                : "Select business activity"
+                                  ? "Select an industry first"
+                                  : "Select business activity"
                             }
                           />
                         </SelectTrigger>
