@@ -68,6 +68,51 @@ export const businessSetups = pgTable("business_setups", {
   updatedAt: timestamp("updated_at"),
 });
 
+// Document Requirements
+export const documentTypes = pgTable("document_types", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  isRequired: boolean("is_required").default(true),
+  validityPeriod: integer("validity_period_months"),
+  attestationRequired: boolean("attestation_required"),
+});
+
+// AI Training Data
+export const aiTrainingData = pgTable("ai_training_data", {
+  id: serial("id").primaryKey(),
+  category: text("category").notNull(),
+  question: text("question").notNull(),
+  answer: text("answer").notNull(),
+  context: jsonb("context"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Free Zones Information
+export const freeZones = pgTable("free_zones", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  location: text("location"),
+  benefits: jsonb("benefits"),
+  requirements: jsonb("requirements"),
+  industries: jsonb("industries"),
+  lastUpdated: timestamp("last_updated").defaultNow(),
+});
+
+// Company Establishment Guidelines
+export const establishmentGuides = pgTable("establishment_guides", {
+  id: serial("id").primaryKey(),
+  category: text("category").notNull(),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  requirements: jsonb("requirements"),
+  documents: jsonb("documents"),
+  steps: jsonb("steps"),
+  lastUpdated: timestamp("last_updated").defaultNow(),
+});
+
 // Create insert schemas
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
@@ -76,11 +121,15 @@ export const insertUserSchema = createInsertSchema(users).pick({
 });
 
 export const businessSetupSchema = createInsertSchema(businessSetups);
+export const insertFreeZoneSchema = createInsertSchema(freeZones);
+export const insertEstablishmentGuideSchema = createInsertSchema(establishmentGuides);
 
 // Export types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type BusinessSetup = typeof businessSetups.$inferSelect;
+export type FreeZone = typeof freeZones.$inferSelect;
+export type EstablishmentGuide = typeof establishmentGuides.$inferSelect;
 
 // Constants for business setup
 export const LEGAL_FORMS = [
@@ -164,24 +213,3 @@ export const LICENSE_TYPES = [
   "Tourism License",
   "E-commerce License"
 ] as const;
-
-// Document Requirements
-export const documentTypes = pgTable("document_types", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  description: text("description"),
-  isRequired: boolean("is_required").default(true),
-  validityPeriod: integer("validity_period_months"),
-  attestationRequired: boolean("attestation_required"),
-});
-
-// AI Training Data
-export const aiTrainingData = pgTable("ai_training_data", {
-  id: serial("id").primaryKey(),
-  category: text("category").notNull(),
-  question: text("question").notNull(),
-  answer: text("answer").notNull(),
-  context: jsonb("context"),
-  metadata: jsonb("metadata"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
