@@ -32,7 +32,7 @@ interface BusinessCategory {
   id: number;
   name: string;
   description: string;
-  activities: BusinessActivity[];
+  isActive: boolean;
 }
 
 interface BusinessActivity {
@@ -42,7 +42,6 @@ interface BusinessActivity {
   categoryId: number;
   requiredDocs: string[];
   minimumCapital: number;
-  fees: Record<string, number>;
   approvalRequirements: string[];
 }
 
@@ -61,16 +60,6 @@ interface LegalForm {
 
 export default function RecommendationForm() {
   const { toast } = useToast();
-
-  // Fetch business categories and legal forms
-  const { data: categories, isLoading: isCategoriesLoading } = useQuery<BusinessCategory[]>({
-    queryKey: ["/api/business-categories"],
-  });
-
-  const { data: legalForms, isLoading: isLegalFormsLoading } = useQuery<LegalForm[]>({
-    queryKey: ["/api/legal-forms"],
-  });
-
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -83,6 +72,23 @@ export default function RecommendationForm() {
       sharePercentage: 100,
       activityDescription: "",
     },
+  });
+
+  // Fetch business categories
+  const { data: categories, isLoading: isCategoriesLoading } = useQuery<BusinessCategory[]>({
+    queryKey: ["/api/business-categories"],
+  });
+
+  // Fetch legal forms
+  const { data: legalForms, isLoading: isLegalFormsLoading } = useQuery<LegalForm[]>({
+    queryKey: ["/api/legal-forms"],
+  });
+
+  // Selected category state
+  const selectedCategory = categories?.find(cat => cat.name === form.watch("industry"));
+  const { data: activities, isLoading: isActivitiesLoading } = useQuery<BusinessActivity[]>({
+    queryKey: ["/api/business-activities", selectedCategory?.id],
+    enabled: !!selectedCategory,
   });
 
   const recommendationMutation = useMutation({
@@ -109,10 +115,6 @@ export default function RecommendationForm() {
       });
     },
   });
-
-  const selectedCategory = categories?.find(
-    cat => cat.name === form.watch("industry")
-  );
 
   if (isCategoriesLoading || isLegalFormsLoading) {
     return (
@@ -169,17 +171,17 @@ export default function RecommendationForm() {
                   <FormItem>
                     <FormLabel>Business Activity</FormLabel>
                     <Select
-                      disabled={!selectedCategory}
+                      disabled={!selectedCategory || isActivitiesLoading}
                       onValueChange={field.onChange}
                       value={field.value}
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder={selectedCategory ? "Select business activity" : "Select an industry first"} />
+                          <SelectValue placeholder={isActivitiesLoading ? "Loading..." : (selectedCategory ? "Select business activity" : "Select an industry first")} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {selectedCategory?.activities.map((activity) => (
+                        {activities?.map((activity) => (
                           <SelectItem key={activity.id} value={activity.name}>
                             {activity.name}
                           </SelectItem>
@@ -204,9 +206,9 @@ export default function RecommendationForm() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {legalForms?.map((form) => (
-                          <SelectItem key={form.id} value={form.name}>
-                            {form.name}
+                        {LEGAL_FORMS.map((form) => (
+                          <SelectItem key={form} value={form}>
+                            {form}
                           </SelectItem>
                         ))}
                       </SelectContent>

@@ -22,7 +22,9 @@ export const businessCategories = pgTable("business_categories", {
 
 export const businessActivities = pgTable("business_activities", {
   id: serial("id").primaryKey(),
-  categoryId: integer("category_id").notNull(),
+  categoryId: integer("category_id")
+    .references(() => businessCategories.id)
+    .notNull(),
   name: text("name").notNull(),
   description: text("description"),
   requiredDocs: jsonb("required_docs"),
@@ -45,16 +47,6 @@ export const legalForms = pgTable("legal_forms", {
   fees: jsonb("fees"),
 });
 
-// License Types
-export const licenseTypes = pgTable("license_types", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  description: text("description"),
-  validity: integer("validity_months"),
-  renewalRequirements: jsonb("renewal_requirements"),
-  fees: jsonb("fees"),
-});
-
 // Business Setup Applications
 export const businessSetups = pgTable("business_setups", {
   id: serial("id").primaryKey(),
@@ -74,27 +66,6 @@ export const businessSetups = pgTable("business_setups", {
   status: text("status").default("pending"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at"),
-});
-
-// Document Requirements
-export const documentTypes = pgTable("document_types", {
-  id: serial("id").primaryKey(),
-  name: text("name").notNull(),
-  description: text("description"),
-  isRequired: boolean("is_required").default(true),
-  validityPeriod: integer("validity_period_months"),
-  attestationRequired: boolean("attestation_required"),
-});
-
-// AI Training Data
-export const aiTrainingData = pgTable("ai_training_data", {
-  id: serial("id").primaryKey(),
-  category: text("category").notNull(),
-  question: text("question").notNull(),
-  answer: text("answer").notNull(),
-  context: jsonb("context"),
-  metadata: jsonb("metadata"),
-  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Create insert schemas
@@ -193,3 +164,24 @@ export const LICENSE_TYPES = [
   "Tourism License",
   "E-commerce License"
 ] as const;
+
+// Document Requirements
+export const documentTypes = pgTable("document_types", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  isRequired: boolean("is_required").default(true),
+  validityPeriod: integer("validity_period_months"),
+  attestationRequired: boolean("attestation_required"),
+});
+
+// AI Training Data
+export const aiTrainingData = pgTable("ai_training_data", {
+  id: serial("id").primaryKey(),
+  category: text("category").notNull(),
+  question: text("question").notNull(),
+  answer: text("answer").notNull(),
+  context: jsonb("context"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});

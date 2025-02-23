@@ -6,6 +6,8 @@ import { getBusinessRecommendations, generateDocumentRequirements } from "./open
 import { BusinessSetup } from "@shared/schema";
 import { calculateBusinessScore } from "./scoring";
 import { db } from "./db";
+import { eq } from "drizzle-orm";
+import { businessCategories, businessActivities } from "@shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
@@ -13,12 +15,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Fetch business categories
   app.get("/api/business-categories", async (req, res) => {
     try {
-      const categories = await db.query.businessCategories.findMany({
-        with: {
-          activities: true
-        }
-      });
+      const categories = await db
+        .select()
+        .from(businessCategories)
+        .where(eq(businessCategories.isActive, true));
       res.json(categories);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      res.status(500).json({ message });
+    }
+  });
+
+  // Fetch business activities by category name
+  app.get("/api/business-activities/:categoryId", async (req, res) => {
+    try {
+      const activities = await db
+        .select()
+        .from(businessActivities)
+        .where(eq(businessActivities.categoryId, parseInt(req.params.categoryId)));
+      res.json(activities);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error occurred';
       res.status(500).json({ message });
@@ -30,19 +45,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const forms = await db.query.legalForms.findMany();
       res.json(forms);
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Unknown error occurred';
-      res.status(500).json({ message });
-    }
-  });
-
-  // Fetch business activities by category
-  app.get("/api/business-activities/:categoryId", async (req, res) => {
-    try {
-      const activities = await db.query.businessActivities.findMany({
-        where: (activities, { eq }) => eq(activities.categoryId, parseInt(req.params.categoryId))
-      });
-      res.json(activities);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error occurred';
       res.status(500).json({ message });
@@ -73,9 +75,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const setupData: Omit<BusinessSetup, "id"> = {
         userId: req.user!.id,
         businessType: recommendations.businessType,
+        legalForm: req.body.legalForm,
+        initialCapital: req.body.initialCapital,
+        sharePercentage: req.body.sharePercentage,
         freeZone: recommendations.freeZone,
         requirements: recommendations.requirements,
         documents,
+        businessActivity: req.body.businessActivity,
+        activityDescription: req.body.activityDescription,
         status: "pending"
       };
 
