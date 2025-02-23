@@ -45,19 +45,6 @@ interface BusinessActivity {
   approvalRequirements: string[];
 }
 
-interface LegalForm {
-  id: number;
-  name: string;
-  description: string;
-  minimumShareholders: number;
-  maximumShareholders: number;
-  minimumCapital: number;
-  localOwnershipRequired: boolean;
-  localOwnershipPercentage: number;
-  requiredDocs: string[];
-  fees: Record<string, number>;
-}
-
 export default function RecommendationForm() {
   const { toast } = useToast();
   const form = useForm<FormData>({
@@ -79,25 +66,24 @@ export default function RecommendationForm() {
     queryKey: ["/api/business-categories"],
   });
 
-  // Fetch legal forms
-  const { data: legalForms, isLoading: isLegalFormsLoading } = useQuery<LegalForm[]>({
-    queryKey: ["/api/legal-forms"],
-  });
-
   // Selected category state
   const selectedIndustry = form.watch("industry");
+  const selectedCategory = categories?.find(cat => cat.name === selectedIndustry);
+
+  // Fetch activities for selected category
   const { data: activities, isLoading: isActivitiesLoading } = useQuery<BusinessActivity[]>({
-    queryKey: ["/api/business-activities", selectedIndustry],
-    enabled: !!selectedIndustry,
+    queryKey: ["/api/business-activities", selectedCategory?.id],
+    enabled: !!selectedCategory?.id,
   });
+
+  console.log("Selected category:", selectedCategory);
+  console.log("Activities:", activities);
 
   const recommendationMutation = useMutation({
     mutationFn: async (data: FormData) => {
       console.log("Submitting form data:", data);
       const res = await apiRequest("POST", "/api/recommendations", data);
-      const jsonResponse = await res.json();
-      console.log("Received response:", jsonResponse);
-      return jsonResponse;
+      return await res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/business-setup"] });
@@ -107,7 +93,6 @@ export default function RecommendationForm() {
       });
     },
     onError: (error: Error) => {
-      console.error("Recommendation form error:", error);
       toast({
         title: "Error",
         description: error.message,
@@ -116,7 +101,7 @@ export default function RecommendationForm() {
     },
   });
 
-  if (isCategoriesLoading || isLegalFormsLoading) {
+  if (isCategoriesLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -171,13 +156,21 @@ export default function RecommendationForm() {
                   <FormItem>
                     <FormLabel>Business Activity</FormLabel>
                     <Select
-                      disabled={!selectedIndustry || isActivitiesLoading}
+                      disabled={!selectedCategory?.id || isActivitiesLoading}
                       onValueChange={field.onChange}
                       value={field.value}
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder={isActivitiesLoading ? "Loading..." : (selectedIndustry ? "Select business activity" : "Select an industry first")} />
+                          <SelectValue 
+                            placeholder={
+                              isActivitiesLoading 
+                                ? "Loading..." 
+                                : (!selectedCategory?.id 
+                                  ? "Select an industry first" 
+                                  : "Select business activity")
+                            } 
+                          />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>

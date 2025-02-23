@@ -15,8 +15,7 @@ const ESTABLISHMENT_STEPS = [
   { step: "3", title: "Submission", description: "Submit the application to relevant authorities." },
   { step: "4", title: "Approval", description: "Await approval from relevant authorities." },
   { step: "5", title: "License Issuance", description: "Collect your license once approved." },
-]
-
+];
 
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
@@ -35,26 +34,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Fetch business activities by category name
-  app.get("/api/business-activities/:name", async (req, res) => {
+  // Fetch business activities by category
+  app.get("/api/business-activities/:categoryId", async (req, res) => {
     try {
-      const category = await db
-        .select()
-        .from(businessCategories)
-        .where(eq(businessCategories.name, req.params.name))
-        .limit(1);
-
-      if (!category.length) {
-        return res.status(404).json({ message: "Category not found" });
-      }
-
+      console.log("Fetching activities for category:", req.params.categoryId);
       const activities = await db
         .select()
         .from(businessActivities)
-        .where(eq(businessActivities.categoryId, category[0].id));
-
+        .where(eq(businessActivities.categoryId, parseInt(req.params.categoryId)));
+      console.log("Found activities:", activities);
       res.json(activities);
     } catch (error: unknown) {
+      console.error("Error fetching activities:", error);
       const message = error instanceof Error ? error.message : 'Unknown error occurred';
       res.status(500).json({ message });
     }
