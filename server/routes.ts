@@ -9,6 +9,15 @@ import { db } from "./db";
 import { eq } from "drizzle-orm";
 import { businessCategories, businessActivities } from "@shared/schema";
 
+const ESTABLISHMENT_STEPS = [
+  { step: "1", title: "Initial Consultation", description: "Schedule your initial consultation" },
+  { step: "2", title: "Document Preparation", description: "Gather all documents and prepare them according to our requirements" },
+  { step: "3", title: "Submission", description: "Submit the application to relevant authorities." },
+  { step: "4", title: "Approval", description: "Await approval from relevant authorities." },
+  { step: "5", title: "License Issuance", description: "Collect your license once approved." },
+]
+
+
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
 
@@ -27,12 +36,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Fetch business activities by category name
-  app.get("/api/business-activities/:categoryId", async (req, res) => {
+  app.get("/api/business-activities/:name", async (req, res) => {
     try {
+      const category = await db
+        .select()
+        .from(businessCategories)
+        .where(eq(businessCategories.name, req.params.name))
+        .limit(1);
+
+      if (!category.length) {
+        return res.status(404).json({ message: "Category not found" });
+      }
+
       const activities = await db
         .select()
         .from(businessActivities)
-        .where(eq(businessActivities.categoryId, parseInt(req.params.categoryId)));
+        .where(eq(businessActivities.categoryId, category[0].id));
+
       res.json(activities);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -83,7 +103,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         documents,
         businessActivity: req.body.businessActivity,
         activityDescription: req.body.activityDescription,
-        status: "pending"
+        licenseType: null,
+        approvalStatus: "pending",
+        establishmentSteps: ESTABLISHMENT_STEPS,
+        status: "pending",
+        createdAt: new Date(),
+        updatedAt: null
       };
 
       const setup = await storage.createBusinessSetup(setupData);

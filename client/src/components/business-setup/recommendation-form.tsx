@@ -85,10 +85,10 @@ export default function RecommendationForm() {
   });
 
   // Selected category state
-  const selectedCategory = categories?.find(cat => cat.name === form.watch("industry"));
+  const selectedIndustry = form.watch("industry");
   const { data: activities, isLoading: isActivitiesLoading } = useQuery<BusinessActivity[]>({
-    queryKey: ["/api/business-activities", selectedCategory?.id],
-    enabled: !!selectedCategory,
+    queryKey: ["/api/business-activities", selectedIndustry],
+    enabled: !!selectedIndustry,
   });
 
   const recommendationMutation = useMutation({
@@ -171,13 +171,13 @@ export default function RecommendationForm() {
                   <FormItem>
                     <FormLabel>Business Activity</FormLabel>
                     <Select
-                      disabled={!selectedCategory || isActivitiesLoading}
+                      disabled={!selectedIndustry || isActivitiesLoading}
                       onValueChange={field.onChange}
                       value={field.value}
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder={isActivitiesLoading ? "Loading..." : (selectedCategory ? "Select business activity" : "Select an industry first")} />
+                          <SelectValue placeholder={isActivitiesLoading ? "Loading..." : (selectedIndustry ? "Select business activity" : "Select an industry first")} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
