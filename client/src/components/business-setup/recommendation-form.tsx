@@ -70,14 +70,17 @@ export default function RecommendationForm() {
   const selectedIndustry = form.watch("industry");
   const selectedCategory = categories?.find(cat => cat.name === selectedIndustry);
 
+  console.log("Categories:", categories);
+  console.log("Selected industry:", selectedIndustry);
+  console.log("Selected category:", selectedCategory);
+
   // Fetch activities for selected category
   const { data: activities, isLoading: isActivitiesLoading } = useQuery<BusinessActivity[]>({
-    queryKey: ["/api/business-activities", selectedCategory?.id],
+    queryKey: ["/api/business-activities", selectedCategory?.id?.toString()],
     enabled: !!selectedCategory?.id,
   });
 
-  console.log("Selected category:", selectedCategory);
-  console.log("Activities:", activities);
+  console.log("Activities data:", activities);
 
   const recommendationMutation = useMutation({
     mutationFn: async (data: FormData) => {
@@ -124,11 +127,11 @@ export default function RecommendationForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Industry Sector</FormLabel>
-                    <Select 
+                    <Select
                       onValueChange={(value) => {
                         form.setValue("businessActivity", "");
                         field.onChange(value);
-                      }} 
+                      }}
                       value={field.value}
                     >
                       <FormControl>
@@ -162,14 +165,14 @@ export default function RecommendationForm() {
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue 
+                          <SelectValue
                             placeholder={
-                              isActivitiesLoading 
-                                ? "Loading..." 
-                                : (!selectedCategory?.id 
-                                  ? "Select an industry first" 
+                              isActivitiesLoading
+                                ? "Loading..."
+                                : (!selectedCategory?.id
+                                  ? "Select an industry first"
                                   : "Select business activity")
-                            } 
+                            }
                           />
                         </SelectTrigger>
                       </FormControl>
@@ -275,7 +278,7 @@ export default function RecommendationForm() {
                 <FormItem>
                   <FormLabel>Activity Description</FormLabel>
                   <FormControl>
-                    <Textarea 
+                    <Textarea
                       placeholder="Provide a detailed description of your business activities..."
                       {...field}
                     />
