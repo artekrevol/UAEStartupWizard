@@ -37,16 +37,15 @@ interface BusinessCategory {
 
 interface BusinessActivity {
   id: number;
+  categoryId: number;
   name: string;
   description: string;
-  categoryId: number;
-  requiredDocs: string[];
   minimumCapital: number;
-  approvalRequirements: string[];
 }
 
 export default function RecommendationForm() {
   const { toast } = useToast();
+
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -61,30 +60,28 @@ export default function RecommendationForm() {
     },
   });
 
-  // Fetch business categories
-  const { data: categories, isLoading: isCategoriesLoading } = useQuery<BusinessCategory[]>({
+  const { data: categories = [], isLoading: isCategoriesLoading } = useQuery<BusinessCategory[]>({
     queryKey: ["/api/business-categories"],
   });
 
-  // Selected category state
   const selectedIndustry = form.watch("industry");
-  const selectedCategory = categories?.find(cat => cat.name === selectedIndustry);
+  const selectedCategory = categories.find(cat => cat.name === selectedIndustry);
 
-  console.log("Categories:", categories);
-  console.log("Selected industry:", selectedIndustry);
-  console.log("Selected category:", selectedCategory);
-
-  // Fetch activities for selected category
-  const { data: activities, isLoading: isActivitiesLoading } = useQuery<BusinessActivity[]>({
-    queryKey: ["/api/business-activities", selectedCategory?.id?.toString()],
+  const { data: activities = [], isLoading: isActivitiesLoading } = useQuery<BusinessActivity[]>({
+    queryKey: ["/api/business-activities", selectedCategory?.id],
     enabled: !!selectedCategory?.id,
+    onError: (error) => {
+      console.error("Failed to fetch activities:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load business activities",
+        variant: "destructive",
+      });
+    },
   });
-
-  console.log("Activities data:", activities);
 
   const recommendationMutation = useMutation({
     mutationFn: async (data: FormData) => {
-      console.log("Submitting form data:", data);
       const res = await apiRequest("POST", "/api/recommendations", data);
       return await res.json();
     },
@@ -140,7 +137,7 @@ export default function RecommendationForm() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {categories?.map((category) => (
+                        {categories.map((category) => (
                           <SelectItem key={category.id} value={category.name}>
                             {category.name}
                           </SelectItem>
@@ -159,25 +156,25 @@ export default function RecommendationForm() {
                   <FormItem>
                     <FormLabel>Business Activity</FormLabel>
                     <Select
-                      disabled={!selectedCategory?.id || isActivitiesLoading}
+                      disabled={!selectedCategory || isActivitiesLoading}
                       onValueChange={field.onChange}
                       value={field.value}
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue
+                          <SelectValue 
                             placeholder={
                               isActivitiesLoading
-                                ? "Loading..."
-                                : (!selectedCategory?.id
-                                  ? "Select an industry first"
-                                  : "Select business activity")
+                                ? "Loading activities..."
+                                : !selectedCategory
+                                ? "Select an industry first"
+                                : "Select business activity"
                             }
                           />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {activities?.map((activity) => (
+                        {activities.map((activity) => (
                           <SelectItem key={activity.id} value={activity.name}>
                             {activity.name}
                           </SelectItem>

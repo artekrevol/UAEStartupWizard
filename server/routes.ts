@@ -42,6 +42,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .select()
         .from(businessActivities)
         .where(eq(businessActivities.categoryId, parseInt(req.params.categoryId)));
+
+      if (!activities.length) {
+        return res.status(404).json({ message: "No activities found for this category" });
+      }
+
       console.log("Found activities:", activities);
       res.json(activities);
     } catch (error: unknown) {
