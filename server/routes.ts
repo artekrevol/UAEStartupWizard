@@ -5,9 +5,49 @@ import { storage } from "./storage";
 import { getBusinessRecommendations, generateDocumentRequirements } from "./openai";
 import { BusinessSetup } from "@shared/schema";
 import { calculateBusinessScore } from "./scoring";
+import { db } from "./db";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
+
+  // Fetch business categories
+  app.get("/api/business-categories", async (req, res) => {
+    try {
+      const categories = await db.query.businessCategories.findMany({
+        with: {
+          activities: true
+        }
+      });
+      res.json(categories);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      res.status(500).json({ message });
+    }
+  });
+
+  // Fetch legal forms
+  app.get("/api/legal-forms", async (req, res) => {
+    try {
+      const forms = await db.query.legalForms.findMany();
+      res.json(forms);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      res.status(500).json({ message });
+    }
+  });
+
+  // Fetch business activities by category
+  app.get("/api/business-activities/:categoryId", async (req, res) => {
+    try {
+      const activities = await db.query.businessActivities.findMany({
+        where: (activities, { eq }) => eq(activities.categoryId, parseInt(req.params.categoryId))
+      });
+      res.json(activities);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      res.status(500).json({ message });
+    }
+  });
 
   app.post("/api/recommendations", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);

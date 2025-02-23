@@ -1,8 +1,17 @@
-import { User, BusinessSetup, InsertUser } from "@shared/schema";
+import { eq } from "drizzle-orm";
+import { db } from "./db";
+import {
+  users,
+  businessSetups,
+  type User,
+  type InsertUser,
+  type BusinessSetup,
+} from "@shared/schema";
 import session from "express-session";
-import createMemoryStore from "memorystore";
+import connectPg from "connect-pg-simple";
+import { pool } from "./db";
 
-const MemoryStore = createMemoryStore(session);
+const PostgresSessionStore = connectPg(session);
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
@@ -15,69 +24,60 @@ export interface IStorage {
   sessionStore: session.Store;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<number, User>;
-  private businessSetups: Map<number, BusinessSetup>;
-  private currentId: number;
+export class DatabaseStorage implements IStorage {
   sessionStore: session.Store;
 
   constructor() {
-    this.users = new Map();
-    this.businessSetups = new Map();
-    this.currentId = 1;
-    this.sessionStore = new MemoryStore({
-      checkPeriod: 86400000,
+    this.sessionStore = new PostgresSessionStore({
+      pool,
+      createTableIfMissing: true,
     });
   }
 
   async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.currentId++;
-    const user: User = {
-      ...insertUser,
-      id,
-      progress: 0,
-      companyName: insertUser.companyName || null,
-    };
-    this.users.set(id, user);
+    const [user] = await db.insert(users).values(insertUser).returning();
     return user;
   }
 
   async updateUserProgress(userId: number, progress: number): Promise<void> {
-    const user = await this.getUser(userId);
-    if (user) {
-      this.users.set(userId, { ...user, progress });
-    }
+    await db
+      .update(users)
+      .set({ progress })
+      .where(eq(users.id, userId));
   }
 
   async getBusinessSetup(userId: number): Promise<BusinessSetup | undefined> {
-    return Array.from(this.businessSetups.values()).find(
-      (setup) => setup.userId === userId,
-    );
+    const [setup] = await db
+      .select()
+      .from(businessSetups)
+      .where(eq(businessSetups.userId, userId));
+    return setup;
   }
 
   async createBusinessSetup(setup: Omit<BusinessSetup, "id">): Promise<BusinessSetup> {
-    const id = this.currentId++;
-    const newSetup: BusinessSetup = { ...setup, id };
-    this.businessSetups.set(id, newSetup);
-    return newSetup;
+    const [businessSetup] = await db
+      .insert(businessSetups)
+      .values(setup)
+      .returning();
+    return businessSetup;
   }
 
   async updateBusinessSetup(id: number, update: Partial<BusinessSetup>): Promise<void> {
-    const setup = this.businessSetups.get(id);
-    if (setup) {
-      this.businessSetups.set(id, { ...setup, ...update });
-    }
+    await db
+      .update(businessSetups)
+      .set(update)
+      .where(eq(businessSetups.id, id));
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();

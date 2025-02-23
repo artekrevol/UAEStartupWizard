@@ -1,15 +1,61 @@
-import { pgTable, text, serial, integer, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, jsonb, timestamp, boolean, real } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Users table
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   companyName: text("company_name"),
   progress: integer("progress").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Business Categories and Activities
+export const businessCategories = pgTable("business_categories", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").default(true),
+});
+
+export const businessActivities = pgTable("business_activities", {
+  id: serial("id").primaryKey(),
+  categoryId: integer("category_id").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  requiredDocs: jsonb("required_docs"),
+  minimumCapital: integer("minimum_capital"),
+  fees: jsonb("fees"),
+  approvalRequirements: jsonb("approval_requirements"),
+});
+
+// Legal Forms and Requirements
+export const legalForms = pgTable("legal_forms", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  minimumShareholders: integer("minimum_shareholders"),
+  maximumShareholders: integer("maximum_shareholders"),
+  minimumCapital: integer("minimum_capital"),
+  localOwnershipRequired: boolean("local_ownership_required"),
+  localOwnershipPercentage: real("local_ownership_percentage"),
+  requiredDocs: jsonb("required_docs"),
+  fees: jsonb("fees"),
+});
+
+// License Types
+export const licenseTypes = pgTable("license_types", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  validity: integer("validity_months"),
+  renewalRequirements: jsonb("renewal_requirements"),
+  fees: jsonb("fees"),
+});
+
+// Business Setup Applications
 export const businessSetups = pgTable("business_setups", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
@@ -22,11 +68,36 @@ export const businessSetups = pgTable("business_setups", {
   documents: jsonb("documents"),
   businessActivity: text("business_activity"),
   activityDescription: text("activity_description"),
+  licenseType: text("license_type"),
   approvalStatus: text("approval_status").default("pending"),
   establishmentSteps: jsonb("establishment_steps"),
   status: text("status").default("pending"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at"),
 });
 
+// Document Requirements
+export const documentTypes = pgTable("document_types", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  isRequired: boolean("is_required").default(true),
+  validityPeriod: integer("validity_period_months"),
+  attestationRequired: boolean("attestation_required"),
+});
+
+// AI Training Data
+export const aiTrainingData = pgTable("ai_training_data", {
+  id: serial("id").primaryKey(),
+  category: text("category").notNull(),
+  question: text("question").notNull(),
+  answer: text("answer").notNull(),
+  context: jsonb("context"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Create insert schemas
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
@@ -35,6 +106,7 @@ export const insertUserSchema = createInsertSchema(users).pick({
 
 export const businessSetupSchema = createInsertSchema(businessSetups);
 
+// Export types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type BusinessSetup = typeof businessSetups.$inferSelect;
@@ -67,4 +139,57 @@ export const APPROVAL_STATUS = [
   "initial_approval",
   "final_approval",
   "rejected"
+] as const;
+
+// Business Activities Categories from MOEC
+export const BUSINESS_CATEGORIES = {
+  "Manufacturing": [
+    "Food & Beverages",
+    "Textiles & Clothing",
+    "Chemical Products",
+    "Electronics & Electrical",
+    "Metal Products",
+    "Pharmaceuticals"
+  ],
+  "Trading": [
+    "General Trading",
+    "Import/Export",
+    "Wholesale",
+    "Retail",
+    "E-commerce",
+    "Specialized Trading"
+  ],
+  "Professional Services": [
+    "Legal Services",
+    "Accounting & Auditing",
+    "Engineering",
+    "Architecture",
+    "Management Consulting",
+    "Healthcare"
+  ],
+  "Construction": [
+    "Building Construction",
+    "Civil Engineering",
+    "Specialized Construction",
+    "Real Estate Development",
+    "MEP Services",
+    "Interior Design"
+  ],
+  "Technology": [
+    "Software Development",
+    "IT Services",
+    "Digital Solutions",
+    "AI & Data Analytics",
+    "Cybersecurity",
+    "Cloud Services"
+  ]
+} as const;
+
+// License Types from MOEC
+export const LICENSE_TYPES = [
+  "Commercial License",
+  "Professional License",
+  "Industrial License",
+  "Tourism License",
+  "E-commerce License"
 ] as const;

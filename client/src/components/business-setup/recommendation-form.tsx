@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
@@ -28,60 +28,48 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>;
 
-// Updated industry categories based on MOEC classification
-const industriesWithActivities = {
-  "Manufacturing": [
-    "Food Manufacturing",
-    "Textile Manufacturing",
-    "Chemical Manufacturing",
-    "Electronics Manufacturing",
-    "Machinery Manufacturing",
-    "Pharmaceutical Manufacturing"
-  ],
-  "Trading": [
-    "General Trading",
-    "Import/Export",
-    "Wholesale Trading",
-    "Retail Trading",
-    "E-commerce Trading",
-    "Specialized Trading"
-  ],
-  "Professional Services": [
-    "Legal Services",
-    "Accounting Services",
-    "Engineering Services",
-    "Architectural Services",
-    "Management Consulting",
-    "Healthcare Services"
-  ],
-  "Technology": [
-    "Software Development",
-    "IT Services",
-    "Digital Solutions",
-    "AI and Data Analytics",
-    "Cybersecurity Services",
-    "Cloud Computing Services"
-  ],
-  "Construction": [
-    "Building Construction",
-    "Infrastructure Development",
-    "Interior Design",
-    "Specialized Contracting",
-    "Project Management",
-    "Real Estate Development"
-  ],
-  "Tourism & Hospitality": [
-    "Hotel Services",
-    "Restaurant Services",
-    "Travel Agency",
-    "Tourism Management",
-    "Event Management",
-    "Entertainment Services"
-  ]
-};
+interface BusinessCategory {
+  id: number;
+  name: string;
+  description: string;
+  activities: BusinessActivity[];
+}
+
+interface BusinessActivity {
+  id: number;
+  name: string;
+  description: string;
+  categoryId: number;
+  requiredDocs: string[];
+  minimumCapital: number;
+  fees: Record<string, number>;
+  approvalRequirements: string[];
+}
+
+interface LegalForm {
+  id: number;
+  name: string;
+  description: string;
+  minimumShareholders: number;
+  maximumShareholders: number;
+  minimumCapital: number;
+  localOwnershipRequired: boolean;
+  localOwnershipPercentage: number;
+  requiredDocs: string[];
+  fees: Record<string, number>;
+}
 
 export default function RecommendationForm() {
   const { toast } = useToast();
+
+  // Fetch business categories and legal forms
+  const { data: categories, isLoading: isCategoriesLoading } = useQuery<BusinessCategory[]>({
+    queryKey: ["/api/business-categories"],
+  });
+
+  const { data: legalForms, isLoading: isLegalFormsLoading } = useQuery<LegalForm[]>({
+    queryKey: ["/api/legal-forms"],
+  });
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -100,12 +88,7 @@ export default function RecommendationForm() {
   const recommendationMutation = useMutation({
     mutationFn: async (data: FormData) => {
       console.log("Submitting form data:", data);
-      const payload = {
-        ...data,
-        activities: [data.businessActivity],
-      };
-      console.log("Sending payload:", payload);
-      const res = await apiRequest("POST", "/api/recommendations", payload);
+      const res = await apiRequest("POST", "/api/recommendations", data);
       const jsonResponse = await res.json();
       console.log("Received response:", jsonResponse);
       return jsonResponse;
@@ -127,8 +110,17 @@ export default function RecommendationForm() {
     },
   });
 
-  const selectedIndustry = form.watch("industry");
-  const availableActivities = selectedIndustry ? industriesWithActivities[selectedIndustry as keyof typeof industriesWithActivities] : [];
+  const selectedCategory = categories?.find(
+    cat => cat.name === form.watch("industry")
+  );
+
+  if (isCategoriesLoading || isLegalFormsLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <Card>
@@ -158,9 +150,9 @@ export default function RecommendationForm() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {Object.keys(industriesWithActivities).map((industry) => (
-                          <SelectItem key={industry} value={industry}>
-                            {industry}
+                        {categories?.map((category) => (
+                          <SelectItem key={category.id} value={category.name}>
+                            {category.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -177,19 +169,19 @@ export default function RecommendationForm() {
                   <FormItem>
                     <FormLabel>Business Activity</FormLabel>
                     <Select
-                      disabled={!selectedIndustry}
+                      disabled={!selectedCategory}
                       onValueChange={field.onChange}
                       value={field.value}
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder={selectedIndustry ? "Select business activity" : "Select an industry first"} />
+                          <SelectValue placeholder={selectedCategory ? "Select business activity" : "Select an industry first"} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {availableActivities.map((activity) => (
-                          <SelectItem key={activity} value={activity}>
-                            {activity}
+                        {selectedCategory?.activities.map((activity) => (
+                          <SelectItem key={activity.id} value={activity.name}>
+                            {activity.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -212,9 +204,9 @@ export default function RecommendationForm() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {LEGAL_FORMS.map((form) => (
-                          <SelectItem key={form} value={form}>
-                            {form}
+                        {legalForms?.map((form) => (
+                          <SelectItem key={form.id} value={form.name}>
+                            {form.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
