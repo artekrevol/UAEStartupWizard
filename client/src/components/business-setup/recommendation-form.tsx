@@ -65,14 +65,14 @@ export default function RecommendationForm() {
     },
   });
 
-  const { data: categories = [], isLoading: isCategoriesLoading } = useQuery<BusinessCategory[]>({
-    queryKey: ["/api/business-categories"],
+  // Query all available industry groups
+  const { data: industryGroups = [], isLoading: isIndustryGroupsLoading } = useQuery<string[]>({
+    queryKey: ["/api/industry-groups"],
   });
 
   const selectedIndustry = form.watch("industry");
-  const selectedCategory = categories.find(cat => cat.name === selectedIndustry);
 
-  // Get ISIC activities instead of category-based ones
+  // Get ISIC activities for the selected industry
   const { data: activitiesResponse, isLoading: isActivitiesLoading } = useQuery<{
     activities: BusinessActivity[];
     pagination: {
@@ -82,20 +82,13 @@ export default function RecommendationForm() {
       totalPages: number;
     };
   }>({
-    queryKey: [`/api/isic-activities`, { industry: selectedIndustry, limit: 100 }],
+    queryKey: ["/api/isic-activities", { industry: selectedIndustry, limit: 100 }],
     // Only fetch if industry is selected
     enabled: !!selectedIndustry
   });
   
   // Extract activities from the response
   const activities = activitiesResponse?.activities || [];
-
-  console.log("Debug:", {
-    selectedIndustry,
-    selectedCategoryId: selectedCategory?.id,
-    activities,
-    isActivitiesLoading
-  });
 
   const recommendationMutation = useMutation({
     mutationFn: async (data: FormData) => {
@@ -118,7 +111,7 @@ export default function RecommendationForm() {
     },
   });
 
-  if (isCategoriesLoading) {
+  if (isIndustryGroupsLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -154,9 +147,9 @@ export default function RecommendationForm() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {categories.map((category) => (
-                          <SelectItem key={category.id} value={category.name}>
-                            {category.name}
+                        {industryGroups.map((group) => (
+                          <SelectItem key={group} value={group}>
+                            {group}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -173,7 +166,7 @@ export default function RecommendationForm() {
                   <FormItem>
                     <FormLabel>Business Activity</FormLabel>
                     <Select
-                      disabled={!selectedCategory || isActivitiesLoading}
+                      disabled={!selectedIndustry || isActivitiesLoading}
                       onValueChange={field.onChange}
                       value={field.value}
                     >
@@ -183,7 +176,7 @@ export default function RecommendationForm() {
                             placeholder={
                               isActivitiesLoading
                                 ? "Loading activities..."
-                                : !selectedCategory
+                                : !selectedIndustry
                                   ? "Select an industry first"
                                   : "Select business activity"
                             }

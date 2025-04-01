@@ -32,11 +32,13 @@ async function importBusinessActivities(csvFilePath) {
         columns: false,
         skip_empty_lines: true,
         trim: true,
-        skip_lines_with_empty_values: true,
+        skip_lines_with_empty_values: false, // Don't skip lines that might have empty values but have needed data
         relax_quotes: true, // Be more lenient with quotes
         relax_column_count: true, // Allow variable column count
         quote: '"',
-        escape: '"'
+        escape: '"',
+        comment: '#', // Ignore lines that start with #
+        from_line: 1 // Start from the first line
       }, (err, records) => {
         if (err) reject(err);
         else resolve(records);
@@ -63,18 +65,24 @@ async function importBusinessActivities(csvFilePath) {
         }
       }
       
-      // Only process rows that have an activity code pattern (column 1)
-      // Activity codes can be like "5911008" or "7310-024"
-      if (record[1] && /^[0-9]+-?[0-9]*$/.test(record[1].trim())) {
-        validRecords.push({
-          activityCode: record[1].trim(),
-          name: record[2] ? record[2].trim() : null,
-          nameArabic: record[3] ? record[3].trim() : null,
-          description: record[4] ? record[4].trim() : null,
-          descriptionArabic: record[5] ? record[5].trim() : null,
-          industryGroup: record[6] ? record[6].trim() : null,
-          isicActivity: record[7] === 'TRUE' ? 'true' : (record[7] ? record[7].trim() : null)
-        });
+      // Accept a broader range of activity codes
+      // Activity codes can be like "5911008", "7310-024", "659992", etc.
+      if (record[1] && record[1].trim()) {
+        // Try to extract activity code regardless of format
+        const activityCode = record[1].trim();
+        
+        // Only proceed if we have a name
+        if (record[2] && record[2].trim()) {
+          validRecords.push({
+            activityCode: activityCode,
+            name: record[2] ? record[2].trim() : null,
+            nameArabic: record[3] ? record[3].trim() : null,
+            description: record[4] ? record[4].trim() : null,
+            descriptionArabic: record[5] ? record[5].trim() : null,
+            industryGroup: record[6] ? record[6].trim() : null,
+            isicActivity: record[7] === 'TRUE' ? 'true' : (record[7] ? record[7].trim() : null)
+          });
+        }
       }
     }
     

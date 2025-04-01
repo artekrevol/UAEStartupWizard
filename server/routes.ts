@@ -205,6 +205,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(setup);
   });
   
+  // Get all unique industry groups for the filter dropdown
+  app.get("/api/industry-groups", async (req, res) => {
+    try {
+      // Query to select distinct industry groups
+      const result = await db.execute(sql`
+        SELECT DISTINCT industry_group 
+        FROM business_activities 
+        WHERE industry_group IS NOT NULL 
+        ORDER BY industry_group
+      `);
+      
+      // Extract the industry group values
+      const industryGroups = result.rows
+        .map(row => row.industry_group)
+        .filter(Boolean); // Remove any null/undefined values
+        
+      res.json(industryGroups);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      console.error("Error fetching industry groups:", errorMessage);
+      res.status(500).json({ error: errorMessage });
+    }
+  });
+  
   // Fetch ISIC business activities
   app.get("/api/isic-activities", async (req, res) => {
     try {
