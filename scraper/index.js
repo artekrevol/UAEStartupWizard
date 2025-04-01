@@ -3,6 +3,7 @@ import { scrapeFreeZones } from './free_zone_scraper.js';
 import { populateBusinessActivities } from './business_activities_scraper.js';
 import { populateAiTrainingData } from './ai_training_data_scraper.js';
 import { populateDocumentTypes } from './document_types_scraper.js';
+import { scrapeUAEFreeZones } from './uae_freezones_scraper.js';
 
 /**
  * Runs all data population scripts in sequence
@@ -12,20 +13,24 @@ async function populateAllData() {
   console.log('This script will populate the database with necessary data for the application');
   
   try {
-    // Step 1: Populate Free Zones
-    console.log('\n===== Step 1: Populating Free Zones Data =====');
+    // Step 1: Populate Free Zones from MOEC
+    console.log('\n===== Step 1: Populating Free Zones Data from MOEC =====');
     await scrapeFreeZones();
     
-    // Step 2: Populate Business Activities
-    console.log('\n===== Step 2: Populating Business Activities Data =====');
+    // Step 2: Enhance Free Zones data with UAEFreeZones.com
+    console.log('\n===== Step 2: Enhancing Free Zones Data from UAEFreeZones.com =====');
+    await scrapeUAEFreeZones();
+    
+    // Step 3: Populate Business Activities
+    console.log('\n===== Step 3: Populating Business Activities Data =====');
     await populateBusinessActivities();
     
-    // Step 3: Populate Document Types
-    console.log('\n===== Step 3: Populating Document Types Data =====');
+    // Step 4: Populate Document Types
+    console.log('\n===== Step 4: Populating Document Types Data =====');
     await populateDocumentTypes();
     
-    // Step 4: Populate AI Training Data
-    console.log('\n===== Step 4: Populating AI Training Data =====');
+    // Step 5: Populate AI Training Data
+    console.log('\n===== Step 5: Populating AI Training Data =====');
     await populateAiTrainingData();
     
     console.log('\n======= Database Population Complete =======');

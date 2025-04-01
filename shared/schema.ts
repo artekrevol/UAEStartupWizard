@@ -100,6 +100,10 @@ export const freeZones = pgTable("free_zones", {
   benefits: jsonb("benefits"),
   requirements: jsonb("requirements"),
   industries: jsonb("industries"),
+  licenseTypes: jsonb("license_types"),
+  facilities: jsonb("facilities"),
+  website: text("website"),
+  setupCost: jsonb("setup_cost"),
   lastUpdated: timestamp("last_updated").defaultNow(),
 });
 

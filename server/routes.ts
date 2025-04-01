@@ -316,6 +316,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+  
+  // Endpoint to scrape UAE Free Zones website
+  app.post("/api/scrape-uae-freezones", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user?.id !== 1 && req.user?.id !== 2)) {
+      return res.status(403).json({ message: "Not authorized to perform this action" });
+    }
+    
+    try {
+      // Import the UAE Free Zones scraper
+      const { scrapeUAEFreeZones } = await import('../scraper/uae_freezones_scraper.js');
+      
+      // Run the scraper
+      console.log("Starting UAE Free Zones scraper...");
+      await scrapeUAEFreeZones();
+      console.log("UAE Free Zones scraping completed successfully");
+      
+      res.json({ 
+        success: true, 
+        message: "Free Zones data has been scraped from UAEFreeZones.com"
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error during UAE Free Zones scraping:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: `UAE Free Zones scraping failed: ${message}`
+      });
+    }
+  });
 
   // UAE Business AI Assistant endpoint
   app.post("/api/business-assistant", async (req, res) => {
