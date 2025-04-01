@@ -37,10 +37,15 @@ interface BusinessCategory {
 
 interface BusinessActivity {
   id: number;
-  categoryId: number;
+  categoryId?: number;
   name: string;
-  description: string;
-  minimumCapital: number;
+  description?: string;
+  minimumCapital?: number;
+  activityCode?: string;
+  nameArabic?: string;
+  descriptionArabic?: string;
+  industryGroup?: string;
+  isicActivity?: boolean;
 }
 
 export default function RecommendationForm() {
@@ -67,17 +72,11 @@ export default function RecommendationForm() {
   const selectedIndustry = form.watch("industry");
   const selectedCategory = categories.find(cat => cat.name === selectedIndustry);
 
+  // Get ISIC activities instead of category-based ones
   const { data: activities = [], isLoading: isActivitiesLoading } = useQuery<BusinessActivity[]>({
-    queryKey: [`/api/business-activities/${selectedCategory?.id}`],
-    enabled: !!selectedCategory?.id,
-    onError: (error) => {
-      console.error("Failed to fetch activities:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load business activities",
-        variant: "destructive",
-      });
-    },
+    queryKey: [`/api/isic-activities`, { industry: selectedIndustry }],
+    // Only fetch if industry is selected
+    enabled: !!selectedIndustry
   });
 
   console.log("Debug:", {
@@ -183,7 +182,7 @@ export default function RecommendationForm() {
                       <SelectContent>
                         {activities.map((activity) => (
                           <SelectItem key={activity.id} value={activity.name}>
-                            {activity.name}
+                            {activity.activityCode && `[${activity.activityCode}] `} {activity.name}
                           </SelectItem>
                         ))}
                       </SelectContent>

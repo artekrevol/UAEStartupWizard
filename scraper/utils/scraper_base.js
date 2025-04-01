@@ -1,85 +1,93 @@
-// scraper/utils/scraper_base.js
-import pkg from 'pg';
-const { Pool } = pkg;
-import axios from 'axios';
-import * as cheerio from 'cheerio';
-
 /**
  * Base scraper class with utility methods for robust web scraping
  */
+import axios from 'axios';
+import cheerio from 'cheerio';
+import { Pool } from 'pg';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
+
 class BaseScraper {
   constructor(options = {}) {
-    this.options = {
-      retryCount: 3,
-      retryDelay: 2000,
-      timeout: 30000,
-      ...options
-    };
+    // Base options
+    this.baseUrl = options.baseUrl || '';
+    this.retryCount = options.retryCount || 3;
+    this.retryDelay = options.retryDelay || 2000;
+    this.timeout = options.timeout || 30000;
+    this.delayBetweenRequests = options.delayBetweenRequests || 1000;
+    this.userAgent = options.userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.63 Safari/537.36';
     
-    // If a database connection is provided, use it; otherwise create one
-    this.pool = options.pool || this.createPool();
+    // Database pool
+    this.pool = null;
     
-    // User agent rotation for more realistic requests
-    this.userAgents = [
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Safari/605.1.15',
-      'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:90.0) Gecko/20100101 Firefox/90.0'
-    ];
+    // Create pool connection if DATABASE_URL is available
+    if (process.env.DATABASE_URL) {
+      this.createPool();
+    }
   }
   
   /**
    * Creates a database connection pool
    */
   createPool() {
-    const pool = new Pool({
-      connectionString: process.env.DATABASE_URL
-    });
-    return pool;
+    if (!this.pool) {
+      this.pool = new Pool({
+        connectionString: process.env.DATABASE_URL,
+        max: 20, // Maximum number of connections in the pool
+        idleTimeoutMillis: 30000, // How long a connection is idle before timing out
+        connectionTimeoutMillis: 2000, // How long to try connecting
+      });
+      
+      this.pool.on('error', (err) => {
+        console.error('Unexpected error on idle client', err);
+        process.exit(-1);
+      });
+    }
+    
+    return this.pool;
   }
   
   /**
    * Fetches a URL with built-in retry logic and error handling
    */
   async fetchUrl(url, options = {}) {
-    const maxRetries = options.retryCount || this.options.retryCount;
-    const retryDelay = options.retryDelay || this.options.retryDelay;
-    const timeout = options.timeout || this.options.timeout;
-    
-    // Get a random user agent
-    const userAgent = this.userAgents[Math.floor(Math.random() * this.userAgents.length)];
+    const maxRetries = options.retries || this.retryCount;
+    const timeout = options.timeout || this.timeout;
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        console.log(`Fetching URL: ${url} (Attempt ${attempt}/${maxRetries})`);
+        console.log(`Fetching ${url} (attempt ${attempt}/${maxRetries})...`);
+        
+        // Add a delay between retries
+        if (attempt > 1) {
+          await this.sleep(this.retryDelay * attempt);
+        }
         
         const response = await axios.get(url, {
+          timeout,
           headers: {
-            'User-Agent': userAgent,
-            'Accept': 'text/html,application/xhtml+xml,application/xml',
-            'Accept-Language': 'en-US,en;q=0.9'
+            'User-Agent': this.userAgent,
+            ...options.headers
           },
-          timeout: timeout,
-          ...options
+          ...options.axiosOptions
         });
         
-        if (response.status === 200) {
-          console.log(`Successfully fetched ${url}`);
-          return response.data;
-        } else {
-          console.warn(`Received status code ${response.status} when fetching ${url}`);
-        }
-      } catch (error) {
-        console.error(`Error fetching ${url}: ${error.message}`);
+        // Delay before the next request to avoid rate limiting
+        await this.sleep(this.delayBetweenRequests);
         
-        if (attempt < maxRetries) {
-          console.log(`Retrying in ${retryDelay / 1000} seconds...`);
-          await this.sleep(retryDelay);
+        return response.data;
+      } catch (error) {
+        console.error(`Error fetching ${url} (attempt ${attempt}/${maxRetries}):`, error.message);
+        
+        if (attempt === maxRetries) {
+          console.error('Max retries reached, giving up');
+          return null;
         }
       }
     }
     
-    console.error(`Failed to fetch ${url} after ${maxRetries} attempts`);
     return null;
   }
   
@@ -88,13 +96,7 @@ class BaseScraper {
    */
   parseHtml(html) {
     if (!html) return null;
-    
-    try {
-      return cheerio.load(html);
-    } catch (error) {
-      console.error(`Error parsing HTML: ${error.message}`);
-      return null;
-    }
+    return cheerio.load(html);
   }
   
   /**
@@ -112,7 +114,7 @@ class BaseScraper {
       
       return clean ? this.cleanText(text) : text;
     } catch (error) {
-      console.error(`Error extracting text: ${error.message}`);
+      console.error('Error extracting text:', error.message);
       return '';
     }
   }
@@ -124,23 +126,35 @@ class BaseScraper {
     if (!text) return '';
     
     return text
-      .replace(/[\r\n\t]+/g, ' ')  // Replace newlines and tabs with spaces
-      .replace(/\s{2,}/g, ' ')     // Replace multiple spaces with a single space
-      .trim();                      // Remove leading/trailing whitespace
+      .replace(/\\n/g, ' ')           // Replace escaped newlines
+      .replace(/\n+/g, ' ')           // Replace actual newlines
+      .replace(/\s+/g, ' ')           // Replace multiple spaces with single space
+      .replace(/&nbsp;/g, ' ')        // Replace non-breaking spaces
+      .replace(/\t+/g, ' ')           // Replace tabs
+      .trim();                        // Trim leading/trailing spaces
   }
   
   /**
    * Safely executes a database query with error handling
    */
   async executeQuery(query, params = []) {
+    if (!this.pool) {
+      this.createPool();
+    }
+    
+    let client;
+    
     try {
-      const result = await this.pool.query(query, params);
+      client = await this.pool.connect();
+      const result = await client.query(query, params);
       return result;
     } catch (error) {
-      console.error(`Database query error: ${error.message}`);
-      console.error(`Query: ${query}`);
-      console.error(`Params: ${JSON.stringify(params)}`);
+      console.error('Database query error:', error.message);
       throw error;
+    } finally {
+      if (client) {
+        client.release();
+      }
     }
   }
   
@@ -158,8 +172,8 @@ class BaseScraper {
     if (!text) return null;
     
     const match = text.match(pattern);
-    if (match && match[groupIndex]) {
-      return match[groupIndex].trim();
+    if (match && match[groupIndex] !== undefined) {
+      return match[groupIndex];
     }
     
     return null;
@@ -169,9 +183,15 @@ class BaseScraper {
    * Handle cleanup operations
    */
   async cleanup() {
-    // We don't close the pool here since it's managed externally
-    // and may be reused for other operations
-    // This prevents "Cannot use a pool after calling end on the pool" errors
+    try {
+      // Close database connection pool if it exists
+      if (this.pool) {
+        await this.pool.end();
+        this.pool = null;
+      }
+    } catch (error) {
+      console.error('Error during cleanup:', error);
+    }
   }
 }
 

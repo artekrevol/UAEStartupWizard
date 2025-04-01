@@ -1,5 +1,5 @@
 // server/migration/import-business-activities.js
-import { pool } from '../db.js';
+import { pool } from '../db';
 import fs from 'fs';
 import { parse } from 'csv-parse';
 import path from 'path';
@@ -229,7 +229,7 @@ async function importBusinessActivities(csvFilePath) {
 
 // Run the import if this script is executed directly
 if (process.argv[1].includes('import-business-activities.js')) {
-  const csvFilePath = './attached_assets/ISIC_Activity-Lists_2024.csv';
+  const csvFilePath = path.join(process.cwd(), 'attached_assets/ISIC_Activity-Lists_2024.csv');
   
   importBusinessActivities(csvFilePath)
     .then((count) => {

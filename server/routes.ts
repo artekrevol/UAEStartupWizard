@@ -44,18 +44,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid category ID" });
       }
 
-      const activities = await db
+      // First try to find activities linked to category
+      const categoryActivities = await db
         .select()
         .from(businessActivities)
         .where(eq(businessActivities.categoryId, categoryId));
 
-      console.log("Found activities:", activities);
+      console.log(`Found ${categoryActivities.length} activities directly linked to category ID ${categoryId}`);
 
-      if (!activities.length) {
-        return res.status(404).json({ message: "No activities found for this category" });
+      // If we have activities, return those
+      if (categoryActivities.length > 0) {
+        return res.json(categoryActivities);
       }
-
-      res.json(activities);
+      
+      // If no activities found by category, try to map activities to categories based on industry_group
+      // This is a fallback to handle ISIC activities which don't have a category assigned
+      const category = await db
+        .select()
+        .from(businessCategories)
+        .where(eq(businessCategories.id, categoryId))
+        .limit(1);
+        
+      if (!category || category.length === 0) {
+        return res.status(404).json({ message: "Category not found" });
+      }
+      
+      const categoryName = category[0].name;
+      console.log(`Looking for activities that match category name '${categoryName}'`);
+      
+      // Map category names to industry groups or keywords that might appear in industry_group
+      const categoryToIndustryMap = {
+        'Manufacturing': ['manufacturing', 'production'],
+        'Trading': ['trading', 'retail', 'wholesale'],
+        'Professional Services': ['professional', 'scientific', 'technical'],
+        'Technology': ['information', 'technology', 'gaming', 'software'],
+        'Construction': ['construction', 'real estate', 'building'],
+        'Tourism & Hospitality': ['tourism', 'hospitality', 'entertainment', 'accommodation']
+      };
+      
+      const industryKeywords = categoryToIndustryMap[categoryName as keyof typeof categoryToIndustryMap] || [categoryName.toLowerCase()];
+      console.log(`Looking for activities with industry group containing: ${industryKeywords.join(' or ')}`);
+      
+      // Build a SQL query with ILIKE conditions for each keyword
+      let query = db.select().from(businessActivities);
+      
+      if (industryKeywords.length > 0) {
+        const conditions = industryKeywords.map(keyword => 
+          sql`${businessActivities.industryGroup} ILIKE ${'%' + keyword + '%'}`
+        );
+        
+        // Combine with OR
+        query = query.where(sql`${conditions.join(' OR ')}`);
+      }
+      
+      const matchedActivities = await query.limit(20);
+      console.log(`Found ${matchedActivities.length} activities by industry group matching`);
+      
+      // If we still don't have activities, return a reasonable sample of activities
+      if (matchedActivities.length === 0) {
+        console.log(`No activities matched. Returning a sample of all activities`);
+        const sampleActivities = await db
+          .select()
+          .from(businessActivities)
+          .limit(20);
+          
+        return res.json(sampleActivities);
+      }
+      
+      return res.json(matchedActivities);
     } catch (error: unknown) {
       console.error("Error fetching activities:", error);
       const message = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -428,6 +484,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ 
         success: false, 
         message: `Running scrapers failed: ${message}`
+      });
+    }
+  });
+  
+  // Endpoint to run the Playwright-based UAE Government Portal scraper
+  app.post("/api/scrape-uae-government-portal", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user?.id !== 1 && req.user?.id !== 2)) {
+      return res.status(403).json({ message: "Not authorized to perform this action" });
+    }
+    
+    try {
+      // Import the scraper manager
+      const { scraperManager } = await import('../scraper/scraper_manager.js');
+      
+      // Run the UAE Government Portal scraper
+      console.log("Starting UAE Government Portal scraper...");
+      const result = await scraperManager.runScraper('uaegovportal', {
+        headless: req.body.headless !== false, // default to headless mode
+        screenshots: req.body.screenshots || false, // default to no screenshots
+        timeout: req.body.timeout || 60000, // default to 60s timeout
+      });
+      
+      if (result) {
+        console.log("UAE Government Portal scraping completed successfully");
+        res.json({ 
+          success: true, 
+          message: "Government portal data has been scraped successfully"
+        });
+      } else {
+        console.log("UAE Government Portal scraping completed with errors");
+        res.json({ 
+          success: false, 
+          message: "Government portal scraping completed with errors, check server logs for details"
+        });
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error during UAE Government Portal scraping:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: `UAE Government Portal scraping failed: ${message}`
       });
     }
   });

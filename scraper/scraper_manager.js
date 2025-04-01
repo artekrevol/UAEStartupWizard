@@ -1,14 +1,20 @@
 // scraper/scraper_manager.js
 import { scrapeUAEFreeZones } from './scrapers/uae_freezones_scraper.js';
+import { scrapeUAEGovernmentPortal } from './scrapers/uae_government_portal_scraper.js';
 
 /**
  * Scraper Manager to orchestrate multiple scrapers
  * Can be expanded to include additional website scrapers
+ * Now includes support for Playwright-based scrapers
  */
 class ScraperManager {
   constructor() {
     this.scrapers = {
-      'uaefreezones': scrapeUAEFreeZones
+      // Original Cheerio-based scrapers
+      'uaefreezones': scrapeUAEFreeZones,
+      
+      // New Playwright-based scrapers
+      'uaegovportal': scrapeUAEGovernmentPortal
     };
     
     // Default options for scrapers

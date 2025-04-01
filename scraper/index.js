@@ -1,51 +1,60 @@
-// Main scraper script to populate database with all required data
-import { scrapeFreeZones } from './free_zone_scraper.js';
-import { populateBusinessActivities } from './business_activities_scraper.js';
-import { populateAiTrainingData } from './ai_training_data_scraper.js';
-import { populateDocumentTypes } from './document_types_scraper.js';
-import { scrapeUAEFreeZones } from './uae_freezones_scraper.js';
-
 /**
  * Runs all data population scripts in sequence
  */
+import { scraperManager } from './scraper_manager.js';
+import cron from 'node-cron';
+
 async function populateAllData() {
-  console.log('======= Starting UAE Business Setup Database Population =======');
-  console.log('This script will populate the database with necessary data for the application');
+  console.log('Starting data population process...');
   
   try {
-    // Step 1: Populate Free Zones from MOEC
-    console.log('\n===== Step 1: Populating Free Zones Data from MOEC =====');
-    await scrapeFreeZones();
+    // Run all scrapers and collect results
+    const results = await scraperManager.runAllScrapers();
     
-    // Step 2: Enhance Free Zones data with UAEFreeZones.com
-    console.log('\n===== Step 2: Enhancing Free Zones Data from UAEFreeZones.com =====');
-    await scrapeUAEFreeZones();
-    
-    // Step 3: Populate Business Activities
-    console.log('\n===== Step 3: Populating Business Activities Data =====');
-    await populateBusinessActivities();
-    
-    // Step 4: Populate Document Types
-    console.log('\n===== Step 4: Populating Document Types Data =====');
-    await populateDocumentTypes();
-    
-    // Step 5: Populate AI Training Data
-    console.log('\n===== Step 5: Populating AI Training Data =====');
-    await populateAiTrainingData();
-    
-    console.log('\n======= Database Population Complete =======');
-    console.log('All data has been successfully added to the database');
+    console.log('All scrapers completed with results:', results);
+    return results;
   } catch (error) {
-    console.error('Error during database population:', error);
+    console.error('Error during data population:', error);
+    return false;
   }
 }
 
-// Run the script if this file is executed directly
-if (import.meta.url === `file://${process.argv[1]}`) {
-  populateAllData().catch(error => {
-    console.error('Fatal error during database population:', error);
-    process.exit(1);
-  });
-}
-
+// Export for use in server
 export { populateAllData };
+
+// If this file is run directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  // Check for --schedule flag to determine whether to run immediately or schedule
+  const scheduleFlag = process.argv.includes('--schedule');
+  
+  if (scheduleFlag) {
+    console.log('Setting up monthly scraper schedule...');
+    
+    // Schedule to run on the first day of each month at 00:01
+    cron.schedule('1 0 1 * *', async () => {
+      console.log(`Running scheduled data population at ${new Date().toISOString()}`);
+      await populateAllData();
+    });
+    
+    console.log('Scraper scheduled to run on the first day of each month at 00:01');
+  } else {
+    console.log('Running data population immediately...');
+    populateAllData()
+      .then(() => {
+        console.log('Data population completed');
+        
+        // Exit if not in schedule mode
+        if (!scheduleFlag) {
+          process.exit(0);
+        }
+      })
+      .catch(error => {
+        console.error(`Error: ${error.message}`);
+        
+        // Exit with error code if not in schedule mode
+        if (!scheduleFlag) {
+          process.exit(1);
+        }
+      });
+  }
+}
