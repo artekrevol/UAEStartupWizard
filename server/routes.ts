@@ -587,6 +587,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Endpoint to run the enhanced free zone scraper that collects detailed information
+  app.post("/api/scrape-enhanced-freezones", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user?.id !== 1 && req.user?.id !== 2)) {
+      return res.status(403).json({ message: "Not authorized to perform this action" });
+    }
+    
+    try {
+      // Import the scraper manager
+      const { scraperManager } = await import('../scraper/scraper_manager.js');
+      
+      // Run the enhanced free zone scraper
+      console.log("Starting enhanced free zone scraper...");
+      const result = await scraperManager.runScraper('enhanced_freezones', {
+        headless: req.body.headless !== false, // default to headless mode
+        screenshots: req.body.screenshots || true, // default to taking screenshots for debugging
+        timeout: req.body.timeout || 120000, // default to 120s timeout (longer for complex pages)
+      });
+      
+      if (result) {
+        console.log("Enhanced free zone scraping completed successfully");
+        res.json({ 
+          success: true, 
+          message: "Free zone data has been enhanced with detailed information"
+        });
+      } else {
+        console.log("Enhanced free zone scraping completed with errors");
+        res.json({ 
+          success: false, 
+          message: "Enhanced free zone scraping completed with errors, check server logs for details"
+        });
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error during enhanced free zone scraping:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: `Enhanced free zone scraping failed: ${message}`
+      });
+    }
+  });
+
+  // Endpoint to get all free zones
+  app.get("/api/free-zones", async (req, res) => {
+    try {
+      const allFreeZones = await db.select().from(freeZones);
+      res.json(allFreeZones);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error fetching free zones:", error);
+      res.status(500).json({ message });
+    }
+  });
+
+  // Endpoint to get a specific free zone by ID
+  app.get("/api/free-zones/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid free zone ID" });
+      }
+
+      const [freeZone] = await db
+        .select()
+        .from(freeZones)
+        .where(eq(freeZones.id, id));
+      
+      if (!freeZone) {
+        return res.status(404).json({ message: "Free zone not found" });
+      }
+      
+      res.json(freeZone);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error(`Error fetching free zone with ID ${req.params.id}:`, error);
+      res.status(500).json({ message });
+    }
+  });
+
   // UAE Business AI Assistant endpoint
   app.post("/api/business-assistant", async (req, res) => {
     try {

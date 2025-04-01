@@ -108,6 +108,7 @@ export const freeZones = pgTable("free_zones", {
   facilities: jsonb("facilities"),
   website: text("website"),
   setupCost: jsonb("setup_cost"),
+  faqs: jsonb("faqs"),
   lastUpdated: timestamp("last_updated").defaultNow(),
 });
 

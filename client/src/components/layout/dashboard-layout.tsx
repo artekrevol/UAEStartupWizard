@@ -1,9 +1,18 @@
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
-import { LogOut, LayoutDashboard, FileText, Settings } from "lucide-react";
+import { useLocation } from "wouter";
+import { 
+  LogOut, 
+  LayoutDashboard, 
+  FileText, 
+  Settings, 
+  Building2,
+  Map 
+} from "lucide-react";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { logoutMutation } = useAuth();
+  const [location, setLocation] = useLocation();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -11,7 +20,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              <span className="text-xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
+              <span 
+                className="text-xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent cursor-pointer"
+                onClick={() => setLocation("/")}
+              >
                 UAE Business Setup
               </span>
             </div>
@@ -31,15 +43,44 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="flex">
         <aside className="w-64 bg-sidebar border-r min-h-screen p-4">
           <nav className="space-y-2">
-            <Button variant="ghost" className="w-full justify-start">
+            <Button 
+              variant={location === "/" ? "default" : "ghost"} 
+              className="w-full justify-start"
+              onClick={() => setLocation("/")}
+            >
               <LayoutDashboard className="mr-2 h-5 w-5" />
               Dashboard
             </Button>
-            <Button variant="ghost" className="w-full justify-start">
+            
+            <Button 
+              variant={location.includes("/free-zone") ? "default" : "ghost"} 
+              className="w-full justify-start"
+              onClick={() => setLocation("/free-zones")}
+            >
+              <Building2 className="mr-2 h-5 w-5" />
+              Free Zones
+            </Button>
+            
+            <Button 
+              variant="ghost" 
+              className="w-full justify-start"
+            >
+              <Map className="mr-2 h-5 w-5" />
+              Business Maps
+            </Button>
+            
+            <Button 
+              variant="ghost" 
+              className="w-full justify-start"
+            >
               <FileText className="mr-2 h-5 w-5" />
               Documents
             </Button>
-            <Button variant="ghost" className="w-full justify-start">
+            
+            <Button 
+              variant="ghost" 
+              className="w-full justify-start"
+            >
               <Settings className="mr-2 h-5 w-5" />
               Settings
             </Button>

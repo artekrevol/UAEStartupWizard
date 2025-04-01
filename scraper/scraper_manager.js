@@ -1,6 +1,7 @@
 // scraper/scraper_manager.js
 import { scrapeUAEFreeZones } from './scrapers/uae_freezones_scraper.js';
 import { scrapeUAEGovernmentPortal } from './scrapers/uae_government_portal_scraper.js';
+import { runEnhancedFreeZoneScraper } from './enhanced_freezone_scraper.js';
 
 /**
  * Scraper Manager to orchestrate multiple scrapers
@@ -14,7 +15,10 @@ class ScraperManager {
       'uaefreezones': scrapeUAEFreeZones,
       
       // New Playwright-based scrapers
-      'uaegovportal': scrapeUAEGovernmentPortal
+      'uaegovportal': scrapeUAEGovernmentPortal,
+      
+      // Enhanced free zone scraper with detailed data collection
+      'enhanced_freezones': runEnhancedFreeZoneScraper
     };
     
     // Default options for scrapers
