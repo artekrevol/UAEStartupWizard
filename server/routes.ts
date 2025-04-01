@@ -148,6 +148,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     res.json(setup);
   });
+  
+  // Fetch ISIC business activities
+  app.get("/api/isic-activities", async (req, res) => {
+    try {
+      // Get optional query parameters for filtering
+      const searchQuery = req.query.q as string | undefined;
+      const industryGroup = req.query.industry as string | undefined;
+      const limit = parseInt(req.query.limit as string || '20');
+      
+      // Build the query
+      let query = db.select().from(businessActivities);
+      
+      // Add filters if provided
+      if (searchQuery) {
+        query = query.where(
+          sql`${businessActivities.name} ILIKE ${'%' + searchQuery + '%'} OR 
+              ${businessActivities.activityCode} ILIKE ${'%' + searchQuery + '%'}`
+        );
+      }
+      
+      if (industryGroup) {
+        query = query.where(
+          sql`${businessActivities.industryGroup} ILIKE ${'%' + industryGroup + '%'}`
+        );
+      }
+      
+      // Get the activities
+      const activities = await query.limit(limit);
+      
+      res.json(activities);
+    } catch (error: unknown) {
+      console.error("Error fetching ISIC activities:", error);
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      res.status(500).json({ message });
+    }
+  });
 
   app.patch("/api/business-setup/:id", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);

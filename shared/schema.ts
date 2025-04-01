@@ -23,10 +23,14 @@ export const businessCategories = pgTable("business_categories", {
 export const businessActivities = pgTable("business_activities", {
   id: serial("id").primaryKey(),
   categoryId: integer("category_id")
-    .references(() => businessCategories.id)
-    .notNull(),
+    .references(() => businessCategories.id),  // categoryId made nullable in the database
+  activityCode: text("activity_code").notNull().unique(),
   name: text("name").notNull(),
+  nameArabic: text("name_arabic"),
   description: text("description"),
+  descriptionArabic: text("description_arabic"),
+  industryGroup: text("industry_group"),
+  isicActivity: text("isic_activity"),
   requiredDocs: jsonb("required_docs"),
   minimumCapital: integer("minimum_capital"),
   fees: jsonb("fees"),
