@@ -50,7 +50,9 @@ export const legalForms = pgTable("legal_forms", {
 // Business Setup Applications
 export const businessSetups = pgTable("business_setups", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
+  userId: integer("user_id")
+    .references(() => users.id)
+    .notNull(),
   businessType: text("business_type").notNull(),
   legalForm: text("legal_form"),
   initialCapital: integer("initial_capital"),
