@@ -73,11 +73,22 @@ export default function RecommendationForm() {
   const selectedCategory = categories.find(cat => cat.name === selectedIndustry);
 
   // Get ISIC activities instead of category-based ones
-  const { data: activities = [], isLoading: isActivitiesLoading } = useQuery<BusinessActivity[]>({
-    queryKey: [`/api/isic-activities`, { industry: selectedIndustry }],
+  const { data: activitiesResponse, isLoading: isActivitiesLoading } = useQuery<{
+    activities: BusinessActivity[];
+    pagination: {
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+    };
+  }>({
+    queryKey: [`/api/isic-activities`, { industry: selectedIndustry, limit: 100 }],
     // Only fetch if industry is selected
     enabled: !!selectedIndustry
   });
+  
+  // Extract activities from the response
+  const activities = activitiesResponse?.activities || [];
 
   console.log("Debug:", {
     selectedIndustry,

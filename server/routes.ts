@@ -211,7 +211,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get optional query parameters for filtering
       const searchQuery = req.query.q as string | undefined;
       const industryGroup = req.query.industry as string | undefined;
-      const limit = parseInt(req.query.limit as string || '20');
+      const limit = parseInt(req.query.limit as string || '100');
+      const page = parseInt(req.query.page as string || '1');
+      const offset = (page - 1) * limit;
       
       // Build the query
       let query = db.select().from(businessActivities);
@@ -230,10 +232,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
       }
       
-      // Get the activities
-      const activities = await query.limit(limit);
+      // Get count for pagination
+      const countQuery = db.select({ count: sql`count(*)` }).from(businessActivities);
       
-      res.json(activities);
+      // Apply the same filters to count query
+      if (searchQuery) {
+        countQuery.where(
+          sql`${businessActivities.name} ILIKE ${'%' + searchQuery + '%'} OR 
+              ${businessActivities.activityCode} ILIKE ${'%' + searchQuery + '%'}`
+        );
+      }
+      
+      if (industryGroup) {
+        countQuery.where(
+          sql`${businessActivities.industryGroup} ILIKE ${'%' + industryGroup + '%'}`
+        );
+      }
+      
+      const [countResult] = await countQuery;
+      const totalCount = Number(countResult?.count || 0);
+      
+      // Get the activities with pagination
+      const activities = await query
+        .limit(limit)
+        .offset(offset)
+        .orderBy(businessActivities.name);
+      
+      // Return with pagination metadata
+      res.json({
+        activities,
+        pagination: {
+          total: totalCount,
+          page,
+          limit,
+          totalPages: Math.ceil(totalCount / limit)
+        }
+      });
     } catch (error: unknown) {
       console.error("Error fetching ISIC activities:", error);
       const message = error instanceof Error ? error.message : 'Unknown error occurred';
