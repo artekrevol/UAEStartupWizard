@@ -324,24 +324,74 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     try {
-      // Import the UAE Free Zones scraper
-      const { scrapeUAEFreeZones } = await import('../scraper/uae_freezones_scraper.js');
+      // Import the scraper manager
+      const { scraperManager } = await import('../scraper/scraper_manager.js');
       
-      // Run the scraper
+      // Run the UAE Free Zones scraper
       console.log("Starting UAE Free Zones scraper...");
-      await scrapeUAEFreeZones();
-      console.log("UAE Free Zones scraping completed successfully");
+      const result = await scraperManager.runScraper('uaefreezones');
       
-      res.json({ 
-        success: true, 
-        message: "Free Zones data has been scraped from UAEFreeZones.com"
-      });
+      if (result) {
+        console.log("UAE Free Zones scraping completed successfully");
+        res.json({ 
+          success: true, 
+          message: "Free Zones data has been scraped from UAEFreeZones.com"
+        });
+      } else {
+        console.log("UAE Free Zones scraping completed with errors");
+        res.json({ 
+          success: false, 
+          message: "Free Zones data scraping completed with errors, check server logs for details"
+        });
+      }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error occurred';
       console.error("Error during UAE Free Zones scraping:", error);
       res.status(500).json({ 
         success: false, 
         message: `UAE Free Zones scraping failed: ${message}`
+      });
+    }
+  });
+  
+  // Endpoint to run all scrapers
+  app.post("/api/run-all-scrapers", async (req, res) => {
+    if (!req.isAuthenticated() || (req.user?.id !== 1 && req.user?.id !== 2)) {
+      return res.status(403).json({ message: "Not authorized to perform this action" });
+    }
+    
+    try {
+      // Import the scraper manager
+      const { scraperManager } = await import('../scraper/scraper_manager.js');
+      
+      // Run all scrapers
+      console.log("Starting all scrapers...");
+      const results = await scraperManager.runAllScrapers();
+      
+      // Check if all scrapers succeeded
+      const allSucceeded = Object.values(results).every(result => result === true);
+      
+      if (allSucceeded) {
+        console.log("All scrapers completed successfully");
+        res.json({ 
+          success: true, 
+          message: "All data sources have been scraped successfully",
+          results
+        });
+      } else {
+        console.log("Some scrapers completed with errors", results);
+        res.json({ 
+          success: false, 
+          message: "Some scrapers completed with errors, check server logs for details",
+          results
+        });
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error running all scrapers:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: `Running scrapers failed: ${message}`
       });
     }
   });
