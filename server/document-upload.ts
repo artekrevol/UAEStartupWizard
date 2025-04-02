@@ -52,7 +52,13 @@ export async function processDMCCDocuments() {
     // Check if dmcc_docs directory exists
     if (!fs.existsSync(dmccDocsDir)) {
       console.log('DMCC docs directory does not exist');
-      return;
+      return {
+        processedCount: 0,
+        addedCount: 0,
+        errorCount: 0,
+        messages: ['DMCC docs directory does not exist'],
+        success: false
+      };
     }
     
     // Recursively find all files in the directory
@@ -69,6 +75,7 @@ export async function processDMCCDocuments() {
     let processedCount = 0;
     let addedCount = 0;
     let errorCount = 0;
+    let resultMessages: string[] = [];
     
     // Process each file
     for (const filePath of documentFiles) {
@@ -122,24 +129,48 @@ export async function processDMCCDocuments() {
         const exists = await checkDocumentExists(filename);
         
         if (!exists) {
-          const document = await storage.createDocument(documentData);
-          console.log(`Added document to database: ${title}`);
-          addedCount++;
+          try {
+            const document = await storage.createDocument(documentData);
+            console.log(`Added document to database: ${title}`);
+            resultMessages.push(`Added: ${title}`);
+            addedCount++;
+          } catch (dbError) {
+            console.error(`Database error adding document ${title}:`, dbError);
+            resultMessages.push(`Error adding ${title}: ${dbError instanceof Error ? dbError.message : 'Unknown error'}`);
+            errorCount++;
+          }
         } else {
           console.log(`Document already exists: ${title}`);
+          resultMessages.push(`Skipped (exists): ${title}`);
         }
         
         processedCount++;
       } catch (error) {
         console.error(`Error processing document ${filePath}:`, error);
+        resultMessages.push(`Error processing: ${path.basename(filePath)}`);
         errorCount++;
       }
     }
     
     console.log(`Finished processing DMCC documents`);
     console.log(`Summary: Processed ${processedCount} files, Added ${addedCount} documents, Errors: ${errorCount}`);
+    
+    return {
+      processedCount,
+      addedCount,
+      errorCount,
+      messages: resultMessages,
+      success: errorCount === 0
+    };
   } catch (error) {
     console.error('Error processing DMCC documents:', error);
+    return {
+      processedCount: 0,
+      addedCount: 0,
+      errorCount: 1,
+      messages: [`Global error: ${error instanceof Error ? error.message : 'Unknown error'}`],
+      success: false
+    };
   }
 }
 

@@ -1003,6 +1003,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Document management routes
+  
+  // Public endpoint to process DMCC documents (needs to be before parameter routes)
+  app.get("/api/documents/process-dmcc-public", async (req, res) => {
+    try {
+      console.log("Starting DMCC document processing (public endpoint)...");
+      
+      // Process DMCC documents
+      const processingResult = await processDMCCDocuments();
+      
+      // Count documents in the database after processing
+      const documentsCount = await db
+        .select({ count: sql`count(*)` })
+        .from(documents);
+      
+      const count = Number(documentsCount[0]?.count || 0);
+      console.log(`Total documents in database after processing: ${count}`);
+      
+      res.status(200).json({
+        message: "DMCC documents processed successfully",
+        count: count,
+        processingResult
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error processing DMCC documents:", error);
+      res.status(500).json({ message });
+    }
+  });
+  
   app.get("/api/documents", async (req, res) => {
     try {
       const category = req.query.category as string | undefined;
@@ -1208,6 +1237,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message });
     }
   });
+  
+
   
   const httpServer = createServer(app);
   return httpServer;
