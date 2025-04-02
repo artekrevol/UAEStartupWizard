@@ -8,7 +8,7 @@
 import fs from 'fs';
 import path from 'path';
 import axios from 'axios';
-import cheerio from 'cheerio';
+import * as cheerio from 'cheerio';
 
 const DMCC_URL = 'https://dmcc.ae/members/support/knowledge-bank/managing-your-business';
 const OUTPUT_DIR = path.join(process.cwd(), 'dmcc_docs/managing_your_business');
@@ -29,35 +29,34 @@ async function extractDocuments() {
     
     const documents = [];
     
-    // Process each publication card
-    $('.publications-list .publication-card').each((index, element) => {
-      // Extract document title
-      const titleElement = $(element).find('.publication-card__title');
-      const title = titleElement.text().trim();
+    // Find all PDF links
+    $('a[href$=".pdf"]').each((index, element) => {
+      // Extract document link
+      const downloadUrl = $(element).attr('href');
       
-      // Extract download link
-      const linkElement = $(element).find('a.publication-card__download-link');
-      let downloadUrl = linkElement.attr('href');
+      // Extract title from the link - take the filename part of the URL
+      const urlParts = downloadUrl.split('/');
+      let title = urlParts[urlParts.length - 1];
+      // Remove extension and replace underscores with spaces
+      title = title.replace('.pdf', '').replace(/_/g, ' ');
       
-      // Make sure URL is absolute
-      if (downloadUrl && !downloadUrl.startsWith('http')) {
-        downloadUrl = `https://dmcc.ae${downloadUrl}`;
-      }
+      // Try to get category from parent elements
+      let category = 'Uncategorized';
+      const $parents = $(element).parents();
+      $parents.each((i, parent) => {
+        const headingText = $(parent).find('h2, h3, h4').first().text().trim();
+        if (headingText) {
+          category = headingText;
+          return false; // break the loop
+        }
+      });
       
-      // Extract document type/category if available
-      const categoryElement = $(element).find('.publication-card__category');
-      const category = categoryElement.text().trim();
-      
-      // Extract date if available
-      const dateElement = $(element).find('.publication-card__date');
-      const date = dateElement.text().trim();
-      
-      if (title && downloadUrl) {
+      if (downloadUrl) {
         documents.push({
           title,
           downloadUrl,
-          category: category || 'Uncategorized',
-          date: date || 'Unknown'
+          category,
+          date: 'Unknown'
         });
       }
     });
