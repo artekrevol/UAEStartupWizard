@@ -24,6 +24,17 @@ import {
 import { formatDistanceToNow } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+// Extended FreeZone interface with proper typing
+interface ExtendedFreeZone extends FreeZone {
+  setupCost: string | Record<string, unknown> | unknown;
+  benefits: string[];
+  requirements: string[];
+  industries: string[];
+  licenseTypes: Array<string | { name: string; description?: string }>;
+  facilities: Array<string | { name: string; description?: string }>;
+  faqs: Array<{ question: string; answer: string }> | string;
+}
+
 interface FAQ {
   question: string;
   answer: string;
@@ -34,7 +45,7 @@ interface FreeZoneDetailsProps {
 }
 
 export function FreeZoneDetails({ freeZoneId }: FreeZoneDetailsProps) {
-  const { data: freeZone, isLoading, error } = useQuery<FreeZone>({
+  const { data: freeZone, isLoading, error } = useQuery<ExtendedFreeZone>({
     queryKey: [`/api/free-zones/${freeZoneId}`],
   });
 
@@ -78,6 +89,21 @@ export function FreeZoneDetails({ freeZoneId }: FreeZoneDetailsProps) {
   const industries: string[] = Array.isArray(freeZone.industries) ? freeZone.industries.map(i => String(i)) : [];
   const licenseTypes: any[] = Array.isArray(freeZone.licenseTypes) ? freeZone.licenseTypes : [];
   const facilities: any[] = Array.isArray(freeZone.facilities) ? freeZone.facilities : [];
+  
+  // Convert setupCost to a displayable format
+  const setupCostDisplay = (() => {
+    if (!freeZone.setupCost) return null;
+    
+    if (typeof freeZone.setupCost === 'string') {
+      return freeZone.setupCost;
+    }
+    
+    try {
+      return JSON.stringify(freeZone.setupCost);
+    } catch (err) {
+      return 'Setup cost information available, contact free zone for details';
+    }
+  })();
   
   return (
     <div className="space-y-6">
@@ -141,7 +167,7 @@ export function FreeZoneDetails({ freeZoneId }: FreeZoneDetailsProps) {
             </CardContent>
           </Card>
 
-          {freeZone.setupCost && typeof freeZone.setupCost === 'string' && (
+          {setupCostDisplay && (
             <Card className="setup-cost-overview">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg font-medium flex items-center">
@@ -150,7 +176,7 @@ export function FreeZoneDetails({ freeZoneId }: FreeZoneDetailsProps) {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm">{freeZone.setupCost}</p>
+                <p className="text-sm">{setupCostDisplay}</p>
               </CardContent>
             </Card>
           )}

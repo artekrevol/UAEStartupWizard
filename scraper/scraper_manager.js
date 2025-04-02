@@ -2,6 +2,9 @@
 import { scrapeUAEFreeZones } from './scrapers/uae_freezones_scraper.js';
 import { scrapeUAEGovernmentPortal } from './scrapers/uae_government_portal_scraper.js';
 import { runEnhancedFreeZoneScraper } from './enhanced_freezone_scraper.js';
+import { downloadDMCCDocuments } from './dmcc_document_downloader.js';
+import { downloadAllDocuments } from './dmcc_business_docs_downloader.js';
+import { downloadDocumentsWithBrowser } from './dmcc_browser_downloader.js';
 
 /**
  * Scraper Manager to orchestrate multiple scrapers
@@ -18,7 +21,12 @@ class ScraperManager {
       'uaegovportal': scrapeUAEGovernmentPortal,
       
       // Enhanced free zone scraper with detailed data collection
-      'enhanced_freezones': runEnhancedFreeZoneScraper
+      'enhanced_freezones': runEnhancedFreeZoneScraper,
+      
+      // DMCC document downloaders
+      'dmcc-documents': downloadDMCCDocuments,
+      'dmcc-business-docs': downloadAllDocuments,
+      'dmcc-browser-docs': downloadDocumentsWithBrowser
     };
     
     // Default options for scrapers
