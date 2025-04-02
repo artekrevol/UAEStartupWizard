@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useParams, useLocation } from "wouter";
+import { useState } from "react";
+import { useLocation } from "wouter";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { FreeZoneDetails } from "@/components/freezone/freezone-details";
 import { Button } from "@/components/ui/button";
@@ -7,26 +7,36 @@ import { useToast } from "@/hooks/use-toast";
 import { ChevronLeft } from "lucide-react";
 
 export default function FreeZonePage() {
-  const [params] = useParams();
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
-  const [freeZoneId, setFreeZoneId] = useState<number | null>(null);
-
-  useEffect(() => {
-    // Parse ID from URL parameters
-    const id = params?.id ? parseInt(params.id, 10) : null;
-    
-    if (!id || isNaN(id)) {
-      toast({
-        title: "Invalid Free Zone ID",
-        description: "Unable to display details for this free zone.",
-        variant: "destructive",
-      });
-      setLocation("/free-zones");
-    } else {
-      setFreeZoneId(id);
+  
+  // Safely extract the ID from the URL
+  const freeZoneId = (() => {
+    try {
+      const matches = location.match(/\/free-zone\/(\d+)/);
+      if (matches && matches[1]) {
+        const id = parseInt(matches[1], 10);
+        if (!isNaN(id)) {
+          return id;
+        }
+      }
+      
+      // Show error toast only if we're on the freezone page
+      if (location.startsWith('/free-zone/')) {
+        toast({
+          title: "Invalid Free Zone ID",
+          description: "Unable to display details for this free zone.",
+          variant: "destructive",
+        });
+        setLocation("/free-zones");
+      }
+      
+      return null;
+    } catch (e) {
+      console.error("Error parsing free zone ID:", e);
+      return null;
     }
-  }, [params, toast, setLocation]);
+  })();
 
   return (
     <DashboardLayout>

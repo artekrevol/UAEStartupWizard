@@ -15,7 +15,6 @@ import {
   Briefcase, 
   CheckCircle2, 
   FileCheck, 
-  Landmark, 
   ListChecks, 
   MapPin,
   Building,
@@ -23,8 +22,12 @@ import {
   DollarSign
 } from "lucide-react";
 import { formatDistanceToNow } from 'date-fns';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+interface FAQ {
+  question: string;
+  answer: string;
+}
 
 interface FreeZoneDetailsProps {
   freeZoneId: number;
@@ -52,10 +55,11 @@ export function FreeZoneDetails({ freeZoneId }: FreeZoneDetailsProps) {
     : 'Unknown';
 
   // Parse FAQs if they're in string format
-  let faqsList: Array<{question: string, answer: string}> = [];
+  let faqsList: FAQ[] = [];
   if (freeZone.faqs) {
     if (Array.isArray(freeZone.faqs)) {
-      faqsList = freeZone.faqs;
+      // Type assertion here since we know the structure from the db
+      faqsList = freeZone.faqs as FAQ[];
     } else if (typeof freeZone.faqs === 'string') {
       try {
         const parsed = JSON.parse(freeZone.faqs);
@@ -68,13 +72,13 @@ export function FreeZoneDetails({ freeZoneId }: FreeZoneDetailsProps) {
     }
   }
 
-  // Ensure arrays are arrays
-  const benefits = Array.isArray(freeZone.benefits) ? freeZone.benefits : [];
-  const requirements = Array.isArray(freeZone.requirements) ? freeZone.requirements : [];
-  const industries = Array.isArray(freeZone.industries) ? freeZone.industries : [];
-  const licenseTypes = Array.isArray(freeZone.licenseTypes) ? freeZone.licenseTypes : [];
-  const facilities = Array.isArray(freeZone.facilities) ? freeZone.facilities : [];
-
+  // Ensure arrays are arrays and cast to known types
+  const benefits: string[] = Array.isArray(freeZone.benefits) ? freeZone.benefits.map(b => String(b)) : [];
+  const requirements: string[] = Array.isArray(freeZone.requirements) ? freeZone.requirements.map(r => String(r)) : [];
+  const industries: string[] = Array.isArray(freeZone.industries) ? freeZone.industries.map(i => String(i)) : [];
+  const licenseTypes: any[] = Array.isArray(freeZone.licenseTypes) ? freeZone.licenseTypes : [];
+  const facilities: any[] = Array.isArray(freeZone.facilities) ? freeZone.facilities : [];
+  
   return (
     <div className="space-y-6">
       <div className="flex flex-col lg:flex-row justify-between gap-6">
@@ -237,7 +241,7 @@ export function FreeZoneDetails({ freeZoneId }: FreeZoneDetailsProps) {
                       <h4 className="font-medium">
                         {typeof license === 'string' ? license : 
                          typeof license === 'object' && license !== null && 'name' in license ? 
-                         license.name : String(license)}
+                         String(license.name) : String(license)}
                       </h4>
                       {typeof license === 'object' && license !== null && 'description' in license && 
                         <p className="text-sm text-muted-foreground mt-1">{String(license.description)}</p>
@@ -268,7 +272,7 @@ export function FreeZoneDetails({ freeZoneId }: FreeZoneDetailsProps) {
                       <h4 className="font-medium">
                         {typeof facility === 'string' ? facility : 
                          typeof facility === 'object' && facility !== null && 'name' in facility ? 
-                         facility.name : String(facility)}
+                         String(facility.name) : String(facility)}
                       </h4>
                       {typeof facility === 'object' && facility !== null && 'description' in facility && 
                         <p className="text-sm text-muted-foreground mt-1">{String(facility.description)}</p>
