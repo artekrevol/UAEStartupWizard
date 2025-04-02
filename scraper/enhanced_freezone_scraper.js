@@ -25,6 +25,9 @@ class EnhancedFreeZoneScraper extends PlaywrightScraper {
       description: 'Enhanced scraper for comprehensive free zone data',
       ...options
     });
+    
+    // Additional options
+    this.detailedLogging = options.detailedLogging || false;
   }
 
   /**
@@ -222,69 +225,106 @@ class EnhancedFreeZoneScraper extends PlaywrightScraper {
     // Create a screenshot directory name
     const screenshotPrefix = `${freeZone.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
     
+    console.log(`📊 Starting comprehensive scrape for ${freeZone.name}`);
+    
     // If we have detailed page URLs, scrape each specific page
     if (detailPages) {
-      console.log(`Using detailed page URLs for ${freeZone.name}`);
+      console.log(`✓ Using detailed page URLs for ${freeZone.name}`);
       
       // Scrape overview/about page
       if (detailPages.overview) {
+        console.log(`📄 Scraping overview from: ${detailPages.overview}`);
         await this.navigateTo(detailPages.overview);
         await this.takeScreenshot(`${screenshotPrefix}_overview`);
         description = await this.extractFreeZoneDescription();
+        if (this.detailedLogging) {
+          console.log(`⮑ Description extracted: ${description ? 'Yes (' + description.substring(0, 50) + '...)' : 'No'}`);
+        }
       }
       
       // Scrape business activities/sectors page
       if (detailPages.businessActivities || detailPages.businessSectors) {
         const activitiesUrl = detailPages.businessActivities || detailPages.businessSectors;
+        console.log(`📄 Scraping industries from: ${activitiesUrl}`);
         await this.navigateTo(activitiesUrl);
         await this.takeScreenshot(`${screenshotPrefix}_business_activities`);
         industries = await this.extractFreeZoneIndustries();
+        if (this.detailedLogging) {
+          console.log(`⮑ Industries extracted: ${industries && industries.length > 0 ? `Yes (${industries.length} found)` : 'No'}`);
+          if (industries && industries.length > 0) {
+            console.log(`⮑ Sample industries: ${industries.slice(0, 3).join(', ')}`);
+          }
+        }
       }
       
       // Scrape facilities/infrastructure page
       if (detailPages.facilities || detailPages.infrastructure) {
         const facilitiesUrl = detailPages.facilities || detailPages.infrastructure;
+        console.log(`📄 Scraping facilities from: ${facilitiesUrl}`);
         await this.navigateTo(facilitiesUrl);
         await this.takeScreenshot(`${screenshotPrefix}_facilities`);
         facilities = await this.extractFreeZoneFacilities();
+        if (this.detailedLogging) {
+          console.log(`⮑ Facilities extracted: ${facilities && facilities.length > 0 ? `Yes (${facilities.length} found)` : 'No'}`);
+        }
       }
       
       // Scrape setup process page
       if (detailPages.setupProcess) {
+        console.log(`📄 Scraping requirements from: ${detailPages.setupProcess}`);
         await this.navigateTo(detailPages.setupProcess);
         await this.takeScreenshot(`${screenshotPrefix}_setup_process`);
         requirements = await this.extractFreeZoneRequirements();
+        if (this.detailedLogging) {
+          console.log(`⮑ Requirements extracted: ${requirements && requirements.length > 0 ? `Yes (${requirements.length} found)` : 'No'}`);
+        }
       }
       
       // Scrape fees/costs page
       if (detailPages.fees) {
+        console.log(`📄 Scraping setup costs from: ${detailPages.fees}`);
         await this.navigateTo(detailPages.fees);
         await this.takeScreenshot(`${screenshotPrefix}_fees`);
         setupCost = await this.extractFreeZoneSetupCost();
+        if (this.detailedLogging) {
+          console.log(`⮑ Setup costs extracted: ${setupCost ? 'Yes' : 'No'}`);
+        }
       }
       
       // Scrape licensing page
       if (detailPages.licensing) {
+        console.log(`📄 Scraping license types from: ${detailPages.licensing}`);
         await this.navigateTo(detailPages.licensing);
         await this.takeScreenshot(`${screenshotPrefix}_licensing`);
         licenseTypes = await this.extractFreeZoneLicenseTypes();
+        if (this.detailedLogging) {
+          console.log(`⮑ License types extracted: ${licenseTypes && licenseTypes.length > 0 ? `Yes (${licenseTypes.length} found)` : 'No'}`);
+        }
       }
       
       // Scrape FAQs page
       if (detailPages.faqs) {
+        console.log(`📄 Scraping FAQs from: ${detailPages.faqs}`);
         await this.navigateTo(detailPages.faqs);
         await this.takeScreenshot(`${screenshotPrefix}_faqs`);
         faqs = await this.extractFreeZoneFAQs();
+        if (this.detailedLogging) {
+          console.log(`⮑ FAQs extracted: ${faqs && faqs.length > 0 ? `Yes (${faqs.length} found)` : 'No'}`);
+          if (faqs && faqs.length > 0) {
+            console.log(`⮑ Sample FAQ: ${faqs[0].question}`);
+          }
+        }
       }
       
     } else {
       // Fallback to the original approach - scrape from the homepage
-      console.log(`No detailed page URLs for ${freeZone.name}, using homepage scraping`);
+      console.log(`⚠️ No detailed page URLs for ${freeZone.name}, using homepage scraping`);
       
       // Navigate to the website
+      console.log(`📄 Navigating to homepage: ${website}`);
       const success = await this.navigateTo(website);
       if (!success) {
-        console.error(`Failed to navigate to ${website}`);
+        console.error(`❌ Failed to navigate to ${website}`);
         return;
       }
       
@@ -292,17 +332,50 @@ class EnhancedFreeZoneScraper extends PlaywrightScraper {
       await this.takeScreenshot(`${screenshotPrefix}_homepage`);
       
       // Extract data from the homepage
+      console.log(`📄 Extracting general information from homepage`);
+      
       description = await this.extractFreeZoneDescription();
+      if (this.detailedLogging) {
+        console.log(`⮑ Description extracted: ${description ? 'Yes (' + description.substring(0, 50) + '...)' : 'No'}`);
+      }
+      
       benefits = await this.extractFreeZoneBenefits();
+      if (this.detailedLogging) {
+        console.log(`⮑ Benefits extracted: ${benefits && benefits.length > 0 ? `Yes (${benefits.length} found)` : 'No'}`);
+      }
+      
       requirements = await this.extractFreeZoneRequirements();
+      if (this.detailedLogging) {
+        console.log(`⮑ Requirements extracted: ${requirements && requirements.length > 0 ? `Yes (${requirements.length} found)` : 'No'}`);
+      }
+      
       industries = await this.extractFreeZoneIndustries();
+      if (this.detailedLogging) {
+        console.log(`⮑ Industries extracted: ${industries && industries.length > 0 ? `Yes (${industries.length} found)` : 'No'}`);
+      }
+      
       licenseTypes = await this.extractFreeZoneLicenseTypes();
+      if (this.detailedLogging) {
+        console.log(`⮑ License types extracted: ${licenseTypes && licenseTypes.length > 0 ? `Yes (${licenseTypes.length} found)` : 'No'}`);
+      }
+      
       facilities = await this.extractFreeZoneFacilities();
+      if (this.detailedLogging) {
+        console.log(`⮑ Facilities extracted: ${facilities && facilities.length > 0 ? `Yes (${facilities.length} found)` : 'No'}`);
+      }
+      
       setupCost = await this.extractFreeZoneSetupCost();
+      if (this.detailedLogging) {
+        console.log(`⮑ Setup costs extracted: ${setupCost ? 'Yes' : 'No'}`);
+      }
       
       // Optional: check for FAQs or other specific pages
+      console.log(`📄 Attempting to find FAQs on a subpage`);
       await this.navigateToSubpage(website, 'faq');
       faqs = await this.extractFreeZoneFAQs();
+      if (this.detailedLogging) {
+        console.log(`⮑ FAQs extracted: ${faqs && faqs.length > 0 ? `Yes (${faqs.length} found)` : 'No'}`);
+      }
     }
     
     // Update the database with new information
@@ -673,17 +746,32 @@ class EnhancedFreeZoneScraper extends PlaywrightScraper {
    */
   async extractFreeZoneFAQs() {
     try {
+      if (this.detailedLogging) {
+        console.log("Attempting to extract FAQs with different selectors...");
+      }
+      
       // Common selectors for FAQ sections
       const selectors = [
         '.faq-section .question, .faq-section .answer', 
         '.faqs .question, .faqs .answer', 
         '.accordion-item h3, .accordion-item div',
-        '[data-section="faq"] h3, [data-section="faq"] p'
+        '[data-section="faq"] h3, [data-section="faq"] p',
+        '.faq-container .faq-title, .faq-container .faq-content',
+        '.accordion-title, .accordion-content',
+        '.question-title, .question-answer'
       ];
       
       for (const selector of selectors) {
+        if (this.detailedLogging) {
+          console.log(`Trying selector: ${selector}`);
+        }
+        
         const elements = await this.page.$$(selector);
         if (elements && elements.length > 0) {
+          if (this.detailedLogging) {
+            console.log(`Found ${elements.length} elements with selector: ${selector}`);
+          }
+          
           // Extract questions and answers
           const faqs = [];
           for (let i = 0; i < elements.length; i += 2) {
@@ -701,11 +789,150 @@ class EnhancedFreeZoneScraper extends PlaywrightScraper {
           }
           
           if (faqs.length > 0) {
+            if (this.detailedLogging) {
+              console.log(`Successfully extracted ${faqs.length} FAQs using selector: ${selector}`);
+            }
             return faqs;
           }
         }
       }
       
+      // Try alternate approach with accordion-like structures
+      if (this.detailedLogging) {
+        console.log("Trying alternate approach for FAQs with accordion structure...");
+      }
+      
+      // Look for FAQ headings first
+      const faqHeadings = await this.page.$$eval('h1, h2, h3, h4', 
+        elements => elements
+          .filter(el => el.textContent.toLowerCase().includes('faq') || 
+                       el.textContent.toLowerCase().includes('frequently asked') || 
+                       el.textContent.toLowerCase().includes('questions'))
+          .map(el => el.textContent.trim()));
+      
+      if (faqHeadings.length > 0) {
+        if (this.detailedLogging) {
+          console.log(`Found FAQ heading: "${faqHeadings[0]}"`);
+        }
+        
+        // Look for accordion structures or question-answer pairs after this heading
+        const accordionSelectors = [
+          'details',
+          '.accordion',
+          '.collapsible',
+          '.toggle',
+          '.faq-item'
+        ];
+        
+        for (const selector of accordionSelectors) {
+          const accordionItems = await this.page.$$(selector);
+          if (accordionItems && accordionItems.length > 0) {
+            const faqs = [];
+            
+            for (const item of accordionItems) {
+              try {
+                // Extract summary/detail text (common accordion pattern)
+                const summary = await item.$('summary, .accordion-header, .accordion-title, h3, h4');
+                const details = await item.$('.accordion-body, .accordion-content, p, div:not(:first-child)');
+                
+                if (summary && details) {
+                  const questionText = await summary.textContent();
+                  const answerText = await details.textContent();
+                  
+                  if (questionText && answerText) {
+                    faqs.push({
+                      question: questionText.trim(),
+                      answer: answerText.trim()
+                    });
+                  }
+                }
+              } catch (err) {
+                // Continue to next item if there's an error
+                if (this.detailedLogging) {
+                  console.log(`Error extracting content from accordion item: ${err.message}`);
+                }
+              }
+            }
+            
+            if (faqs.length > 0) {
+              if (this.detailedLogging) {
+                console.log(`Successfully extracted ${faqs.length} FAQs from accordion structure`);
+              }
+              return faqs;
+            }
+          }
+        }
+        
+        // Try more general approach - find all question-like elements followed by answers
+        const potentialQuestions = await this.page.$$('strong, b, h3, h4, h5, .question, [class*="question"], [class*="faq-q"]');
+        if (potentialQuestions && potentialQuestions.length > 0) {
+          const faqs = [];
+          
+          for (const questionEl of potentialQuestions) {
+            try {
+              const questionText = await questionEl.textContent();
+              
+              // Skip if not a clear question
+              if (!questionText || 
+                  !(questionText.includes('?') || 
+                    questionText.toLowerCase().includes('how') ||
+                    questionText.toLowerCase().includes('what') ||
+                    questionText.toLowerCase().includes('when') ||
+                    questionText.toLowerCase().includes('where') ||
+                    questionText.toLowerCase().includes('why') ||
+                    questionText.toLowerCase().includes('can'))) {
+                continue;
+              }
+              
+              // Try to find the answer in the next element
+              const answerEl = await questionEl.evaluateHandle(el => {
+                // Try different approaches to find the answer element
+                let answer = el.nextElementSibling;
+                if (answer && answer.tagName !== 'STRONG' && answer.tagName !== 'B' && 
+                    answer.tagName !== 'H3' && answer.tagName !== 'H4' && answer.tagName !== 'H5') {
+                  return answer;
+                }
+                
+                // Try parent-next approach
+                answer = el.parentElement.nextElementSibling;
+                if (answer) {
+                  return answer;
+                }
+                
+                return null;
+              });
+              
+              if (answerEl) {
+                const answerText = await answerEl.textContent();
+                
+                if (answerText && answerText.length > 10) { // Only consider substantial answers
+                  faqs.push({
+                    question: questionText.trim(),
+                    answer: answerText.trim()
+                  });
+                }
+              }
+            } catch (err) {
+              // Continue to next item if there's an error
+              if (this.detailedLogging) {
+                console.log(`Error extracting question-answer: ${err.message}`);
+              }
+            }
+          }
+          
+          if (faqs.length > 0) {
+            if (this.detailedLogging) {
+              console.log(`Successfully extracted ${faqs.length} FAQs from general Q&A structure`);
+            }
+            return faqs;
+          }
+        }
+      }
+      
+      // If all attempts failed, return null
+      if (this.detailedLogging) {
+        console.log("Could not extract any FAQs using available methods");
+      }
       return null;
     } catch (error) {
       console.error('Error extracting free zone FAQs:', error);
@@ -788,6 +1015,48 @@ class EnhancedFreeZoneScraper extends PlaywrightScraper {
 }
 
 /**
+ * Run the enhanced free zone scraper for a specific free zone
+ */
+async function scrapeSpecificFreeZone(freeZoneName, options = {}) {
+  try {
+    const scraper = new EnhancedFreeZoneScraper({
+      ...options,
+      detailedLogging: true // Always enable detailed logging for specific freezone scraping
+    });
+    
+    await scraper.initialize();
+    
+    // First update all website URLs
+    await scraper.updateWebsiteUrls();
+    
+    // Get the specific free zone
+    const freezone = await db
+      .select()
+      .from(freeZones)
+      .where(sql => sql`LOWER(${freeZones.name}) LIKE LOWER(${'%' + freeZoneName + '%'})`)
+      .limit(1);
+      
+    if (!freezone || freezone.length === 0) {
+      console.error(`No free zone found matching: ${freeZoneName}`);
+      await scraper.cleanup();
+      return false;
+    }
+    
+    console.log(`🔍 Found free zone: ${freezone[0].name} (ID: ${freezone[0].id})`);
+    console.log(`🌐 Website: ${freezone[0].website || 'No website defined'}`);
+    
+    // Scrape the free zone
+    await scraper.scrapeFreeZoneWebsite(freezone[0]);
+    
+    await scraper.cleanup();
+    return true;
+  } catch (error) {
+    console.error('Error in specific free zone scraper:', error);
+    return false;
+  }
+}
+
+/**
  * Run the enhanced free zone scraper
  */
 async function runEnhancedFreeZoneScraper(options = {}) {
@@ -795,8 +1064,9 @@ async function runEnhancedFreeZoneScraper(options = {}) {
   return await scraper.scrape();
 }
 
-// Export the scraper function and class
+// Export the scraper functions and class
 export { 
-  runEnhancedFreeZoneScraper, 
+  runEnhancedFreeZoneScraper,
+  scrapeSpecificFreeZone,
   EnhancedFreeZoneScraper 
 };

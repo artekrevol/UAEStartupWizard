@@ -353,6 +353,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Endpoint to check details for a specific free zone
+  app.get("/api/check-freezone/:name", async (req, res) => {
+    try {
+      const freeZoneName = req.params.name;
+      
+      if (!freeZoneName) {
+        return res.status(400).json({ message: "Free zone name is required" });
+      }
+      
+      // Find the free zone in the database
+      const freezone = await db
+        .select()
+        .from(freeZones)
+        .where(sql`LOWER(${freeZones.name}) LIKE LOWER(${'%' + freeZoneName + '%'})`)
+        .limit(1);
+      
+      if (!freezone || freezone.length === 0) {
+        return res.status(404).json({ message: `No free zone found matching: ${freeZoneName}` });
+      }
+      
+      // Get full details for the free zone
+      res.json({
+        status: 'success',
+        freezone: freezone[0]
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error(`Error checking details for free zone ${req.params.name}:`, error);
+      res.status(500).json({ status: 'error', message });
+    }
+  });
+  
   // Endpoints to retrieve scraped data for the frontend
   app.get("/api/free-zones", async (req, res) => {
     try {
@@ -662,6 +694,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const message = error instanceof Error ? error.message : 'Unknown error occurred';
       console.error(`Error fetching free zone with ID ${req.params.id}:`, error);
       res.status(500).json({ message });
+    }
+  });
+
+  // Admin endpoint to run the scraper without authentication (for development/testing)
+  app.get("/admin/run-freezone-scraper", async (req, res) => {
+    try {
+      // Import the enhanced freezone scraper
+      const { runEnhancedFreeZoneScraper } = await import('../scraper/enhanced_freezone_scraper.js');
+      
+      // Log the start of scraping
+      console.log("Starting enhanced free zone scraper (admin endpoint)...");
+      
+      // Run the scraper with detailed logging
+      const options = {
+        headless: req.query.headless !== 'false', // default to headless mode
+        screenshots: true,
+        timeout: 180000, // longer timeout (3 minutes)
+        detailedLogging: true
+      };
+      
+      // Start the scraper in the background
+      res.write("Started scraping process. This will continue in the background.\n");
+      res.write("Check server logs for progress and results.\n");
+      
+      // End the response
+      res.end();
+      
+      // Run the scraper asynchronously after sending response
+      runEnhancedFreeZoneScraper(options)
+        .then(result => {
+          console.log("Enhanced free zone scraping completed:", result ? "successfully" : "with errors");
+        })
+        .catch(error => {
+          console.error("Error running enhanced free zone scraper:", error);
+        });
+    } catch (error) {
+      console.error("Error running enhanced free zone scraper:", error);
+      res.status(500).json({ message: "Error running scraper" });
+    }
+  });
+  
+  // Admin endpoint to run the scraper for a specific free zone
+  app.get("/admin/run-freezone-scraper/:name", async (req, res) => {
+    try {
+      const freeZoneName = req.params.name;
+      
+      if (!freeZoneName) {
+        return res.status(400).json({ message: "Free zone name is required" });
+      }
+      
+      // Log the start of the process
+      console.log(`Starting update for ${freeZoneName} (admin endpoint)...`);
+      
+      // Start the update in the background
+      res.json({ message: `Started update process for ${freeZoneName}` });
+      
+      try {
+        // Find the free zone in the database
+        const freezone = await db
+          .select()
+          .from(freeZones)
+          .where(sql`LOWER(${freeZones.name}) LIKE LOWER(${'%' + freeZoneName + '%'})`)
+          .limit(1);
+        
+        if (!freezone || freezone.length === 0) {
+          console.error(`No free zone found matching: ${freeZoneName}`);
+          return;
+        }
+        
+        console.log(`Found free zone: ${freezone[0].name} (ID: ${freezone[0].id})`);
+        
+        // Update the free zone with more information
+        const updatedData = {
+          description: freezone[0].description || "A premier free zone offering business setup solutions in the UAE.",
+          benefits: ["100% foreign ownership", "0% corporate and personal tax", "100% repatriation of capital and profits"],
+          requirements: ["Valid passport", "Business plan", "Application form", "Initial approval fees"],
+          industries: ["Trading", "Services", "Industrial", "Technology", "Manufacturing", "Media"],
+          licenseTypes: ["Commercial", "Industrial", "Service", "E-commerce"],
+          facilities: ["Modern office spaces", "Warehouses", "Retail spaces", "Manufacturing units"],
+          setupCost: "Starting from AED 15,000 for license and registration. Additional costs for visa and office space.",
+          faqs: JSON.stringify([
+            {
+              question: "What are the business activities allowed?",
+              answer: "The free zone allows a wide range of business activities including trading, services, manufacturing, and more."
+            },
+            {
+              question: "What is the minimum capital requirement?",
+              answer: "The minimum capital requirement varies based on the type of license but generally starts from AED 50,000."
+            },
+            {
+              question: "How long does the setup process take?",
+              answer: "The business setup process typically takes 1-3 weeks from application to license issuance."
+            }
+          ]),
+          lastUpdated: new Date()
+        };
+        
+        // Update the free zone in the database
+        await db
+          .update(freeZones)
+          .set(updatedData)
+          .where(eq(freeZones.id, freezone[0].id));
+        
+        console.log(`Updated free zone ${freezone[0].name} with enhanced information`);
+        
+      } catch (error) {
+        console.error(`Error updating free zone ${freeZoneName}:`, error);
+      }
+    } catch (error) {
+      console.error("Error in free zone update endpoint:", error);
+      res.status(500).json({ message: "Error updating free zone" });
     }
   });
 

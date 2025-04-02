@@ -2,8 +2,9 @@
  * Base scraper class with utility methods for robust web scraping
  */
 import axios from 'axios';
-import cheerio from 'cheerio';
-import { Pool } from 'pg';
+import * as cheerio from 'cheerio';
+import pkg from 'pg';
+const { Pool } = pkg;
 import dotenv from 'dotenv';
 
 // Load environment variables
