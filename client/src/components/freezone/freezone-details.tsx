@@ -18,7 +18,6 @@ import {
   Landmark, 
   ListChecks, 
   MapPin,
-  PanelTop,
   Building,
   HelpCircle,
   DollarSign
@@ -51,6 +50,30 @@ export function FreeZoneDetails({ freeZoneId }: FreeZoneDetailsProps) {
   const lastUpdated = freeZone.lastUpdated 
     ? formatDistanceToNow(new Date(freeZone.lastUpdated), { addSuffix: true }) 
     : 'Unknown';
+
+  // Parse FAQs if they're in string format
+  let faqsList: Array<{question: string, answer: string}> = [];
+  if (freeZone.faqs) {
+    if (Array.isArray(freeZone.faqs)) {
+      faqsList = freeZone.faqs;
+    } else if (typeof freeZone.faqs === 'string') {
+      try {
+        const parsed = JSON.parse(freeZone.faqs);
+        if (Array.isArray(parsed)) {
+          faqsList = parsed;
+        }
+      } catch (e) {
+        console.error("Failed to parse FAQs:", e);
+      }
+    }
+  }
+
+  // Ensure arrays are arrays
+  const benefits = Array.isArray(freeZone.benefits) ? freeZone.benefits : [];
+  const requirements = Array.isArray(freeZone.requirements) ? freeZone.requirements : [];
+  const industries = Array.isArray(freeZone.industries) ? freeZone.industries : [];
+  const licenseTypes = Array.isArray(freeZone.licenseTypes) ? freeZone.licenseTypes : [];
+  const facilities = Array.isArray(freeZone.facilities) ? freeZone.facilities : [];
 
   return (
     <div className="space-y-6">
@@ -85,15 +108,15 @@ export function FreeZoneDetails({ freeZoneId }: FreeZoneDetailsProps) {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              {freeZone.industries && freeZone.industries.length > 0 && (
+              {industries.length > 0 && (
                 <div>
                   <p className="text-sm font-medium">Top Industries:</p>
                   <div className="flex flex-wrap gap-1 mt-1">
-                    {freeZone.industries.slice(0, 3).map((industry, i) => (
+                    {industries.slice(0, 3).map((industry, i) => (
                       <Badge key={i} variant="secondary">{industry}</Badge>
                     ))}
-                    {freeZone.industries.length > 3 && (
-                      <Badge variant="outline">+{freeZone.industries.length - 3} more</Badge>
+                    {industries.length > 3 && (
+                      <Badge variant="outline">+{industries.length - 3} more</Badge>
                     )}
                   </div>
                 </div>
@@ -114,8 +137,8 @@ export function FreeZoneDetails({ freeZoneId }: FreeZoneDetailsProps) {
             </CardContent>
           </Card>
 
-          {freeZone.setupCost && (
-            <Card>
+          {freeZone.setupCost && typeof freeZone.setupCost === 'string' && (
+            <Card className="setup-cost-overview">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg font-medium flex items-center">
                   <DollarSign className="mr-2 h-5 w-5" />
@@ -123,11 +146,7 @@ export function FreeZoneDetails({ freeZoneId }: FreeZoneDetailsProps) {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {typeof freeZone.setupCost === 'object' && freeZone.setupCost.description ? (
-                  <p className="text-sm">{freeZone.setupCost.description}</p>
-                ) : (
-                  <p className="text-sm italic">Cost details available on request</p>
-                )}
+                <p className="text-sm">{freeZone.setupCost}</p>
               </CardContent>
             </Card>
           )}
@@ -167,9 +186,9 @@ export function FreeZoneDetails({ freeZoneId }: FreeZoneDetailsProps) {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {freeZone.benefits && freeZone.benefits.length > 0 ? (
+              {benefits.length > 0 ? (
                 <ul className="space-y-2 list-disc pl-5">
-                  {freeZone.benefits.map((benefit, index) => (
+                  {benefits.map((benefit, index) => (
                     <li key={index} className="text-sm">{benefit}</li>
                   ))}
                 </ul>
@@ -189,9 +208,9 @@ export function FreeZoneDetails({ freeZoneId }: FreeZoneDetailsProps) {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {freeZone.requirements && freeZone.requirements.length > 0 ? (
+              {requirements.length > 0 ? (
                 <ul className="space-y-2 list-disc pl-5">
-                  {freeZone.requirements.map((requirement, index) => (
+                  {requirements.map((requirement, index) => (
                     <li key={index} className="text-sm">{requirement}</li>
                   ))}
                 </ul>
@@ -211,17 +230,18 @@ export function FreeZoneDetails({ freeZoneId }: FreeZoneDetailsProps) {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {freeZone.licenseTypes && Array.isArray(freeZone.licenseTypes) && freeZone.licenseTypes.length > 0 ? (
+              {licenseTypes.length > 0 ? (
                 <div className="space-y-4">
-                  {/* Handling both object format and string format */}
-                  {freeZone.licenseTypes.map((license, index) => (
+                  {licenseTypes.map((license, index) => (
                     <div key={index} className="border-b pb-3 last:border-0 last:pb-0">
                       <h4 className="font-medium">
-                        {typeof license === 'string' ? license : license.name}
+                        {typeof license === 'string' ? license : 
+                         typeof license === 'object' && license !== null && 'name' in license ? 
+                         license.name : String(license)}
                       </h4>
-                      {typeof license !== 'string' && license.description && (
-                        <p className="text-sm text-muted-foreground mt-1">{license.description}</p>
-                      )}
+                      {typeof license === 'object' && license !== null && 'description' in license && 
+                        <p className="text-sm text-muted-foreground mt-1">{String(license.description)}</p>
+                      }
                     </div>
                   ))}
                 </div>
@@ -241,17 +261,18 @@ export function FreeZoneDetails({ freeZoneId }: FreeZoneDetailsProps) {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {freeZone.facilities && Array.isArray(freeZone.facilities) && freeZone.facilities.length > 0 ? (
+              {facilities.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Handling both object format and string format */}
-                  {freeZone.facilities.map((facility, index) => (
+                  {facilities.map((facility, index) => (
                     <div key={index} className="border rounded-lg p-3">
                       <h4 className="font-medium">
-                        {typeof facility === 'string' ? facility : facility.name}
+                        {typeof facility === 'string' ? facility : 
+                         typeof facility === 'object' && facility !== null && 'name' in facility ? 
+                         facility.name : String(facility)}
                       </h4>
-                      {typeof facility !== 'string' && facility.description && (
-                        <p className="text-sm text-muted-foreground mt-1">{facility.description}</p>
-                      )}
+                      {typeof facility === 'object' && facility !== null && 'description' in facility && 
+                        <p className="text-sm text-muted-foreground mt-1">{String(facility.description)}</p>
+                      }
                     </div>
                   ))}
                 </div>
@@ -271,41 +292,24 @@ export function FreeZoneDetails({ freeZoneId }: FreeZoneDetailsProps) {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {/* Parsing FAQs if they're stored as a JSON string */}
-              {(() => {
-                let parsedFaqs = [];
-                
-                if (freeZone.faqs) {
-                  if (Array.isArray(freeZone.faqs)) {
-                    parsedFaqs = freeZone.faqs;
-                  } else if (typeof freeZone.faqs === 'string') {
-                    try {
-                      parsedFaqs = JSON.parse(freeZone.faqs);
-                    } catch (e) {
-                      console.error("Failed to parse FAQs:", e);
-                    }
-                  }
-                }
-                
-                return parsedFaqs.length > 0 ? (
-                  <Accordion type="single" collapsible className="w-full">
-                    {parsedFaqs.map((faq, index) => (
-                      <AccordionItem key={index} value={`faq-${index}`}>
-                        <AccordionTrigger className="text-left">{faq.question}</AccordionTrigger>
-                        <AccordionContent>{faq.answer}</AccordionContent>
-                      </AccordionItem>
-                    ))}
-                  </Accordion>
-                ) : (
-                  <p className="text-muted-foreground italic">No FAQ information available</p>
-                );
-              })()}
+              {faqsList.length > 0 ? (
+                <Accordion type="single" collapsible className="w-full">
+                  {faqsList.map((faq, index) => (
+                    <AccordionItem key={index} value={`faq-${index}`}>
+                      <AccordionTrigger className="text-left">{faq.question}</AccordionTrigger>
+                      <AccordionContent>{faq.answer}</AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
+              ) : (
+                <p className="text-muted-foreground italic">No FAQ information available</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
 
-      {freeZone.industries && freeZone.industries.length > 0 && (
+      {industries.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center">
@@ -318,7 +322,7 @@ export function FreeZoneDetails({ freeZoneId }: FreeZoneDetailsProps) {
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
-              {freeZone.industries.map((industry, index) => (
+              {industries.map((industry, index) => (
                 <Badge key={index} variant="secondary" className="text-sm py-1">
                   {industry}
                 </Badge>
@@ -327,68 +331,6 @@ export function FreeZoneDetails({ freeZoneId }: FreeZoneDetailsProps) {
           </CardContent>
         </Card>
       )}
-
-      {/* Display setup costs either as text or as a structured table */}
-      {(() => {
-        // If setupCost is an object with detailed information
-        if (freeZone.setupCost && typeof freeZone.setupCost === 'object' && 
-            freeZone.setupCost.header && freeZone.setupCost.rows) {
-          return (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Landmark className="mr-2 h-5 w-5" />
-                  Detailed Setup Costs
-                </CardTitle>
-                <CardDescription>
-                  Fees and costs associated with setting up in {freeZone.name}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      {freeZone.setupCost.header.map((header, index) => (
-                        <TableHead key={index}>{header}</TableHead>
-                      ))}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {freeZone.setupCost.rows.map((row, rowIndex) => (
-                      <TableRow key={rowIndex}>
-                        {row.map((cell, cellIndex) => (
-                          <TableCell key={cellIndex}>{cell}</TableCell>
-                        ))}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          );
-        } 
-        // If setupCost is string but not in the Card above
-        else if (freeZone.setupCost && typeof freeZone.setupCost === 'string' && 
-                !document.querySelector('.setup-cost-overview')) {
-          return (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Landmark className="mr-2 h-5 w-5" />
-                  Setup Cost Information
-                </CardTitle>
-                <CardDescription>
-                  General cost information for {freeZone.name}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p>{freeZone.setupCost}</p>
-              </CardContent>
-            </Card>
-          );
-        }
-        return null;
-      })()}
     </div>
   );
 }
