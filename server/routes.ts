@@ -1,4 +1,4 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import * as path from "path";
 import * as fs from "fs";
@@ -10,7 +10,21 @@ import { calculateBusinessScore } from "./scoring";
 import { db } from "./db";
 import { eq, sql } from "drizzle-orm";
 import { businessCategories, businessActivities, freeZones, establishmentGuides, documents } from "@shared/schema";
-import { documentUpload, processUploadedDocument } from "./document-upload";
+import { documentUpload, processUploadedDocument, processDMCCDocuments } from "./document-upload";
+
+// Middleware to check if user is admin
+function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  
+  const user = req.user as any;
+  if (!user || user.role !== 'admin') {
+    return res.status(403).json({ message: "Forbidden: Admin access required" });
+  }
+  
+  next();
+}
 
 const ESTABLISHMENT_STEPS = [
   { step: "1", title: "Initial Consultation", description: "Schedule your initial consultation" },
@@ -701,7 +715,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin endpoint to run the scraper without authentication (for development/testing)
-  app.get("/admin/run-freezone-scraper", async (req, res) => {
+  app.get("/admin/run-freezone-scraper", requireAdmin, async (req, res) => {
     try {
       // Import the enhanced freezone scraper
       const { runEnhancedFreeZoneScraper } = await import('../scraper/enhanced_freezone_scraper.js');
@@ -739,7 +753,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Admin endpoint to run the specialized DMCC scraper
-  app.get("/admin/run-dmcc-scraper", async (req, res) => {
+  app.get("/admin/run-dmcc-scraper", requireAdmin, async (req, res) => {
     try {
       // First try the Playwright-based scraper
       try {
@@ -805,7 +819,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Admin endpoint to run the scraper for a specific free zone
-  app.get("/admin/run-freezone-scraper/:name", async (req, res) => {
+  app.get("/admin/run-freezone-scraper/:name", requireAdmin, async (req, res) => {
     try {
       const freeZoneName = req.params.name;
       
@@ -1168,6 +1182,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error occurred';
       console.error("Error downloading document:", error);
+      res.status(500).json({ message });
+    }
+  });
+  
+  // Endpoint to import DMCC documents into the database
+  app.post("/api/documents/process-dmcc", requireAdmin, async (req, res) => {
+    
+    try {
+      console.log("Starting DMCC document processing...");
+      await processDMCCDocuments();
+      
+      // Count documents in the database
+      const documentsCount = await db
+        .select({ count: sql`count(*)` })
+        .from(documents);
+      
+      res.json({
+        message: "DMCC documents processed successfully",
+        count: Number(documentsCount[0]?.count || 0)
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error processing DMCC documents:", error);
       res.status(500).json({ message });
     }
   });

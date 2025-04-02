@@ -24,6 +24,27 @@ try {
 /**
  * Process downloaded DMCC documents and store them in the database
  */
+/**
+ * Find all files recursively in a directory
+ * @param dir Directory to search
+ * @param fileList Array to store found files
+ * @returns Array of file paths
+ */
+function findAllFiles(dir: string, fileList: string[] = []): string[] {
+  const files = fs.readdirSync(dir);
+  
+  files.forEach(file => {
+    const filePath = path.join(dir, file);
+    if (fs.statSync(filePath).isDirectory()) {
+      findAllFiles(filePath, fileList);
+    } else {
+      fileList.push(filePath);
+    }
+  });
+  
+  return fileList;
+}
+
 export async function processDMCCDocuments() {
   try {
     console.log('Processing DMCC documents...');
@@ -34,72 +55,89 @@ export async function processDMCCDocuments() {
       return;
     }
     
-    // Read all files in the directory
-    const files = fs.readdirSync(dmccDocsDir);
-    console.log(`Found ${files.length} files in DMCC docs directory`);
+    // Recursively find all files in the directory
+    const allFiles = findAllFiles(dmccDocsDir);
+    
+    // Filter for supported file types
+    const supportedExtensions = ['.pdf', '.doc', '.docx', '.xlsx', '.xls', '.txt'];
+    const documentFiles = allFiles.filter(file => 
+      supportedExtensions.includes(path.extname(file).toLowerCase())
+    );
+    
+    console.log(`Found ${documentFiles.length} document files in DMCC docs directory and subdirectories`);
+    
+    let processedCount = 0;
+    let addedCount = 0;
+    let errorCount = 0;
     
     // Process each file
-    for (const file of files) {
-      const filePath = path.join(dmccDocsDir, file);
-      const stats = fs.statSync(filePath);
-      
-      // Skip directories
-      if (stats.isDirectory()) {
-        continue;
-      }
-      
-      // Check if document already exists in the database
-      const fileStats = fs.statSync(filePath);
-      const fileSize = fileStats.size;
-      
-      // Extract document metadata from filename
-      // Example filename: "dmcc_company-setup_guidelines.pdf"
-      const filenameParts = file.split('_');
-      const category = filenameParts.length > 1 ? filenameParts[1] : 'general';
-      const documentType = path.extname(file).replace('.', '');
-      const title = path.basename(file, path.extname(file))
-        .replace(/dmcc_/, '')
-        .replace(/_/g, ' ')
-        .replace(/-/g, ' ')
-        .split(' ')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ');
-      
-      // Create document in database
-      const documentData: InsertDocument = {
-        title,
-        filename: file,
-        filePath: filePath,
-        fileSize,
-        documentType,
-        category,
-        freeZoneId: 14, // DMCC Free Zone ID
-        metadata: {
-          source: 'DMCC Knowledge Bank',
-          uploadMethod: 'automatic',
-          processingDate: new Date().toISOString()
-        },
-        content: null, // We'll add content extraction later if needed
-        uploadedAt: new Date()
-      };
-      
+    for (const filePath of documentFiles) {
       try {
+        // Get file stats
+        const fileStats = fs.statSync(filePath);
+        const fileSize = fileStats.size;
+        
+        // Get relative path for category
+        const relativePath = path.relative(dmccDocsDir, filePath);
+        const pathParts = relativePath.split(path.sep);
+        
+        // Use directory structure for categorization
+        const category = pathParts.length > 1 ? pathParts[0] : 'general';
+        const subcategory = pathParts.length > 2 ? pathParts[1] : '';
+        
+        // Get filename
+        const filename = path.basename(filePath);
+        const documentType = path.extname(filename).replace('.', '');
+        
+        // Create title from filename
+        const title = path.basename(filename, path.extname(filename))
+          .replace(/_/g, ' ')
+          .replace(/-/g, ' ')
+          .replace(/[0-9]+\s+/, '') // Remove leading numbers
+          .split(' ')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ');
+        
+        // Create document in database
+        const documentData: InsertDocument = {
+          title,
+          filename,
+          filePath,
+          fileSize,
+          documentType,
+          category,
+          freeZoneId: 14, // DMCC Free Zone ID
+          metadata: {
+            source: 'DMCC Knowledge Bank',
+            uploadMethod: 'automatic',
+            processingDate: new Date().toISOString(),
+            relativePath,
+            subcategory
+          },
+          content: null, // We'll add content extraction later if needed
+          uploadedAt: new Date()
+        };
+        
         // Check if document already exists
-        // For now we're just doing a basic check by filename
-        const exists = await checkDocumentExists(file);
+        const exists = await checkDocumentExists(filename);
         
         if (!exists) {
           const document = await storage.createDocument(documentData);
           console.log(`Added document to database: ${title}`);
+          addedCount++;
         } else {
           console.log(`Document already exists: ${title}`);
         }
+        
+        processedCount++;
       } catch (error) {
-        console.error(`Error adding document ${file} to database:`, error);
+        console.error(`Error processing document ${filePath}:`, error);
+        errorCount++;
       }
     }
     
-    console.log('Finished processing DMCC documents');
+    console.log(`Finished processing DMCC documents`);
+    console.log(`Summary: Processed ${processedCount} files, Added ${addedCount} documents, Errors: ${errorCount}`);
   } catch (error) {
     console.error('Error processing DMCC documents:', error);
   }

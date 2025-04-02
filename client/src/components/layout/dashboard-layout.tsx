@@ -7,12 +7,16 @@ import {
   FileText, 
   Settings, 
   Building2,
-  Map 
+  Map,
+  ShieldAlert
 } from "lucide-react";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { logoutMutation } = useAuth();
+  const { user, logoutMutation } = useAuth();
   const [location, setLocation] = useLocation();
+  
+  // Check if user is admin
+  const isAdmin = (user as any)?.role === 'admin';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -84,6 +88,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Settings className="mr-2 h-5 w-5" />
               Settings
             </Button>
+            
+            {isAdmin && (
+              <Button 
+                variant={location === "/admin" ? "default" : "ghost"} 
+                className="w-full justify-start"
+                onClick={() => setLocation("/admin")}
+              >
+                <ShieldAlert className="mr-2 h-5 w-5" />
+                Admin Panel
+              </Button>
+            )}
           </nav>
         </aside>
 
