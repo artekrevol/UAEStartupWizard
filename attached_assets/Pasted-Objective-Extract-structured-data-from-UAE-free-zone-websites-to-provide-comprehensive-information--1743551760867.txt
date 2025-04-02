@@ -1,0 +1,104 @@
+Objective: Extract structured data from UAE free zone websites to provide comprehensive information for our AI chatbot.
+🔹 Dubai Free Zones
+1. Dubai Multi Commodities Centre (DMCC)
+
+    Website: https://www.dmcc.ae/
+
+    Pages & Data to Extract:
+
+        Overview: https://www.dmcc.ae/about-us → General information about DMCC’s services and benefits
+
+        Business Activities: https://www.dmcc.ae/setup-a-business → List of permissible business activities
+
+        Facilities & Services: https://www.dmcc.ae/facilities → Office spaces, warehouses, etc.
+
+        Setup Process: https://www.dmcc.ae/how-to-setup → Step-by-step guide
+
+        Fees & Charges: https://www.dmcc.ae/setup-a-business/cost → Setup and annual fees
+
+        FAQs: https://www.dmcc.ae/faqs → Commonly asked questions
+
+2. Jebel Ali Free Zone (JAFZA)
+
+    Website: https://www.jafza.ae/
+
+    Pages & Data to Extract:
+
+        Overview: https://www.jafza.ae/about/ → Strategic advantages of JAFZA
+
+        Business Sectors: https://www.jafza.ae/business-sectors/ → List of industries supported
+
+        Licensing Options: https://www.jafza.ae/licensing/ → Available business licenses
+
+        Infrastructure: https://www.jafza.ae/facilities/ → Details on plots, warehouses, and offices
+
+        Fee Structure: https://www.jafza.ae/fees/ → Breakdown of setup and operational costs
+
+        FAQs: https://www.jafza.ae/faqs/ → Answers to common inquiries
+
+3. Dubai Airport Free Zone (DAFZ)
+
+    Website: https://www.dafz.ae/
+
+    Pages & Data to Extract:
+
+        Overview: https://www.dafz.ae/about-dafz/ → Introduction to DAFZ’s services
+
+        Business Activities: https://www.dafz.ae/setup-a-business/ → List of permissible activities
+
+        Facilities & Services: https://www.dafz.ae/facilities/ → Available office spaces, logistics support
+
+        Setup Process: https://www.dafz.ae/company-formation/ → Company registration steps
+
+        Fees & Charges: https://www.dafz.ae/cost/ → Costs for setup and renewal
+
+        FAQs: https://www.dafz.ae/faqs/ → Frequently asked questions
+
+🔹 Abu Dhabi Free Zones
+1. Abu Dhabi Global Market (ADGM)
+
+    Website: https://www.adgm.com/
+
+    Pages & Data to Extract:
+
+        Overview: https://www.adgm.com/about-adgm → ADGM as an international financial center
+
+        Business Sectors: https://www.adgm.com/business → Supported industries
+
+        Regulatory Environment: https://www.adgm.com/regulation → Laws and compliance details
+
+        Setup Process: https://www.adgm.com/setup → Company formation guidelines
+
+        Fees & Charges: https://www.adgm.com/fees → Setup and operational costs
+
+        FAQs: https://www.adgm.com/faqs → Common questions answered
+
+2. Khalifa Industrial Zone Abu Dhabi (KIZAD)
+
+    Website: https://www.kizad.ae/
+
+    Pages & Data to Extract:
+
+        Overview: https://www.kizad.ae/about-kizad/ → KIZAD’s industrial and logistics offerings
+
+        Business Activities: https://www.kizad.ae/business-sectors/ → Supported industries
+
+        Infrastructure: https://www.kizad.ae/facilities/ → Plots, warehouses, and office spaces
+
+        Licensing & Registration: https://www.kizad.ae/licensing/ → License types and registration guidelines
+
+        Fees & Charges: https://www.kizad.ae/fees/ → Setup and operational costs
+
+        FAQs: https://www.kizad.ae/faqs/ → Frequently asked questions
+
+💡 Instructions for Replit Agent:
+
+    Scrape each listed URL for the relevant content sections mentioned.
+
+    Ensure structured data extraction (headings, paragraphs, tables, links).
+
+    Check for JavaScript rendering (use headless browsing if necessary).
+
+    Identify anti-scraping measures (switch IPs, use proxies if blocked).
+
+    Store data in JSON format for easy integration into the chatbot.

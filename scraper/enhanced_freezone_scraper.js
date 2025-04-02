@@ -31,9 +31,69 @@ class EnhancedFreeZoneScraper extends PlaywrightScraper {
    * Update website URLs for free zones
    */
   async updateWebsiteUrls() {
-    // Define known websites for major free zones
+    // Define known websites for major free zones with detailed page URLs for scraping
     const websiteData = [
-      { name: 'Dubai Multi Commodities Centre (DMCC)', url: 'https://www.dmcc.ae' },
+      { 
+        name: 'Dubai Multi Commodities Centre (DMCC)', 
+        url: 'https://www.dmcc.ae',
+        detailPages: {
+          overview: 'https://www.dmcc.ae/about-us',
+          businessActivities: 'https://www.dmcc.ae/setup-a-business',
+          facilities: 'https://www.dmcc.ae/facilities',
+          setupProcess: 'https://www.dmcc.ae/how-to-setup',
+          fees: 'https://www.dmcc.ae/setup-a-business/cost',
+          faqs: 'https://www.dmcc.ae/faqs'
+        }
+      },
+      {
+        name: 'Jebel Ali Free Zone (JAFZA)',
+        url: 'https://www.jafza.ae',
+        detailPages: {
+          overview: 'https://www.jafza.ae/about/',
+          businessSectors: 'https://www.jafza.ae/business-sectors/',
+          licensing: 'https://www.jafza.ae/licensing/',
+          infrastructure: 'https://www.jafza.ae/facilities/',
+          fees: 'https://www.jafza.ae/fees/',
+          faqs: 'https://www.jafza.ae/faqs/'
+        }
+      },
+      {
+        name: 'Dubai Airport Free Zone (DAFZ)',
+        url: 'https://www.dafz.ae',
+        detailPages: {
+          overview: 'https://www.dafz.ae/about-dafz/',
+          businessActivities: 'https://www.dafz.ae/setup-a-business/',
+          facilities: 'https://www.dafz.ae/facilities/',
+          setupProcess: 'https://www.dafz.ae/company-formation/',
+          fees: 'https://www.dafz.ae/cost/',
+          faqs: 'https://www.dafz.ae/faqs/'
+        }
+      },
+      {
+        name: 'Abu Dhabi Global Market (ADGM)',
+        url: 'https://www.adgm.com',
+        detailPages: {
+          overview: 'https://www.adgm.com/about-adgm',
+          businessSectors: 'https://www.adgm.com/business',
+          regulation: 'https://www.adgm.com/regulation',
+          setupProcess: 'https://www.adgm.com/setup',
+          fees: 'https://www.adgm.com/fees',
+          faqs: 'https://www.adgm.com/faqs'
+        }
+      },
+      {
+        name: 'Khalifa Industrial Zone Abu Dhabi (KIZAD)',
+        url: 'https://www.kizad.ae',
+        detailPages: {
+          overview: 'https://www.kizad.ae/about-kizad/',
+          businessSectors: 'https://www.kizad.ae/business-sectors/',
+          infrastructure: 'https://www.kizad.ae/facilities/',
+          licensing: 'https://www.kizad.ae/licensing/',
+          fees: 'https://www.kizad.ae/fees/',
+          faqs: 'https://www.kizad.ae/faqs/'
+        }
+      },
+      // Additional Free Zones
       { name: 'Dubai Internet City (DIC)', url: 'https://dic.ae' },
       { name: 'Dubai Media City (DMC)', url: 'https://dmc.ae' },
       { name: 'Dubai Healthcare City (DHCC)', url: 'https://dhcc.ae' },
@@ -42,19 +102,12 @@ class EnhancedFreeZoneScraper extends PlaywrightScraper {
       { name: 'Ajman Free Zone', url: 'https://www.afz.ae' },
       { name: 'Ras Al Khaimah Economic Zone (RAKEZ)', url: 'https://rakez.com' },
       { name: 'Fujairah Free Zone', url: 'https://fujairahfreezone.ae' },
-      { name: 'Dubai South', url: 'https://www.dubaisouth.ae' },
       { name: 'International Free Zone Authority', url: 'https://ifza.com' },
-      { name: 'Dubai Multi Commodities Centre', url: 'https://www.dmcc.ae' },
       { name: 'Sharjah Airport International Free Zone', url: 'https://www.saif-zone.com' },
-      { name: 'Sharjah Media City', url: 'https://shams.ae' },
       { name: 'Umm Al Quwain Free Zone - UAQ', url: 'https://uaqftz.com' },
-      { name: 'Dubai Airport Freezone', url: 'https://www.dafz.ae' },
       { name: 'Dubai World Trade Centre Free Zone', url: 'https://dwtc.com/free-zone' },
       { name: 'Dubai Silicon Oasis', url: 'https://www.dsoa.ae' },
-      { name: 'Jebel Ali Free Zone Authority', url: 'https://jafza.ae' },
       { name: 'Abu Dhabi Airport Free Zone', url: 'https://www.adafz.ae' },
-      { name: 'Industrial City of Abu Dhabi (ICAD)', url: 'https://www.kizad.ae' },
-      { name: 'Dubai Internet City', url: 'https://dic.ae' },
       { name: 'Dubai International Academic City (DIAC)', url: 'https://diacedu.ae' },
       { name: 'Dubai Biotech Research Park', url: 'https://dubiotech.ae' },
       { name: 'Dubai Design District', url: 'https://dubaidesigndistrict.com' },
@@ -70,7 +123,8 @@ class EnhancedFreeZoneScraper extends PlaywrightScraper {
 
     console.log(`Updating website URLs for ${websiteData.length} free zones`);
 
-    for (const { name, url } of websiteData) {
+    for (const data of websiteData) {
+      const { name, url, detailPages } = data;
       try {
         // Try exact match first
         let results = await db
@@ -89,17 +143,25 @@ class EnhancedFreeZoneScraper extends PlaywrightScraper {
         if (results.length > 0) {
           const freeZone = results[0];
           
-          // Only update if website is not already set
-          if (!freeZone.website) {
-            await db
-              .update(freeZones)
-              .set({ website: url })
-              .where(eq(freeZones.id, freeZone.id));
-              
-            console.log(`Updated website for "${name}" to ${url}`);
-          } else {
-            console.log(`Website for "${name}" already set to ${freeZone.website}`);
+          // Store detailPages in a metadata field if available
+          const updateData = { website: url };
+          
+          if (detailPages) {
+            // Store the detail pages for later scraping
+            updateData.metadata = {
+              ...freeZone.metadata,
+              detailPages
+            };
+            console.log(`Added detailed page URLs for "${name}"`);
           }
+          
+          // Update the database
+          await db
+            .update(freeZones)
+            .set(updateData)
+            .where(eq(freeZones.id, freeZone.id));
+            
+          console.log(`Updated website for "${name}" to ${url}`);
         } else {
           console.log(`No matching free zone found for "${name}"`);
         }
@@ -153,28 +215,95 @@ class EnhancedFreeZoneScraper extends PlaywrightScraper {
     const website = freeZone.website;
     if (!website) return;
     
-    // Navigate to the website
-    const success = await this.navigateTo(website);
-    if (!success) {
-      console.error(`Failed to navigate to ${website}`);
-      return;
+    // Check if we have detailed page URLs in metadata
+    const detailPages = freeZone.metadata?.detailPages;
+    let description, benefits, requirements, industries, licenseTypes, facilities, setupCost, faqs;
+    
+    // Create a screenshot directory name
+    const screenshotPrefix = `${freeZone.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    
+    // If we have detailed page URLs, scrape each specific page
+    if (detailPages) {
+      console.log(`Using detailed page URLs for ${freeZone.name}`);
+      
+      // Scrape overview/about page
+      if (detailPages.overview) {
+        await this.navigateTo(detailPages.overview);
+        await this.takeScreenshot(`${screenshotPrefix}_overview`);
+        description = await this.extractFreeZoneDescription();
+      }
+      
+      // Scrape business activities/sectors page
+      if (detailPages.businessActivities || detailPages.businessSectors) {
+        const activitiesUrl = detailPages.businessActivities || detailPages.businessSectors;
+        await this.navigateTo(activitiesUrl);
+        await this.takeScreenshot(`${screenshotPrefix}_business_activities`);
+        industries = await this.extractFreeZoneIndustries();
+      }
+      
+      // Scrape facilities/infrastructure page
+      if (detailPages.facilities || detailPages.infrastructure) {
+        const facilitiesUrl = detailPages.facilities || detailPages.infrastructure;
+        await this.navigateTo(facilitiesUrl);
+        await this.takeScreenshot(`${screenshotPrefix}_facilities`);
+        facilities = await this.extractFreeZoneFacilities();
+      }
+      
+      // Scrape setup process page
+      if (detailPages.setupProcess) {
+        await this.navigateTo(detailPages.setupProcess);
+        await this.takeScreenshot(`${screenshotPrefix}_setup_process`);
+        requirements = await this.extractFreeZoneRequirements();
+      }
+      
+      // Scrape fees/costs page
+      if (detailPages.fees) {
+        await this.navigateTo(detailPages.fees);
+        await this.takeScreenshot(`${screenshotPrefix}_fees`);
+        setupCost = await this.extractFreeZoneSetupCost();
+      }
+      
+      // Scrape licensing page
+      if (detailPages.licensing) {
+        await this.navigateTo(detailPages.licensing);
+        await this.takeScreenshot(`${screenshotPrefix}_licensing`);
+        licenseTypes = await this.extractFreeZoneLicenseTypes();
+      }
+      
+      // Scrape FAQs page
+      if (detailPages.faqs) {
+        await this.navigateTo(detailPages.faqs);
+        await this.takeScreenshot(`${screenshotPrefix}_faqs`);
+        faqs = await this.extractFreeZoneFAQs();
+      }
+      
+    } else {
+      // Fallback to the original approach - scrape from the homepage
+      console.log(`No detailed page URLs for ${freeZone.name}, using homepage scraping`);
+      
+      // Navigate to the website
+      const success = await this.navigateTo(website);
+      if (!success) {
+        console.error(`Failed to navigate to ${website}`);
+        return;
+      }
+      
+      // Take a screenshot for debugging
+      await this.takeScreenshot(`${screenshotPrefix}_homepage`);
+      
+      // Extract data from the homepage
+      description = await this.extractFreeZoneDescription();
+      benefits = await this.extractFreeZoneBenefits();
+      requirements = await this.extractFreeZoneRequirements();
+      industries = await this.extractFreeZoneIndustries();
+      licenseTypes = await this.extractFreeZoneLicenseTypes();
+      facilities = await this.extractFreeZoneFacilities();
+      setupCost = await this.extractFreeZoneSetupCost();
+      
+      // Optional: check for FAQs or other specific pages
+      await this.navigateToSubpage(website, 'faq');
+      faqs = await this.extractFreeZoneFAQs();
     }
-    
-    // Take a screenshot for debugging
-    await this.takeScreenshot(`${freeZone.name.replace(/[^a-zA-Z0-9]/g, '_')}_homepage`);
-    
-    // Extract data from the homepage
-    const description = await this.extractFreeZoneDescription();
-    const benefits = await this.extractFreeZoneBenefits();
-    const requirements = await this.extractFreeZoneRequirements();
-    const industries = await this.extractFreeZoneIndustries();
-    const licenseTypes = await this.extractFreeZoneLicenseTypes();
-    const facilities = await this.extractFreeZoneFacilities();
-    const setupCost = await this.extractFreeZoneSetupCost();
-    
-    // Optional: check for FAQs or other specific pages
-    await this.navigateToSubpage(website, 'faq');
-    const faqs = await this.extractFreeZoneFAQs();
     
     // Update the database with new information
     await this.updateFreeZoneData(freeZone.id, {
@@ -185,6 +314,7 @@ class EnhancedFreeZoneScraper extends PlaywrightScraper {
       license_types: licenseTypes || freeZone.license_types,
       facilities: facilities || freeZone.facilities,
       setup_cost: setupCost || freeZone.setup_cost,
+      faqs: faqs || freeZone.faqs,
       last_updated: new Date()
     });
     
