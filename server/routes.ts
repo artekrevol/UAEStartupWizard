@@ -1,13 +1,16 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
+import * as path from "path";
+import * as fs from "fs";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { getBusinessRecommendations, generateDocumentRequirements, getUAEBusinessAssistantResponse } from "./openai";
-import { BusinessSetup } from "@shared/schema";
+import { BusinessSetup, InsertDocument } from "@shared/schema";
 import { calculateBusinessScore } from "./scoring";
 import { db } from "./db";
 import { eq, sql } from "drizzle-orm";
-import { businessCategories, businessActivities, freeZones, establishmentGuides } from "@shared/schema";
+import { businessCategories, businessActivities, freeZones, establishmentGuides, documents } from "@shared/schema";
+import { documentUpload, processUploadedDocument } from "./document-upload";
 
 const ESTABLISHMENT_STEPS = [
   { step: "1", title: "Initial Consultation", description: "Schedule your initial consultation" },
@@ -985,6 +988,190 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Document management routes
+  app.get("/api/documents", async (req, res) => {
+    try {
+      const category = req.query.category as string | undefined;
+      const freeZoneId = req.query.freeZoneId ? parseInt(req.query.freeZoneId as string) : undefined;
+      
+      if (freeZoneId && !isNaN(freeZoneId)) {
+        const documents = await storage.getDocumentsByFreeZone(freeZoneId);
+        return res.json(documents);
+      } else if (category) {
+        const documents = await storage.getDocumentsByCategory(category);
+        return res.json(documents);
+      } else {
+        // Get all documents - consider adding pagination here
+        const allDocuments = await db.execute(sql`SELECT * FROM documents LIMIT 100`);
+        return res.json(allDocuments.rows || []);
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error fetching documents:", error);
+      res.status(500).json({ message });
+    }
+  });
+
+  app.get("/api/documents/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid document ID" });
+      }
+      
+      const document = await storage.getDocument(id);
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+      
+      res.json(document);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error fetching document:", error);
+      res.status(500).json({ message });
+    }
+  });
+
+  // Regular document creation endpoint (no file upload)
+  app.post("/api/documents", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      const document = await storage.createDocument(req.body);
+      res.status(201).json(document);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error creating document:", error);
+      res.status(500).json({ message });
+    }
+  });
+  
+  // Document upload endpoint with file attachment
+  app.post("/api/documents/upload", documentUpload.single('file'), processUploadedDocument, async (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      const documentFile = req.body.documentFile;
+      if (!documentFile) {
+        return res.status(400).json({ message: 'No document file metadata found' });
+      }
+      
+      // Create document in database
+      const documentData: InsertDocument = {
+        title: documentFile.title || 'Untitled Document',
+        filename: documentFile.filename,
+        filePath: documentFile.filePath,
+        fileSize: documentFile.fileSize,
+        documentType: documentFile.documentType || path.extname(documentFile.filename).replace('.', ''),
+        category: documentFile.category || 'general',
+        freeZoneId: documentFile.freeZoneId || null,
+        metadata: {
+          source: 'user_upload',
+          uploadMethod: 'manual',
+          contentType: documentFile.mimetype,
+          uploadedBy: req.user?.username || 'anonymous',
+          originalName: documentFile.originalName
+        },
+        content: null,
+        uploadedAt: new Date()
+      };
+      
+      const document = await storage.createDocument(documentData);
+      res.status(201).json(document);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error uploading document:", error);
+      res.status(500).json({ message });
+    }
+  });
+
+  app.patch("/api/documents/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid document ID" });
+      }
+      
+      await storage.updateDocument(id, req.body);
+      res.sendStatus(200);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error updating document:", error);
+      res.status(500).json({ message });
+    }
+  });
+
+  app.delete("/api/documents/:id", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid document ID" });
+      }
+      
+      await storage.deleteDocument(id);
+      res.sendStatus(204);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error deleting document:", error);
+      res.status(500).json({ message });
+    }
+  });
+  
+  // Download document file endpoint
+  app.get("/api/documents/:id/download", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid document ID" });
+      }
+      
+      // Get document from database
+      const document = await storage.getDocument(id);
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+      
+      // Check if file exists
+      if (!fs.existsSync(document.filePath)) {
+        return res.status(404).json({ message: "Document file not found" });
+      }
+      
+      // Set appropriate content disposition and type
+      const filename = encodeURIComponent(document.filename);
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      
+      // Attempt to set the correct content type based on file extension
+      const ext = path.extname(document.filename).toLowerCase();
+      const mimeTypes: Record<string, string> = {
+        '.pdf': 'application/pdf',
+        '.doc': 'application/msword',
+        '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        '.xls': 'application/vnd.ms-excel',
+        '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.txt': 'text/plain',
+        '.csv': 'text/csv',
+        '.md': 'text/markdown'
+      };
+      
+      res.setHeader('Content-Type', mimeTypes[ext] || 'application/octet-stream');
+      
+      // Stream the file to the response
+      const fileStream = fs.createReadStream(document.filePath);
+      fileStream.pipe(res);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error downloading document:", error);
+      res.status(500).json({ message });
+    }
+  });
+  
   const httpServer = createServer(app);
   return httpServer;
 }

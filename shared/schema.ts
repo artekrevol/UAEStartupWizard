@@ -135,12 +135,32 @@ export const businessSetupSchema = createInsertSchema(businessSetups);
 export const insertFreeZoneSchema = createInsertSchema(freeZones);
 export const insertEstablishmentGuideSchema = createInsertSchema(establishmentGuides);
 
+// Documents table
+export const documents = pgTable("documents", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  filename: text("filename").notNull(),
+  filePath: text("file_path").notNull(),
+  fileSize: integer("file_size"),
+  documentType: text("document_type"),
+  category: text("category"),
+  freeZoneId: integer("free_zone_id").references(() => freeZones.id),
+  metadata: jsonb("metadata"),
+  content: text("content"),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+});
+
+// Create document insert schema
+export const insertDocumentSchema = createInsertSchema(documents).omit({ id: true });
+
 // Export types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type BusinessSetup = typeof businessSetups.$inferSelect;
 export type FreeZone = typeof freeZones.$inferSelect;
 export type EstablishmentGuide = typeof establishmentGuides.$inferSelect;
+export type Document = typeof documents.$inferSelect;
+export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 
 // Constants for business setup
 export const LEGAL_FORMS = [
