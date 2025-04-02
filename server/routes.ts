@@ -735,6 +735,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Admin endpoint to run the specialized DMCC scraper
+  app.get("/admin/run-dmcc-scraper", async (req, res) => {
+    try {
+      // First try the Playwright-based scraper
+      try {
+        // Import the DMCC specialized scraper
+        const { runDMCCScraper } = await import('../scraper/dmcc_freezone_scraper.js');
+        
+        // Log the start of scraping
+        console.log("Starting specialized DMCC scraper (admin endpoint)...");
+        
+        // Run the scraper with detailed logging
+        const options = {
+          headless: req.query.headless !== 'false', // default to headless mode
+          screenshots: true,
+          timeout: 300000, // longer timeout (5 minutes) for thorough scraping
+          detailedLogging: true
+        };
+        
+        // Start the scraper in the background
+        res.json({
+          status: 'started',
+          message: "Started DMCC specialized scraping process. This will continue in the background. Check server logs for progress and results."
+        });
+        
+        // Run the scraper asynchronously after sending response
+        await runDMCCScraper(options);
+        console.log("DMCC specialized scraping completed successfully");
+        return;
+      } catch (playwrightError) {
+        console.error("Playwright-based DMCC scraper failed, falling back to HTTP-based scraper:", playwrightError.message);
+        
+        // If Playwright scraper fails, try the fallback scraper
+        const { runDMCCFallbackScraper } = await import('../scraper/dmcc_freezone_scraper_fallback.js');
+        
+        // Log the start of fallback scraping
+        console.log("Starting DMCC fallback scraper...");
+        
+        // Run the fallback scraper
+        const options = {
+          timeout: 60000, // 60 second timeout for HTTP requests
+          detailedLogging: true
+        };
+        
+        if (!res.headersSent) {
+          res.json({
+            status: 'started',
+            message: "Started DMCC fallback scraping process. This will continue in the background. Check server logs for progress and results."
+          });
+        }
+        
+        // Run the fallback scraper
+        const result = await runDMCCFallbackScraper(options);
+        console.log("DMCC fallback scraping completed:", result ? "successfully" : "with errors");
+      }
+    } catch (error) {
+      console.error("Error running DMCC specialized scraper:", error);
+      if (!res.headersSent) {
+        res.status(500).json({ 
+          status: 'error',
+          message: "Error running DMCC specialized scraper" 
+        });
+      }
+    }
+  });
+  
   // Admin endpoint to run the scraper for a specific free zone
   app.get("/admin/run-freezone-scraper/:name", async (req, res) => {
     try {

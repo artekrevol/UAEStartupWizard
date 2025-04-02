@@ -213,10 +213,13 @@ export function FreeZoneDetails({ freeZoneId }: FreeZoneDetailsProps) {
             <CardContent>
               {freeZone.licenseTypes && Array.isArray(freeZone.licenseTypes) && freeZone.licenseTypes.length > 0 ? (
                 <div className="space-y-4">
+                  {/* Handling both object format and string format */}
                   {freeZone.licenseTypes.map((license, index) => (
                     <div key={index} className="border-b pb-3 last:border-0 last:pb-0">
-                      <h4 className="font-medium">{license.name}</h4>
-                      {license.description && (
+                      <h4 className="font-medium">
+                        {typeof license === 'string' ? license : license.name}
+                      </h4>
+                      {typeof license !== 'string' && license.description && (
                         <p className="text-sm text-muted-foreground mt-1">{license.description}</p>
                       )}
                     </div>
@@ -240,10 +243,13 @@ export function FreeZoneDetails({ freeZoneId }: FreeZoneDetailsProps) {
             <CardContent>
               {freeZone.facilities && Array.isArray(freeZone.facilities) && freeZone.facilities.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Handling both object format and string format */}
                   {freeZone.facilities.map((facility, index) => (
                     <div key={index} className="border rounded-lg p-3">
-                      <h4 className="font-medium">{facility.name}</h4>
-                      {facility.description && (
+                      <h4 className="font-medium">
+                        {typeof facility === 'string' ? facility : facility.name}
+                      </h4>
+                      {typeof facility !== 'string' && facility.description && (
                         <p className="text-sm text-muted-foreground mt-1">{facility.description}</p>
                       )}
                     </div>
@@ -265,19 +271,35 @@ export function FreeZoneDetails({ freeZoneId }: FreeZoneDetailsProps) {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {/* This assumes FAQs are stored somewhere in the free zone object */}
-              {freeZone.faqs && Array.isArray(freeZone.faqs) && freeZone.faqs.length > 0 ? (
-                <Accordion type="single" collapsible className="w-full">
-                  {freeZone.faqs.map((faq, index) => (
-                    <AccordionItem key={index} value={`faq-${index}`}>
-                      <AccordionTrigger className="text-left">{faq.question}</AccordionTrigger>
-                      <AccordionContent>{faq.answer}</AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-              ) : (
-                <p className="text-muted-foreground italic">No FAQ information available</p>
-              )}
+              {/* Parsing FAQs if they're stored as a JSON string */}
+              {(() => {
+                let parsedFaqs = [];
+                
+                if (freeZone.faqs) {
+                  if (Array.isArray(freeZone.faqs)) {
+                    parsedFaqs = freeZone.faqs;
+                  } else if (typeof freeZone.faqs === 'string') {
+                    try {
+                      parsedFaqs = JSON.parse(freeZone.faqs);
+                    } catch (e) {
+                      console.error("Failed to parse FAQs:", e);
+                    }
+                  }
+                }
+                
+                return parsedFaqs.length > 0 ? (
+                  <Accordion type="single" collapsible className="w-full">
+                    {parsedFaqs.map((faq, index) => (
+                      <AccordionItem key={index} value={`faq-${index}`}>
+                        <AccordionTrigger className="text-left">{faq.question}</AccordionTrigger>
+                        <AccordionContent>{faq.answer}</AccordionContent>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
+                ) : (
+                  <p className="text-muted-foreground italic">No FAQ information available</p>
+                );
+              })()}
             </CardContent>
           </Card>
         </TabsContent>
@@ -306,39 +328,67 @@ export function FreeZoneDetails({ freeZoneId }: FreeZoneDetailsProps) {
         </Card>
       )}
 
-      {freeZone.setupCost && typeof freeZone.setupCost === 'object' && freeZone.setupCost.header && freeZone.setupCost.rows && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Landmark className="mr-2 h-5 w-5" />
-              Detailed Setup Costs
-            </CardTitle>
-            <CardDescription>
-              Fees and costs associated with setting up in {freeZone.name}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {freeZone.setupCost.header.map((header, index) => (
-                    <TableHead key={index}>{header}</TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {freeZone.setupCost.rows.map((row, rowIndex) => (
-                  <TableRow key={rowIndex}>
-                    {row.map((cell, cellIndex) => (
-                      <TableCell key={cellIndex}>{cell}</TableCell>
+      {/* Display setup costs either as text or as a structured table */}
+      {(() => {
+        // If setupCost is an object with detailed information
+        if (freeZone.setupCost && typeof freeZone.setupCost === 'object' && 
+            freeZone.setupCost.header && freeZone.setupCost.rows) {
+          return (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Landmark className="mr-2 h-5 w-5" />
+                  Detailed Setup Costs
+                </CardTitle>
+                <CardDescription>
+                  Fees and costs associated with setting up in {freeZone.name}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {freeZone.setupCost.header.map((header, index) => (
+                        <TableHead key={index}>{header}</TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {freeZone.setupCost.rows.map((row, rowIndex) => (
+                      <TableRow key={rowIndex}>
+                        {row.map((cell, cellIndex) => (
+                          <TableCell key={cellIndex}>{cell}</TableCell>
+                        ))}
+                      </TableRow>
                     ))}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          );
+        } 
+        // If setupCost is string but not in the Card above
+        else if (freeZone.setupCost && typeof freeZone.setupCost === 'string' && 
+                !document.querySelector('.setup-cost-overview')) {
+          return (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Landmark className="mr-2 h-5 w-5" />
+                  Setup Cost Information
+                </CardTitle>
+                <CardDescription>
+                  General cost information for {freeZone.name}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p>{freeZone.setupCost}</p>
+              </CardContent>
+            </Card>
+          );
+        }
+        return null;
+      })()}
     </div>
   );
 }
