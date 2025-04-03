@@ -1004,6 +1004,136 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Document management routes
   
+  // Endpoint to get document statistics by category
+  app.get("/api/documents/stats", async (req, res) => {
+    try {
+      // Get document counts by category
+      const categoryCounts = await db
+        .select({
+          category: documents.category,
+          count: sql`count(*)`,
+        })
+        .from(documents)
+        .groupBy(documents.category);
+      
+      // Calculate total document count
+      const totalCount = categoryCounts.reduce((sum, item) => sum + Number(item.count), 0);
+      
+      // Format and sort the categories by count in descending order
+      const formattedCounts = categoryCounts.map(item => ({
+        category: item.category,
+        count: Number(item.count),
+        percentage: Math.round((Number(item.count) / totalCount) * 100)
+      })).sort((a, b) => b.count - a.count);
+      
+      // Format the response
+      const stats = {
+        totalDocuments: totalCount,
+        categoryCounts: formattedCounts
+      };
+      
+      res.json(stats);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error fetching document statistics:", error);
+      res.status(500).json({ message });
+    }
+  });
+  
+  // Endpoint to get document statistics by subcategory
+  app.get("/api/documents/stats/subcategories", async (req, res) => {
+    try {
+      const category = req.query.category as string | undefined;
+      
+      // Check if subcategory field exists in documents schema
+      let hasSubcategory = false;
+      try {
+        // Try to execute a simple count query first to verify structure
+        await db.select({ count: sql`count(*)` }).from(documents);
+        hasSubcategory = true;
+      } catch (error) {
+        console.error("Error checking documents table structure:", error);
+      }
+      
+      if (!hasSubcategory) {
+        // Execute a simpler version if subcategory doesn't exist
+        const results = await db
+          .select({
+            category: documents.category,
+            count: sql`count(*)`,
+          })
+          .from(documents)
+          .groupBy(documents.category);
+          
+        const totalCount = results.reduce((sum, item) => sum + Number(item.count), 0);
+        
+        // Format each category as having a single "general" subcategory
+        const formattedCounts = results.map(item => ({
+          category: item.category,
+          subcategory: 'general',
+          count: Number(item.count),
+          percentage: Math.round((Number(item.count) / totalCount) * 100)
+        })).sort((a, b) => a.category.localeCompare(b.category));
+        
+        return res.json({
+          totalDocuments: totalCount,
+          subcategoryCounts: formattedCounts
+        });
+      }
+      
+      // Build the query with subcategory if it exists
+      const results = await db.execute(
+        sql`SELECT category, 
+           COALESCE(subcategory, 'general') as subcategory, 
+           COUNT(*) as count 
+           FROM documents
+           ${category ? sql`WHERE category = ${category}` : sql``}
+           GROUP BY category, subcategory`
+      );
+      
+      if (!results.rows || results.rows.length === 0) {
+        return res.json({
+          totalDocuments: 0,
+          subcategoryCounts: []
+        });
+      }
+      
+      // Format the results
+      const subcategoryCounts = results.rows.map((row: any) => ({
+        category: row.category,
+        subcategory: row.subcategory,
+        count: Number(row.count)
+      }));
+      
+      // Calculate total document count for percentage
+      const totalCount = subcategoryCounts.reduce((sum, item) => sum + item.count, 0);
+      
+      // Add percentage and sort
+      const formattedCounts = subcategoryCounts.map(item => ({
+        ...item,
+        percentage: Math.round((item.count / totalCount) * 100)
+      })).sort((a, b) => {
+        // Sort by category first, then by count (descending) within each category
+        if (a.category !== b.category) {
+          return a.category.localeCompare(b.category);
+        }
+        return b.count - a.count;
+      });
+      
+      // Format the response
+      const stats = {
+        totalDocuments: totalCount,
+        subcategoryCounts: formattedCounts
+      };
+      
+      res.json(stats);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error fetching subcategory statistics:", error);
+      res.status(500).json({ message });
+    }
+  });
+  
   // Public endpoint to process DMCC documents (needs to be before parameter routes)
   app.get("/api/documents/process-dmcc-public", async (req, res) => {
     try {
@@ -1035,19 +1165,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/documents", async (req, res) => {
     try {
       const category = req.query.category as string | undefined;
+      const subcategory = req.query.subcategory as string | undefined;
       const freeZoneId = req.query.freeZoneId ? parseInt(req.query.freeZoneId as string) : undefined;
       
+      let query = sql`SELECT * FROM documents`;
+      let whereConditions = [];
+      
+      // Build WHERE conditions based on provided filters
       if (freeZoneId && !isNaN(freeZoneId)) {
-        const documents = await storage.getDocumentsByFreeZone(freeZoneId);
-        return res.json(documents);
-      } else if (category) {
-        const documents = await storage.getDocumentsByCategory(category);
-        return res.json(documents);
-      } else {
-        // Get all documents - consider adding pagination here
-        const allDocuments = await db.execute(sql`SELECT * FROM documents LIMIT 100`);
-        return res.json(allDocuments.rows || []);
+        whereConditions.push(sql`free_zone_id = ${freeZoneId}`);
       }
+      
+      if (category) {
+        whereConditions.push(sql`category = ${category}`);
+      }
+      
+      if (subcategory) {
+        whereConditions.push(sql`subcategory = ${subcategory}`);
+      }
+      
+      // Add WHERE clause if conditions exist
+      if (whereConditions.length > 0) {
+        query = sql`${query} WHERE ${sql.join(whereConditions, sql` AND `)}`;
+      }
+      
+      // Add ORDER BY and LIMIT
+      query = sql`${query} ORDER BY uploaded_at DESC LIMIT 100`;
+      
+      // Log query for debugging
+      console.log("Document query: ", query.toString());
+      
+      // Execute query
+      const results = await db.execute(query);
+      return res.json(results.rows || []);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error occurred';
       console.error("Error fetching documents:", error);

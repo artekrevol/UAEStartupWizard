@@ -145,6 +145,7 @@ export const documents = pgTable("documents", {
   fileSize: integer("file_size"),
   documentType: text("document_type"),
   category: text("category"),
+  subcategory: text("subcategory"),
   freeZoneId: integer("free_zone_id").references(() => freeZones.id),
   metadata: jsonb("metadata"),
   content: text("content"),
