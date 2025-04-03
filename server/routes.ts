@@ -10,7 +10,7 @@ import { calculateBusinessScore } from "./scoring";
 import { db } from "./db";
 import { eq, sql } from "drizzle-orm";
 import { businessCategories, businessActivities, freeZones, establishmentGuides, documents, saifZoneForms } from "@shared/schema";
-import { documentUpload, processUploadedDocument, processDMCCDocuments } from "./document-upload";
+import { documentUpload, processUploadedDocument, processDMCCDocuments, processSAIFZoneDocuments } from "./document-upload";
 import { spawn } from 'child_process';
 
 // Middleware to check if user is admin
@@ -1168,6 +1168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const category = req.query.category as string | undefined;
       const subcategory = req.query.subcategory as string | undefined;
       const freeZoneId = req.query.freeZoneId ? parseInt(req.query.freeZoneId as string) : undefined;
+      const freeZoneName = req.query.freeZoneName as string | undefined;
       
       let query = sql`SELECT * FROM documents`;
       let whereConditions = [];
@@ -1177,12 +1178,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         whereConditions.push(sql`free_zone_id = ${freeZoneId}`);
       }
       
+      // If free zone name is provided instead of ID, first lookup the free zone ID
+      if (freeZoneName && !freeZoneId) {
+        try {
+          const freeZone = await db
+            .select()
+            .from(freeZones)
+            .where(sql`LOWER(${freeZones.name}) LIKE LOWER(${'%' + freeZoneName + '%'})`)
+            .limit(1);
+          
+          if (freeZone && freeZone.length > 0) {
+            whereConditions.push(sql`free_zone_id = ${freeZone[0].id}`);
+          }
+        } catch (error) {
+          console.error("Error looking up free zone by name:", error);
+          // Continue with query, even if free zone isn't found
+        }
+      }
+      
       if (category) {
         whereConditions.push(sql`category = ${category}`);
       }
       
+      // For subcategory, use JSONB operator to search in metadata
       if (subcategory) {
-        whereConditions.push(sql`subcategory = ${subcategory}`);
+        whereConditions.push(sql`metadata->>'subcategory' = ${subcategory}`);
       }
       
       // Add WHERE clause if conditions exist
@@ -1202,6 +1222,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error occurred';
       console.error("Error fetching documents:", error);
+      res.status(500).json({ message });
+    }
+  });
+  
+  // Endpoint to get documents by free zone name
+  app.get("/api/documents/freezone/:name", async (req, res) => {
+    try {
+      const freeZoneName = req.params.name;
+      
+      if (!freeZoneName) {
+        return res.status(400).json({ message: "Free zone name is required" });
+      }
+      
+      // First find the free zone by name
+      const freeZone = await db
+        .select()
+        .from(freeZones)
+        .where(sql`LOWER(name) LIKE LOWER(${'%' + freeZoneName + '%'})`)
+        .limit(1);
+      
+      if (!freeZone || freeZone.length === 0) {
+        return res.status(404).json({ message: "Free zone not found" });
+      }
+      
+      const freeZoneId = freeZone[0].id;
+      
+      // Get category and subcategory filters if provided
+      const category = req.query.category as string | undefined;
+      const subcategory = req.query.subcategory as string | undefined;
+      
+      // Build query to get documents for this free zone
+      let query = sql`SELECT * FROM documents WHERE free_zone_id = ${freeZoneId}`;
+      
+      // Add category filter if provided
+      if (category) {
+        query = sql`${query} AND category = ${category}`;
+      }
+      
+      // Add subcategory filter if provided
+      if (subcategory) {
+        query = sql`${query} AND metadata->>'subcategory' = ${subcategory}`;
+      }
+      
+      // Add ORDER BY and LIMIT
+      query = sql`${query} ORDER BY uploaded_at DESC LIMIT 100`;
+      
+      // Log query for debugging
+      console.log("Free zone documents query: ", query.toString());
+      
+      // Execute query
+      const results = await db.execute(query);
+      
+      // Return documents with free zone information
+      return res.json({
+        freeZone: freeZone[0],
+        documents: results.rows || []
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error fetching free zone documents:", error);
       res.status(500).json({ message });
     }
   });
@@ -1386,6 +1466,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const message = error instanceof Error ? error.message : 'Unknown error occurred';
       console.error("Error processing DMCC documents:", error);
       res.status(500).json({ message });
+    }
+  });
+  
+  // Process SAIF Zone documents - requires admin
+  app.post("/api/documents/process-saif-zone", requireAdmin, async (req, res) => {
+    try {
+      console.log("Starting SAIF Zone document processing...");
+      const result = await processSAIFZoneDocuments();
+      
+      res.json({
+        message: "SAIF Zone documents processed successfully",
+        count: result.totalDocuments,
+        processed: result.processedCount,
+        added: result.addedCount,
+        errors: result.errorCount,
+        success: result.success
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error processing SAIF Zone documents:", error);
+      res.status(500).json({ message, success: false });
     }
   });
   

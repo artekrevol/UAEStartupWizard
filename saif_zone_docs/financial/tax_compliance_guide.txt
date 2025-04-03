@@ -1,0 +1,74 @@
+# SAIF Zone Tax Compliance Guide
+
+## Overview
+This guide outlines the tax requirements and compliance procedures for companies operating in the Sharjah Airport International Free Zone (SAIF Zone).
+
+## VAT in SAIF Zone
+
+### Registration Requirements
+- Companies with taxable supplies and imports exceeding AED 375,000 per annum must register for VAT
+- Voluntary registration possible for businesses with taxable supplies or taxable expenses exceeding AED 187,500
+- Registration must be completed through the Federal Tax Authority (FTA) portal
+
+### VAT Rates
+- Standard rate: 5% on most goods and services
+- Zero rate: Applies to certain categories including exports outside GCC
+- Exempt: Certain financial services, residential properties, and local passenger transport
+
+### Compliance Requirements
+- Quarterly VAT returns submission
+- Maintaining tax records for minimum 5 years
+- Issuing tax invoices for all transactions
+
+## Corporate Tax
+
+### Free Zone Benefits
+- 0% corporate tax on qualifying activities within the free zone
+- 9% on non-qualifying income and mainland sourced income
+- Tax holidays and exemptions as per SAIF Zone regulations
+
+### Requirements for Tax Exemption
+- Maintaining adequate substance in the free zone
+- Compliance with regulatory requirements
+- Proper segregation of qualifying and non-qualifying activities
+
+## Double Tax Treaties
+The UAE has signed double taxation avoidance agreements with over 100 countries, providing potential benefits for SAIF Zone companies engaged in international operations.
+
+## Economic Substance Regulations (ESR)
+- Applicable to certain licensed activities
+- Annual notification and reporting requirements
+- Substance requirements including physical presence, employees, and expenditure
+
+## Excise Tax
+Applicable to specific products such as:
+- Tobacco products (100%)
+- Carbonated drinks (50%)
+- Energy drinks (100%)
+- Sweetened drinks (50%)
+
+## Customs Duties
+- Exemption on imports to the free zone
+- 5% duty applicable when goods enter UAE mainland
+- Certificate of Origin requirements for preferential duty rates
+
+## Record Keeping
+Companies must maintain comprehensive financial records including:
+- Audited financial statements
+- Tax invoices and receipts
+- Import/export documentation
+- Bank statements and transaction records
+
+## Penalties for Non-Compliance
+- Late registration: AED 20,000
+- Late filing: AED 1,000 first offense, AED 2,000 for repeat offenses
+- Late payment: 2% immediate penalty, 4% after 7 days, additional 1% daily after day 7
+
+## Contact Information
+SAIF Zone Finance Department
+Email: finance@saif-zone.com
+Phone: +971-6-557-8000
+
+Document ID: SAIF-TAX-001
+Version: 1.0
+Date: 2025-04-03

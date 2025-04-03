@@ -1,0 +1,70 @@
+# SAIF Zone Visa Application Form
+
+## Application Details
+Application Number: _______________________
+Date of Application: _______________________
+
+## Company Information
+Company Name: _______________________________
+License Number: _______________________________
+License Type: □ Commercial □ Service □ Industrial
+License Expiry Date: _______________________________
+Office/Warehouse Number: _______________________________
+
+## Visa Type Requested
+□ Employment Visa (3 years)
+□ Investor/Partner Visa (3 years)
+□ Family Visa (3 years)
+□ Temporary Visit Visa (1 month)
+□ Mission Visa (3 months)
+
+## Applicant Details
+Full Name (as per passport): _______________________________
+Passport Number: _______________________________
+Passport Issue Date: _______________________________
+Passport Expiry Date: _______________________________
+Nationality: _______________________________
+Date of Birth: _______________________________
+Gender: □ Male □ Female
+Marital Status: □ Single □ Married □ Divorced □ Widowed
+Current Residence: _______________________________
+Educational Qualification: _______________________________
+
+## Employment Details (For Employment Visa)
+Position/Designation: _______________________________
+Monthly Salary (AED): _______________________________
+Contract Duration: _______________________________
+Previous UAE Visa (if any): □ Yes □ No
+If Yes, Emirates ID Number: _______________________________
+
+## For Family Visa
+Relationship to Sponsor: _______________________________
+Sponsor's Passport Number: _______________________________
+Sponsor's Visa Number: _______________________________
+
+## Required Attachments
+□ Passport copy (valid for at least 6 months)
+□ Recent photograph (white background)
+□ Educational certificates (attested)
+□ No objection certificate (if applicable)
+□ Medical fitness certificate
+□ Marriage certificate (for family visa, attested)
+□ Birth certificate (for dependent children, attested)
+
+## Declaration
+I, the undersigned, hereby declare that all information provided above is true and correct to the best of my knowledge. I understand that providing false information may lead to rejection of the application and legal consequences.
+
+Authorized Signatory: _______________________________
+Company Stamp: 
+
+Date: _______________________________
+
+## For Official Use Only
+Application Received By: _______________________________
+Payment Receipt Number: _______________________________
+Application Status: □ Approved □ Rejected □ Pending
+Remarks: _______________________________
+
+Document ID: SAIF-VISA-001
+Version: 2.0
+Date: 2025-04-03
