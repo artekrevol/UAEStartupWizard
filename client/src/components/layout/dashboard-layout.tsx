@@ -74,8 +74,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </Button>
             
             <Button 
-              variant="ghost" 
+              variant={location === "/documents" ? "default" : "ghost"} 
               className="w-full justify-start"
+              onClick={() => setLocation("/documents")}
             >
               <FileText className="mr-2 h-5 w-5" />
               Documents

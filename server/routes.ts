@@ -11,6 +11,7 @@ import { db } from "./db";
 import { eq, sql } from "drizzle-orm";
 import { businessCategories, businessActivities, freeZones, establishmentGuides, documents } from "@shared/schema";
 import { documentUpload, processUploadedDocument, processDMCCDocuments } from "./document-upload";
+import { spawn } from 'child_process';
 
 // Middleware to check if user is admin
 function requireAdmin(req: Request, res: Response, next: NextFunction) {
@@ -1385,6 +1386,183 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const message = error instanceof Error ? error.message : 'Unknown error occurred';
       console.error("Error processing DMCC documents:", error);
       res.status(500).json({ message });
+    }
+  });
+  
+  // Endpoint to run the comprehensive document downloader
+  app.post("/api/documents/run-comprehensive-downloader", requireAdmin, async (req, res) => {
+    try {
+      console.log("Starting comprehensive DMCC document downloader...");
+      
+      // Create process to run the downloader script
+      const scriptProcess = spawn('node', ['./scraper/run_comprehensive_downloader.js'], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        detached: true
+      });
+      
+      // Collect output for response
+      let stdoutChunks: Buffer[] = [];
+      let stderrChunks: Buffer[] = [];
+      
+      scriptProcess.stdout.on('data', (chunk) => {
+        stdoutChunks.push(Buffer.from(chunk));
+        console.log(`Downloader stdout: ${chunk}`);
+      });
+      
+      scriptProcess.stderr.on('data', (chunk) => {
+        stderrChunks.push(Buffer.from(chunk));
+        console.error(`Downloader stderr: ${chunk}`);
+      });
+      
+      // Set timeout to not block the response for too long
+      const timeout = setTimeout(() => {
+        // Unref the process so it can continue running after we respond
+        if (scriptProcess.pid) {
+          process.kill(-scriptProcess.pid, 0); // Check if process group exists
+          scriptProcess.unref();
+        }
+        
+        res.json({
+          status: 'running',
+          message: 'Document downloader started successfully and is running in the background',
+          output: Buffer.concat(stdoutChunks).toString()
+        });
+      }, 2000);
+      
+      // Handle process completion
+      scriptProcess.on('close', (code) => {
+        clearTimeout(timeout);
+        
+        const stdout = Buffer.concat(stdoutChunks).toString();
+        const stderr = Buffer.concat(stderrChunks).toString();
+        
+        if (code === 0) {
+          console.log("Comprehensive document downloader completed successfully");
+          
+          // Only send response if timeout hasn't fired yet
+          if (!res.headersSent) {
+            res.json({
+              status: 'success',
+              message: 'Document downloader completed successfully',
+              output: stdout
+            });
+          }
+        } else {
+          console.error(`Comprehensive document downloader failed with code ${code}`);
+          console.error(`Error output: ${stderr}`);
+          
+          // Only send response if timeout hasn't fired yet
+          if (!res.headersSent) {
+            res.status(500).json({
+              status: 'error',
+              message: `Document downloader failed with code ${code}`,
+              error: stderr,
+              output: stdout
+            });
+          }
+        }
+      });
+      
+      // Handle errors
+      scriptProcess.on('error', (err) => {
+        clearTimeout(timeout);
+        console.error("Error running document downloader:", err);
+        
+        if (!res.headersSent) {
+          res.status(500).json({
+            status: 'error',
+            message: 'Failed to start document downloader',
+            error: err.message
+          });
+        }
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error starting document downloader:", error);
+      res.status(500).json({ status: 'error', message });
+    }
+  });
+  
+  // Endpoint to run the enhanced document processor
+  app.post("/api/documents/process-enhanced", requireAdmin, async (req, res) => {
+    try {
+      console.log("Starting enhanced DMCC document processing...");
+      
+      const { spawn } = require('child_process');
+      
+      // Create process to run the enhanced processor script
+      const scriptProcess = spawn('npx', ['tsx', './process-dmcc-docs-enhanced.ts'], {
+        stdio: ['ignore', 'pipe', 'pipe']
+      });
+      
+      // Collect output for response
+      let stdoutChunks: Buffer[] = [];
+      let stderrChunks: Buffer[] = [];
+      
+      scriptProcess.stdout.on('data', (chunk) => {
+        stdoutChunks.push(Buffer.from(chunk));
+        console.log(`Processor stdout: ${chunk}`);
+      });
+      
+      scriptProcess.stderr.on('data', (chunk) => {
+        stderrChunks.push(Buffer.from(chunk));
+        console.error(`Processor stderr: ${chunk}`);
+      });
+      
+      // Handle process completion
+      scriptProcess.on('close', (code) => {
+        const stdout = Buffer.concat(stdoutChunks).toString();
+        const stderr = Buffer.concat(stderrChunks).toString();
+        
+        if (code === 0) {
+          console.log("Enhanced document processor completed successfully");
+          
+          // Count documents in the database after processing
+          db.select({ count: sql`count(*)` })
+            .from(documents)
+            .then(documentsCount => {
+              res.json({
+                status: 'success',
+                message: 'Enhanced document processing completed successfully',
+                count: Number(documentsCount[0]?.count || 0),
+                output: stdout
+              });
+            })
+            .catch(err => {
+              console.error("Error counting documents:", err);
+              res.json({
+                status: 'success',
+                message: 'Enhanced document processing completed successfully',
+                output: stdout
+              });
+            });
+        } else {
+          console.error(`Enhanced document processor failed with code ${code}`);
+          console.error(`Error output: ${stderr}`);
+          
+          res.status(500).json({
+            status: 'error',
+            message: `Enhanced document processor failed with code ${code}`,
+            error: stderr,
+            output: stdout
+          });
+        }
+      });
+      
+      // Handle errors
+      scriptProcess.on('error', (err) => {
+        console.error("Error running enhanced document processor:", err);
+        
+        res.status(500).json({
+          status: 'error',
+          message: 'Failed to start enhanced document processor',
+          error: err.message
+        });
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error starting enhanced document processor:", error);
+      res.status(500).json({ status: 'error', message });
     }
   });
   

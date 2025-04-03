@@ -9,6 +9,7 @@ import Dashboard from "@/pages/dashboard";
 import FreeZonesPage from "@/pages/freezones-page";
 import FreeZonePage from "@/pages/freezone-page";
 import AdminPage from "@/pages/admin-page";
+import DocumentManagement from "@/pages/DocumentManagement";
 import { ProtectedRoute } from "./lib/protected-route";
 
 function Router() {
@@ -18,6 +19,7 @@ function Router() {
       <ProtectedRoute path="/free-zones" component={FreeZonesPage} />
       <ProtectedRoute path="/free-zone/:id" component={FreeZonePage} />
       <ProtectedRoute path="/admin" component={AdminPage} />
+      <ProtectedRoute path="/documents" component={DocumentManagement} />
       <Route path="/auth" component={AuthPage} />
       <Route component={NotFound} />
     </Switch>
