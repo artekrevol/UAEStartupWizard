@@ -1,0 +1,73 @@
+# Anti-Money Laundering (AML) Guidelines for DMCC Companies
+
+## Introduction
+All DMCC member companies must establish adequate AML procedures to prevent, detect, and report money laundering activities in accordance with UAE Federal laws and DMCC regulations.
+
+## Key AML Requirements
+
+### 1. Risk Assessment
+- Conduct a business-wide money laundering risk assessment
+- Identify and assess customers based on risk profiles
+- Regular review and update of risk assessments
+- Documentation of risk assessment methodology and findings
+
+### 2. Customer Due Diligence (CDD)
+- Verification of customer identity using reliable sources
+- Identification of beneficial owners
+- Understanding the purpose and nature of business relationships
+- Enhanced due diligence for higher-risk customers
+- Simplified due diligence for lower-risk customers
+
+### 3. Ongoing Monitoring
+- Regular review of customer transactions and activities
+- Update of customer information as needed
+- Transaction monitoring systems implementation
+- Red flags identification and escalation procedures
+- Periodic review of high-risk customers
+
+### 4. Record Keeping
+- Maintain records for at least 5 years
+- Documentation of CDD information and transaction history
+- Training records of employees
+- Documentation of suspicious activity reports
+- Evidence of compliance with AML obligations
+
+### 5. Suspicious Transaction Reporting
+- Procedures for internal reporting of suspicious activities
+- Assessment of suspicious activity reports
+- Filing Suspicious Transaction Reports (STRs) with the UAE FIU
+- Confidentiality of reporting process
+- Non-tipping off provisions
+
+### 6. AML Training
+- Initial AML training for all employees
+- Regular refresher training
+- Specialized training for compliance officers
+- Training documentation and assessment
+- Updates on new typologies and red flags
+
+### 7. AML Compliance Program
+- Appointment of a Money Laundering Reporting Officer (MLRO)
+- Development of written AML policies and procedures
+- Regular independent review and testing
+- Management reporting on AML compliance
+- Remediation of identified compliance gaps
+
+## Common AML Red Flags
+- Transactions inconsistent with customer's business profile
+- Complex or unusual transaction patterns
+- Reluctance to provide identity information
+- Transactions with high-risk jurisdictions
+- Cash-intensive businesses
+- Shell companies with no apparent business purpose
+- Unexplained sources of funds
+
+## Penalties for Non-Compliance
+Non-compliance with AML regulations can result in:
+- Substantial financial penalties
+- Criminal prosecution
+- License suspension or revocation
+- Reputational damage
+- Restrictions on banking services
+
+For AML compliance assistance, please contact the DMCC Compliance Department.
