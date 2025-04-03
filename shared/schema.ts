@@ -164,6 +164,28 @@ export type EstablishmentGuide = typeof establishmentGuides.$inferSelect;
 export type Document = typeof documents.$inferSelect;
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 
+// SAIF Zone Forms table for specialized forms and documents
+export const saifZoneForms = pgTable("saif_zone_forms", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  filename: text("filename").notNull(),
+  filePath: text("file_path").notNull(),
+  fileSize: integer("file_size"),
+  formType: text("form_type"), // application, guideline, brochure, etc.
+  description: text("description"),
+  language: text("language").default("english"),
+  version: text("version"),
+  isActive: boolean("is_active").default(true),
+  downloadUrl: text("download_url"),
+  metadata: jsonb("metadata"),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+});
+
+// Create SAIF Zone form insert schema
+export const insertSaifZoneFormSchema = createInsertSchema(saifZoneForms).omit({ id: true });
+export type InsertSaifZoneForm = z.infer<typeof insertSaifZoneFormSchema>;
+export type SaifZoneForm = typeof saifZoneForms.$inferSelect;
+
 // Constants for business setup
 export const LEGAL_FORMS = [
   "Limited Liability Company (LLC)",

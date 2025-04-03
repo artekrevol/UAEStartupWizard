@@ -5,11 +5,11 @@ import * as fs from "fs";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { getBusinessRecommendations, generateDocumentRequirements, getUAEBusinessAssistantResponse } from "./openai";
-import { BusinessSetup, InsertDocument } from "@shared/schema";
+import { BusinessSetup, InsertDocument, InsertSaifZoneForm } from "@shared/schema";
 import { calculateBusinessScore } from "./scoring";
 import { db } from "./db";
 import { eq, sql } from "drizzle-orm";
-import { businessCategories, businessActivities, freeZones, establishmentGuides, documents } from "@shared/schema";
+import { businessCategories, businessActivities, freeZones, establishmentGuides, documents, saifZoneForms } from "@shared/schema";
 import { documentUpload, processUploadedDocument, processDMCCDocuments } from "./document-upload";
 import { spawn } from 'child_process';
 
@@ -1566,7 +1566,195 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-
+  // SAIF Zone Forms API Routes
+  
+  // Get all SAIF Zone forms
+  app.get("/api/saif-zone-forms", async (req, res) => {
+    try {
+      const forms = await storage.getAllSaifZoneForms();
+      res.json(forms);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error fetching SAIF Zone forms:", error);
+      res.status(500).json({ message });
+    }
+  });
+  
+  // Get SAIF Zone form by ID
+  app.get("/api/saif-zone-forms/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid form ID" });
+      }
+      
+      const form = await storage.getSaifZoneForm(id);
+      if (!form) {
+        return res.status(404).json({ message: "Form not found" });
+      }
+      
+      res.json(form);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error fetching SAIF Zone form:", error);
+      res.status(500).json({ message });
+    }
+  });
+  
+  // Get SAIF Zone forms by type
+  app.get("/api/saif-zone-forms-by-type/:type", async (req, res) => {
+    try {
+      const formType = req.params.type;
+      if (!formType) {
+        return res.status(400).json({ message: "Form type is required" });
+      }
+      
+      const forms = await storage.getSaifZoneFormsByType(formType);
+      res.json(forms);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error fetching SAIF Zone forms by type:", error);
+      res.status(500).json({ message });
+    }
+  });
+  
+  // Create new SAIF Zone form (Admin only)
+  app.post("/api/saif-zone-forms", requireAdmin, async (req, res) => {
+    try {
+      const formData: InsertSaifZoneForm = req.body;
+      const newForm = await storage.createSaifZoneForm(formData);
+      res.status(201).json(newForm);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error creating SAIF Zone form:", error);
+      res.status(500).json({ message });
+    }
+  });
+  
+  // Update SAIF Zone form (Admin only)
+  app.patch("/api/saif-zone-forms/:id", requireAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid form ID" });
+      }
+      
+      await storage.updateSaifZoneForm(id, req.body);
+      res.sendStatus(200);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error updating SAIF Zone form:", error);
+      res.status(500).json({ message });
+    }
+  });
+  
+  // Delete SAIF Zone form (Admin only)
+  app.delete("/api/saif-zone-forms/:id", requireAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid form ID" });
+      }
+      
+      await storage.deleteSaifZoneForm(id);
+      res.sendStatus(204);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error deleting SAIF Zone form:", error);
+      res.status(500).json({ message });
+    }
+  });
+  
+  // Download SAIF Zone form
+  app.get("/api/saif-zone-forms/:id/download", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid form ID" });
+      }
+      
+      const form = await storage.getSaifZoneForm(id);
+      if (!form) {
+        return res.status(404).json({ message: "Form not found" });
+      }
+      
+      const filePath = form.filePath;
+      
+      // Check if file exists
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ message: "Form file not found" });
+      }
+      
+      // Set content type if available
+      const metadata = form.metadata as Record<string, any> || {};
+      const contentType = metadata.contentType || 'application/octet-stream';
+      
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Disposition', `attachment; filename="${form.filename}"`);
+      
+      // Stream the file to the response
+      const fileStream = fs.createReadStream(filePath);
+      fileStream.pipe(res);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error downloading SAIF Zone form:", error);
+      res.status(500).json({ message });
+    }
+  });
+  
+  // Run SAIF Zone document downloader (Admin only)
+  app.post("/api/saif-zone/run-document-downloader", requireAdmin, async (req, res) => {
+    try {
+      console.log("Starting SAIF Zone document downloader...");
+      
+      // Import the SAIF Zone document downloader
+      const { downloadSAIFZoneDocuments } = await import('../scraper/saif_zone_document_downloader.js');
+      
+      // Run the downloader
+      const result = await downloadSAIFZoneDocuments();
+      
+      console.log("SAIF Zone document downloader completed successfully");
+      res.json({ 
+        success: true, 
+        message: "SAIF Zone documents have been downloaded and saved",
+        result
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error running SAIF Zone document downloader:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: `SAIF Zone document downloader failed: ${message}`
+      });
+    }
+  });
+  
+  // Run SAIF Zone scraper (Admin only)
+  app.post("/api/saif-zone/run-scraper", requireAdmin, async (req, res) => {
+    try {
+      console.log("Starting SAIF Zone scraper...");
+      
+      // Import the SAIF Zone scraper
+      const { runSAIFZoneScraper } = await import('../scraper/saif_zone_scraper.js');
+      
+      // Run the scraper
+      const result = await runSAIFZoneScraper();
+      
+      console.log("SAIF Zone scraper completed successfully");
+      res.json({ 
+        success: true, 
+        message: "SAIF Zone data has been scraped and saved to the database",
+        result
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error running SAIF Zone scraper:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: `SAIF Zone scraper failed: ${message}`
+      });
+    }
+  });
   
   const httpServer = createServer(app);
   return httpServer;

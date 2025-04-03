@@ -4,11 +4,14 @@ import {
   users,
   businessSetups,
   documents,
+  saifZoneForms,
   type User,
   type InsertUser,
   type BusinessSetup,
   type Document,
   type InsertDocument,
+  type SaifZoneForm,
+  type InsertSaifZoneForm,
 } from "@shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -33,6 +36,14 @@ export interface IStorage {
   createDocument(document: InsertDocument): Promise<Document>;
   updateDocument(id: number, document: Partial<Document>): Promise<void>;
   deleteDocument(id: number): Promise<void>;
+  
+  // SAIF Zone Forms management methods
+  getSaifZoneForm(id: number): Promise<SaifZoneForm | undefined>;
+  getSaifZoneFormsByType(formType: string): Promise<SaifZoneForm[]>;
+  getAllSaifZoneForms(): Promise<SaifZoneForm[]>;
+  createSaifZoneForm(form: InsertSaifZoneForm): Promise<SaifZoneForm>;
+  updateSaifZoneForm(id: number, form: Partial<SaifZoneForm>): Promise<void>;
+  deleteSaifZoneForm(id: number): Promise<void>;
   
   sessionStore: session.Store;
 }
@@ -129,6 +140,41 @@ export class DatabaseStorage implements IStorage {
     await db
       .delete(documents)
       .where(eq(documents.id, id));
+  }
+
+  // SAIF Zone Forms management methods implementation
+  async getSaifZoneForm(id: number): Promise<SaifZoneForm | undefined> {
+    const [form] = await db.select().from(saifZoneForms).where(eq(saifZoneForms.id, id));
+    return form;
+  }
+
+  async getSaifZoneFormsByType(formType: string): Promise<SaifZoneForm[]> {
+    return await db.select().from(saifZoneForms).where(eq(saifZoneForms.formType, formType));
+  }
+
+  async getAllSaifZoneForms(): Promise<SaifZoneForm[]> {
+    return await db.select().from(saifZoneForms);
+  }
+
+  async createSaifZoneForm(form: InsertSaifZoneForm): Promise<SaifZoneForm> {
+    const [createdForm] = await db
+      .insert(saifZoneForms)
+      .values(form)
+      .returning();
+    return createdForm;
+  }
+
+  async updateSaifZoneForm(id: number, form: Partial<SaifZoneForm>): Promise<void> {
+    await db
+      .update(saifZoneForms)
+      .set(form)
+      .where(eq(saifZoneForms.id, id));
+  }
+
+  async deleteSaifZoneForm(id: number): Promise<void> {
+    await db
+      .delete(saifZoneForms)
+      .where(eq(saifZoneForms.id, id));
   }
 }
 
