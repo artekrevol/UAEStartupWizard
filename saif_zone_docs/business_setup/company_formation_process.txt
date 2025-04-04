@@ -1,11 +1,26 @@
 # SAIF Zone Company Formation Process
 
-## Contact Information
-SAIF Zone Company Formation Department
-Website: https://www.saif-zone.com/en/business-set-up/company-formation/
-Email: info@saif-zone.com
-Phone: +971-6-557-8000
+## Formation Process
+1. Select your business activity
+2. Choose a legal structure (FZE, FZC, or Branch)
+3. Submit name reservation application
+4. Select office or warehouse facility
+5. Submit required documents
+6. Pay registration fees
+7. Receive license and incorporation documents
 
-Document ID: SAIF-CF-001
-Version: 1.0
-Date: 2025-04-03
+## Requirements
+- Minimum share capital requirements vary depending on the license type and legal structure
+- At least one shareholder and one director (can be the same person)
+- No prior criminal record for directors and shareholders
+- Valid passport and visa for UAE residents
+- Proof of address
+
+## Required Documents
+- Application form
+- Passport copies of shareholders and directors
+- Recent photographs
+- Bank reference letter
+- Business profile or plan
+- Parent company documents (for branch offices)
+- Board resolution (for corporate shareholders)

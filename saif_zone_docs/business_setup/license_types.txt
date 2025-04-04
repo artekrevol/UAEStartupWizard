@@ -1,11 +1,59 @@
 # SAIF Zone License Types
 
-## Contact Information
-SAIF Zone Licensing Department
-Website: https://www.saif-zone.com/en/business-set-up/licensing/
-Email: licensing@saif-zone.com
-Phone: +971-6-557-8000
+## Commercial License
+Allows for trading activities, import/export, and distribution of products. This license is suitable for businesses involved in buying and selling goods without significant modification.
 
-Document ID: SAIF-LT-001
-Version: 1.0
-Date: 2025-04-03
+### Permitted Activities
+- General trading
+- Import and export
+- Distribution
+- Retail and wholesale
+
+### Requirements
+- Completed application form
+- Proof of relevant experience (for specific activities)
+- Minimum office space requirement
+
+## Service License
+Permits the provision of various services. This license is suitable for consultancies, management firms, and other service providers.
+
+### Permitted Activities
+- Consultancy services
+- Logistics services
+- IT services
+- Management services
+- Marketing services
+
+### Requirements
+- Completed application form
+- Professional qualifications (for specific services)
+- Minimum office space requirement
+
+## Industrial License
+Allows for manufacturing, processing, and assembly activities. This license is suitable for businesses that transform raw materials into finished products.
+
+### Permitted Activities
+- Manufacturing
+- Processing
+- Assembly
+- Packaging
+- Industrial services
+
+### Requirements
+- Completed application form
+- Project report or feasibility study
+- Environmental compliance certificate (if applicable)
+- Minimum warehouse/factory space requirement
+
+## General Business Activities
+- Import and export
+- General trading
+- Consulting services
+- IT services
+- Logistics and supply chain management
+- Manufacturing
+- Food processing
+- E-commerce
+- Marketing services
+- Educational services
+- Healthcare services

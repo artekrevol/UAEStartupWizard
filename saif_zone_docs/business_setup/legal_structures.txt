@@ -1,11 +1,17 @@
 # SAIF Zone Legal Structures
 
-## Contact Information
-SAIF Zone Legal Department
-Website: https://www.saif-zone.com/en/business-set-up/legal-structure/
-Email: legal@saif-zone.com
-Phone: +971-6-557-8000
+## Free Zone Establishment (FZE)
+A limited liability entity with a single shareholder. The minimum capital requirement varies by license type. FZE is suitable for individual entrepreneurs or small businesses looking to establish a presence in the UAE with full ownership.
 
-Document ID: SAIF-LS-001
-Version: 1.0
-Date: 2025-04-03
+## Free Zone Company (FZC)
+A limited liability entity with multiple shareholders (2-5). The minimum capital requirement varies by license type. FZC is ideal for partnerships or joint ventures that want to maintain full ownership of their UAE operations.
+
+## Branch of Foreign Company
+A branch of an existing foreign company with no separate legal identity. No capital requirement, but requires a corporate guarantee from the parent company. This option allows foreign companies to extend their activities to the UAE without establishing a new legal entity.
+
+### Requirements
+- Existing foreign company as parent
+- No capital requirement
+- Corporate guarantee from parent company
+- Appointment of a branch manager
+

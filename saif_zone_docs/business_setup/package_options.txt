@@ -1,11 +1,40 @@
 # SAIF Zone Package Options
 
-## Contact Information
-SAIF Zone Sales Department
-Website: https://www.saif-zone.com/en/business-set-up/package-options/
-Email: sales@saif-zone.com
-Phone: +971-6-557-8000
+## Executive Office Package
+**Price:** Starting from AED 15,000 per year
 
-Document ID: SAIF-PO-001
-Version: 1.0
-Date: 2025-04-03
+### Features
+- Fully furnished executive office
+- 3 visa eligibility
+- Shared meeting room access
+- Dedicated reception and secretarial services
+- Business center facilities
+
+## Flexi Desk Package
+**Price:** Starting from AED 9,500 per year
+
+### Features
+- Shared desk space
+- 1-2 visa eligibility
+- Shared meeting room access
+- Shared reception services
+- Business support services
+
+## Warehouse Package
+**Price:** Starting from AED 35,000 per year (rates vary by size)
+
+### Features
+- Warehousing space (various sizes available)
+- Multiple visa eligibility based on space size
+- 24/7 security
+- Loading/unloading facilities
+- Easy access to airport and seaports
+
+## Package Comparison
+
+| Category | Executive Office | Flexi Desk | Warehouse |
+|----------|---------|---------|---------|
+| Visa Allocation | 3 visas | 1-2 visas | Based on space size |
+| Privacy Level | High | Moderate | High |
+| Cost Range | Medium to High | Low to Medium | High |
+
