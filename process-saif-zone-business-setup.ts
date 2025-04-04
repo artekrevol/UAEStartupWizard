@@ -6,7 +6,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { storage } from './server/storage';
-import { InsertDocument } from '@shared/schema';
+import { InsertDocument } from './shared/schema';
 
 const BUSINESS_SETUP_JSON_PATH = path.join(process.cwd(), 'saif_zone_docs', 'business_setup', 'business_setup_page.json');
 const BUSINESS_SETUP_TEXT_PATH = path.join(process.cwd(), 'saif_zone_docs', 'business_setup', 'business_setup_page.txt');

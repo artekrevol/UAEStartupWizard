@@ -96,6 +96,42 @@ export const aiTrainingData = pgTable("ai_training_data", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// User Conversations for memory and context
+export const conversations = pgTable("conversations", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id),
+  sessionId: text("session_id").notNull(),
+  summary: text("summary"),
+  metadata: jsonb("metadata"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at"),
+});
+
+// Conversation Messages
+export const conversationMessages = pgTable("conversation_messages", {
+  id: serial("id").primaryKey(),
+  conversationId: integer("conversation_id").references(() => conversations.id).notNull(),
+  role: text("role").notNull(), // 'user', 'assistant', 'system'
+  content: text("content").notNull(),
+  tokenCount: integer("token_count"),
+  metadata: jsonb("metadata"),
+  timestamp: timestamp("timestamp").defaultNow(),
+});
+
+// AI Setup Flow Steps - for guided business setup
+export const setupFlowSteps = pgTable("setup_flow_steps", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  stepNumber: integer("step_number").notNull(),
+  category: text("category").notNull(),
+  requiredFields: jsonb("required_fields"),
+  nextStepId: integer("next_step_id"),
+  aiPrompt: text("ai_prompt"),
+  isActive: boolean("is_active").default(true),
+});
+
 // Free Zones Information
 export const freeZones = pgTable("free_zones", {
   id: serial("id").primaryKey(),
@@ -136,6 +172,11 @@ export const businessSetupSchema = createInsertSchema(businessSetups);
 export const insertFreeZoneSchema = createInsertSchema(freeZones);
 export const insertEstablishmentGuideSchema = createInsertSchema(establishmentGuides);
 
+// Conversation related schemas
+export const insertConversationSchema = createInsertSchema(conversations).omit({ id: true });
+export const insertMessageSchema = createInsertSchema(conversationMessages).omit({ id: true });
+export const insertSetupFlowStepSchema = createInsertSchema(setupFlowSteps).omit({ id: true });
+
 // Documents table
 export const documents = pgTable("documents", {
   id: serial("id").primaryKey(),
@@ -163,6 +204,14 @@ export type FreeZone = typeof freeZones.$inferSelect;
 export type EstablishmentGuide = typeof establishmentGuides.$inferSelect;
 export type Document = typeof documents.$inferSelect;
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
+
+// Conversation and AI Assistant related types
+export type Conversation = typeof conversations.$inferSelect;
+export type ConversationMessage = typeof conversationMessages.$inferSelect;
+export type SetupFlowStep = typeof setupFlowSteps.$inferSelect;
+export type InsertConversation = z.infer<typeof insertConversationSchema>;
+export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export type InsertSetupFlowStep = z.infer<typeof insertSetupFlowStepSchema>;
 
 // SAIF Zone Forms table for specialized forms and documents
 export const saifZoneForms = pgTable("saif_zone_forms", {

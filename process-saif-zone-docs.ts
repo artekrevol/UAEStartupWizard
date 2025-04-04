@@ -5,11 +5,10 @@
 
 import { db } from './server/db';
 import { sql } from 'drizzle-orm';
-import { documents } from './shared/schema';
+import { documents, InsertDocument } from './shared/schema';
 import * as fs from 'fs';
 import * as path from 'path';
 import { storage } from './server/storage';
-import { InsertDocument } from '@shared/schema';
 
 /**
  * Find all files recursively in a directory

@@ -1,10 +1,13 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { db } from "./db";
 import {
   users,
   businessSetups,
   documents,
   saifZoneForms,
+  conversations,
+  conversationMessages,
+  setupFlowSteps,
   type User,
   type InsertUser,
   type BusinessSetup,
@@ -12,7 +15,13 @@ import {
   type InsertDocument,
   type SaifZoneForm,
   type InsertSaifZoneForm,
-} from "@shared/schema";
+  type Conversation,
+  type InsertConversation,
+  type ConversationMessage,
+  type InsertMessage,
+  type SetupFlowStep,
+  type InsertSetupFlowStep,
+} from "../shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
@@ -44,6 +53,22 @@ export interface IStorage {
   createSaifZoneForm(form: InsertSaifZoneForm): Promise<SaifZoneForm>;
   updateSaifZoneForm(id: number, form: Partial<SaifZoneForm>): Promise<void>;
   deleteSaifZoneForm(id: number): Promise<void>;
+  
+  // Conversation management methods
+  getConversation(id: number): Promise<Conversation | undefined>;
+  getConversationsByUser(userId: number): Promise<Conversation[]>;
+  getActiveConversation(userId: number): Promise<Conversation | undefined>;
+  createConversation(conversation: InsertConversation): Promise<Conversation>;
+  updateConversation(id: number, conversation: Partial<Conversation>): Promise<void>;
+  getConversationMessages(conversationId: number): Promise<ConversationMessage[]>;
+  addMessage(message: InsertMessage): Promise<ConversationMessage>;
+  
+  // Setup Flow Steps management methods
+  getSetupFlowStep(id: number): Promise<SetupFlowStep | undefined>;
+  getSetupFlowStepByNumber(stepNumber: number, category: string): Promise<SetupFlowStep | undefined>;
+  getAllSetupFlowSteps(category: string): Promise<SetupFlowStep[]>;
+  createSetupFlowStep(step: InsertSetupFlowStep): Promise<SetupFlowStep>;
+  updateSetupFlowStep(id: number, step: Partial<SetupFlowStep>): Promise<void>;
   
   sessionStore: session.Store;
 }
@@ -175,6 +200,102 @@ export class DatabaseStorage implements IStorage {
     await db
       .delete(saifZoneForms)
       .where(eq(saifZoneForms.id, id));
+  }
+
+  // Conversation management methods implementation
+  async getConversation(id: number): Promise<Conversation | undefined> {
+    const [conversation] = await db.select().from(conversations).where(eq(conversations.id, id));
+    return conversation;
+  }
+
+  async getConversationsByUser(userId: number): Promise<Conversation[]> {
+    return await db.select().from(conversations).where(eq(conversations.userId, userId));
+  }
+
+  async getActiveConversation(userId: number): Promise<Conversation | undefined> {
+    const [conversation] = await db
+      .select()
+      .from(conversations)
+      .where(and(
+        eq(conversations.userId, userId),
+        eq(conversations.isActive, true)
+      ));
+    return conversation;
+  }
+
+  async createConversation(conversation: InsertConversation): Promise<Conversation> {
+    const [createdConversation] = await db
+      .insert(conversations)
+      .values(conversation)
+      .returning();
+    return createdConversation;
+  }
+
+  async updateConversation(id: number, update: Partial<Conversation>): Promise<void> {
+    await db
+      .update(conversations)
+      .set(update)
+      .where(eq(conversations.id, id));
+  }
+
+  async getConversationMessages(conversationId: number): Promise<ConversationMessage[]> {
+    return await db
+      .select()
+      .from(conversationMessages)
+      .where(eq(conversationMessages.conversationId, conversationId))
+      .orderBy(conversationMessages.timestamp);
+  }
+
+  async addMessage(message: InsertMessage): Promise<ConversationMessage> {
+    const [createdMessage] = await db
+      .insert(conversationMessages)
+      .values(message)
+      .returning();
+    return createdMessage;
+  }
+
+  // Setup Flow Steps management methods implementation
+  async getSetupFlowStep(id: number): Promise<SetupFlowStep | undefined> {
+    const [step] = await db.select().from(setupFlowSteps).where(eq(setupFlowSteps.id, id));
+    return step;
+  }
+
+  async getSetupFlowStepByNumber(stepNumber: number, category: string): Promise<SetupFlowStep | undefined> {
+    const [step] = await db
+      .select()
+      .from(setupFlowSteps)
+      .where(and(
+        eq(setupFlowSteps.stepNumber, stepNumber),
+        eq(setupFlowSteps.category, category),
+        eq(setupFlowSteps.isActive, true)
+      ));
+    return step;
+  }
+
+  async getAllSetupFlowSteps(category: string): Promise<SetupFlowStep[]> {
+    return await db
+      .select()
+      .from(setupFlowSteps)
+      .where(and(
+        eq(setupFlowSteps.category, category),
+        eq(setupFlowSteps.isActive, true)
+      ))
+      .orderBy(setupFlowSteps.stepNumber);
+  }
+
+  async createSetupFlowStep(step: InsertSetupFlowStep): Promise<SetupFlowStep> {
+    const [createdStep] = await db
+      .insert(setupFlowSteps)
+      .values(step)
+      .returning();
+    return createdStep;
+  }
+
+  async updateSetupFlowStep(id: number, update: Partial<SetupFlowStep>): Promise<void> {
+    await db
+      .update(setupFlowSteps)
+      .set(update)
+      .where(eq(setupFlowSteps.id, id));
   }
 }
 
