@@ -9,7 +9,8 @@ import { storage } from "./storage";
 import { db } from "./db";
 import * as fs from 'fs';
 import * as path from 'path';
-import { freeZones, documents, businessActivities, establishmentGuides } from "../shared/schema";
+import { freeZones, documents, businessActivities, establishmentGuides, conversations } from "../shared/schema";
+import { eq } from "drizzle-orm";
 
 // Initialize OpenAI with API key
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -395,7 +396,21 @@ ${doc.content?.substring(0, 1000) || 'No content available'}${doc.content?.lengt
 // We'll export the initialization function to be called from elsewhere
 export async function runInitialization(): Promise<void> {
   console.log("Starting assistant memory initialization...");
+  
   try {
+    // Check if system conversation already exists
+    const systemConversations = await db
+      .select()
+      .from(conversations)
+      .where(eq(conversations.sessionId, "system-knowledge-base"));
+    
+    if (systemConversations.length > 0) {
+      console.log(`System knowledge conversation already exists with ID: ${systemConversations[0].id}`);
+      console.log("Skipping full reinitialization to improve performance");
+      return Promise.resolve();
+    }
+    
+    // If no existing conversation, initialize from scratch
     await initializeAssistantMemory();
     console.log("Assistant memory initialization successful.");
     return Promise.resolve();
