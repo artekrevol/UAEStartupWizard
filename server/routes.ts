@@ -5,6 +5,8 @@ import * as fs from "fs";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { getBusinessRecommendations, generateDocumentRequirements, getUAEBusinessAssistantResponse } from "./openai";
+import { chatWithBusinessAssistant, getBusinessSetupFlow, getStepGuidance } from "./assistantService";
+import { performWebResearch, createDocumentFromResearch, chatWithWebResearchAssistant, searchDocuments } from "./WebResearchAssistant";
 import { BusinessSetup, InsertDocument, InsertSaifZoneForm, InsertIssuesLog } from "../shared/schema";
 import { calculateBusinessScore } from "./scoring";
 import { db } from "./db";
