@@ -9,7 +9,7 @@ import { BusinessSetup, InsertDocument, InsertSaifZoneForm, InsertIssuesLog } fr
 import { calculateBusinessScore } from "./scoring";
 import { db } from "./db";
 import { eq, sql } from "drizzle-orm";
-import { businessCategories, businessActivities, freeZones, establishmentGuides, documents, saifZoneForms } from "@shared/schema";
+import { businessCategories, businessActivities, freeZones, establishmentGuides, documents, saifZoneForms, issuesLog } from "../shared/schema";
 import { documentUpload, processUploadedDocument, processDMCCDocuments, processSAIFZoneDocuments } from "./document-upload";
 import { spawn } from 'child_process';
 
@@ -1857,6 +1857,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Issues Log Endpoints
+  
+  // Create a new issue
+  app.post("/api/issues", async (req, res) => {
+    try {
+      const userId = req.isAuthenticated() ? (req.user as any).id : null;
+      
+      const issue: InsertIssuesLog = {
+        userId,
+        type: req.body.type,
+        severity: req.body.severity,
+        message: req.body.message,
+        stackTrace: req.body.stackTrace,
+        url: req.body.url,
+        userAgent: req.headers["user-agent"],
+        component: req.body.component,
+        action: req.body.action,
+        metadata: req.body.metadata,
+        resolved: false,
+        createdAt: new Date(),
+        resolvedAt: null
+      };
+      
+      const createdIssue = await storage.createIssue(issue);
+      console.log(`[IssueLog] New ${issue.type} issue logged: ${issue.message}`);
+      
+      res.status(201).json(createdIssue);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error creating issue log:", error);
+      res.status(500).json({ message });
+    }
+  });
+  
+  // Get all issues (admin only)
+  app.get("/api/issues", requireAdmin, async (req, res) => {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 100;
+      const issues = await storage.getRecentIssues(limit);
+      res.json(issues);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error fetching issues:", error);
+      res.status(500).json({ message });
+    }
+  });
+  
+  // Get unresolved issues (admin only)
+  app.get("/api/issues/unresolved", requireAdmin, async (req, res) => {
+    try {
+      const issues = await storage.getUnresolvedIssues();
+      res.json(issues);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error fetching unresolved issues:", error);
+      res.status(500).json({ message });
+    }
+  });
+  
+  // Get issues for the current user
+  app.get("/api/issues/me", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      const issues = await storage.getIssuesByUser((req.user as any).id);
+      res.json(issues);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error fetching user issues:", error);
+      res.status(500).json({ message });
+    }
+  });
+  
+  // Resolve an issue (admin only)
+  app.patch("/api/issues/:id/resolve", requireAdmin, async (req, res) => {
+    try {
+      const issueId = parseInt(req.params.id);
+      if (isNaN(issueId)) {
+        return res.status(400).json({ message: "Invalid issue ID" });
+      }
+      
+      await storage.resolveIssue(issueId);
+      res.sendStatus(200);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error resolving issue:", error);
+      res.status(500).json({ message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

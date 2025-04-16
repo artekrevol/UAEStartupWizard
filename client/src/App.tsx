@@ -11,6 +11,9 @@ import FreeZonePage from "@/pages/freezone-page";
 import AdminPage from "@/pages/admin-page";
 import DocumentManagement from "@/pages/DocumentManagement";
 import { ProtectedRoute } from "./lib/protected-route";
+import ErrorBoundary from "@/components/error-boundary";
+import { useEffect } from "react";
+import { trackPageView } from "@/lib/user-tracker";
 
 function Router() {
   return (
