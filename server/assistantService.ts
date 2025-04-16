@@ -11,9 +11,15 @@ import {
 import { db } from "./db";
 import { eq } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
+import { initializeAssistantMemory } from "./initializeAssistantMemory";
+import * as fs from 'fs';
+import * as path from 'path';
 
 // Initialize OpenAI with API key
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// System knowledge conversation ID
+let systemKnowledgeConversationId: number | null = null;
 
 /**
  * Calculate token count using a simple approximation
@@ -584,5 +590,171 @@ export async function initializeDefaultSetupFlowSteps(): Promise<void> {
     console.log("Default setup flow steps initialized");
   } catch (error) {
     console.error("Error initializing default setup flow steps:", error);
+  }
+}
+
+/**
+ * Initialize the system knowledge conversation to power the business assistant
+ * This function loads all the data from the database into memory for better responses
+ */
+export async function initializeSystemKnowledge(): Promise<void> {
+  try {
+    // Check if we need to initialize the system memory
+    const knowledgeDir = path.join(process.cwd(), 'knowledge');
+    const knowledgeFilePath = path.join(knowledgeDir, 'assistant-knowledge-base.json');
+    
+    // First check if we already have a system knowledge conversation
+    const systemConversations = await db
+      .select()
+      .from(conversations)
+      .where(eq(conversations.sessionId, "system-knowledge-base"));
+    
+    if (systemConversations.length > 0) {
+      systemKnowledgeConversationId = systemConversations[0].id;
+      console.log(`Using existing system knowledge conversation with ID: ${systemKnowledgeConversationId}`);
+      return;
+    }
+    
+    // If we have a saved knowledge base file but no conversation, create one
+    if (fs.existsSync(knowledgeFilePath)) {
+      console.log("Found existing knowledge base file, creating system conversation...");
+      
+      // Create system conversation
+      const conversation = await storage.createConversation({
+        sessionId: "system-knowledge-base",
+        isActive: true,
+        metadata: { type: "system_knowledge" },
+        summary: "Comprehensive UAE business setup knowledge base"
+      });
+      
+      systemKnowledgeConversationId = conversation.id;
+      
+      // Load the knowledge base file
+      const knowledgeBase = fs.readFileSync(knowledgeFilePath, 'utf8');
+      
+      // Add to conversation as a system message
+      await storage.addMessage({
+        conversationId: conversation.id,
+        role: "system",
+        content: `CONSOLIDATED KNOWLEDGE BASE:\n${knowledgeBase}`,
+        tokenCount: Math.ceil(knowledgeBase.length / 4),
+        metadata: { type: "consolidated_knowledge" }
+      });
+      
+      console.log(`Created system knowledge conversation with ID: ${conversation.id}`);
+      return;
+    }
+    
+    // If we don't have a knowledge base file or conversation, create it from scratch
+    console.log("No existing knowledge base found, initializing assistant memory...");
+    await initializeAssistantMemory();
+    
+    // Find the system conversation that was created
+    const newSystemConversations = await db
+      .select()
+      .from(conversations)
+      .where(eq(conversations.sessionId, "system-knowledge-base"));
+    
+    if (newSystemConversations.length > 0) {
+      systemKnowledgeConversationId = newSystemConversations[0].id;
+      console.log(`Initialized system knowledge conversation with ID: ${systemKnowledgeConversationId}`);
+    } else {
+      console.error("Failed to find or create system knowledge conversation");
+    }
+    
+  } catch (error) {
+    console.error("Error initializing system knowledge:", error);
+  }
+}
+
+/**
+ * Enhanced business assistant chat that includes system knowledge
+ * @param userId The user's ID (optional)
+ * @param message The user's message
+ * @returns Assistant's response
+ */
+export async function chatWithEnhancedBusinessAssistant(
+  userId: number | undefined,
+  message: string
+): Promise<{
+  conversationId: number;
+  message: string;
+  memory: {
+    key_topics: string[];
+    next_steps: string[];
+    business_setup_info: Record<string, string>;
+  };
+}> {
+  try {
+    // Ensure system knowledge is initialized
+    if (systemKnowledgeConversationId === null) {
+      await initializeSystemKnowledge();
+    }
+    
+    // Get or create a conversation
+    const conversation = await getOrCreateConversation(userId);
+    
+    // Add user message to the conversation
+    await addMessageToConversation(conversation.id, "user", message);
+    
+    // Get conversation history
+    const conversationHistory = await getConversationHistoryForOpenAI(conversation.id);
+    
+    // Generate system message
+    const systemMessage = await generateBusinessAssistantSystemMessage(userId);
+    
+    // Get system knowledge from the knowledge conversation
+    let systemKnowledge = "";
+    if (systemKnowledgeConversationId !== null) {
+      const knowledgeMessages = await storage.getConversationMessages(systemKnowledgeConversationId);
+      const consolidatedMessage = knowledgeMessages.find(msg => 
+        msg.role === "system" && msg.metadata?.type === "consolidated_knowledge"
+      );
+      
+      if (consolidatedMessage) {
+        systemKnowledge = `\n\nUSE THE FOLLOWING KNOWLEDGE BASE TO INFORM YOUR RESPONSES:\n${consolidatedMessage.content}`;
+      }
+    }
+    
+    // Enhanced system message with knowledge base
+    const enhancedSystemMessage = systemMessage + systemKnowledge;
+    
+    // Call OpenAI API with enhanced context
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system" as const, content: enhancedSystemMessage },
+        ...conversationHistory.map(msg => ({
+          role: msg.role as "user" | "assistant",
+          content: msg.content
+        }))
+      ],
+      temperature: 0.7,
+      max_tokens: 800
+    });
+    
+    // Extract response content
+    const assistantMessage = response.choices[0].message.content || "I'm sorry, I couldn't generate a response.";
+    
+    // Add assistant message to the conversation
+    await addMessageToConversation(conversation.id, "assistant", assistantMessage);
+    
+    // Generate memory/context from the conversation
+    const memory = await generateMemoryFromConversation(conversation.id, userId);
+    
+    // Update conversation summary based on memory
+    await storage.updateConversation(conversation.id, {
+      summary: memory.key_topics.join(", "),
+      updatedAt: new Date()
+    });
+    
+    return {
+      conversationId: conversation.id,
+      message: assistantMessage,
+      memory
+    };
+  } catch (error) {
+    console.error("Error in enhanced business assistant chat:", error);
+    throw new Error("Failed to communicate with the enhanced business assistant");
   }
 }
