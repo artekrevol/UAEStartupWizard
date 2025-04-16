@@ -724,9 +724,11 @@ export async function chatWithEnhancedBusinessAssistant(
     // Enhanced system message with knowledge base
     const enhancedSystemMessage = systemMessage + systemKnowledge;
     
-    // Call OpenAI API with enhanced context
+    console.log("Calling OpenAI API with enhanced context...");
+    
+    // Call OpenAI API with enhanced context - using faster GPT-3.5 for better performance
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-3.5-turbo-16k", // Using 3.5 Turbo with larger context window for faster responses
       messages: [
         { role: "system" as const, content: enhancedSystemMessage },
         ...conversationHistory.map(msg => ({
