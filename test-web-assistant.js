@@ -6,6 +6,7 @@
  */
 
 import { premiumBusinessAnswer } from './server/WebResearchAssistant.js';
+import 'dotenv/config';
 
 /**
  * Test the premium business answer functionality
