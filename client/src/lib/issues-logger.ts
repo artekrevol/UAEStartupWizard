@@ -62,7 +62,13 @@ class IssuesLogger {
       }
 
       // Send issue to server
-      await apiRequest('/api/issues', 'POST', issueData);
+      await fetch('/api/issues', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(issueData)
+      });
 
       console.log(`[IssuesLogger] Logged ${issueData.type} issue: ${issueData.message}`);
     } catch (error) {
