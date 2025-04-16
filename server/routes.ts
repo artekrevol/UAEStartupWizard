@@ -5,7 +5,7 @@ import * as fs from "fs";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { getBusinessRecommendations, generateDocumentRequirements, getUAEBusinessAssistantResponse } from "./openai";
-import { chatWithBusinessAssistant, getBusinessSetupFlow, getStepGuidance } from "./assistantService";
+import { chatWithBusinessAssistant, getBusinessSetupFlow, getStepGuidance, chatWithEnhancedBusinessAssistant, initializeSystemKnowledge } from "./assistantService";
 import { performWebResearch, createDocumentFromResearch, chatWithWebResearchAssistant, searchDocuments } from "./WebResearchAssistant";
 import { BusinessSetup, InsertDocument, InsertSaifZoneForm, InsertIssuesLog } from "../shared/schema";
 import { calculateBusinessScore } from "./scoring";
@@ -1002,6 +1002,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const message = error instanceof Error ? error.message : 'Unknown error occurred';
       console.error("Error with business assistant:", error);
       res.status(500).json({ message });
+    }
+  });
+
+  // Enhanced AI Assistant routes
+  
+  // Endpoint for chatting with the enhanced business assistant
+  app.post("/api/enhanced-business-assistant/chat", async (req, res) => {
+    try {
+      // Verify OpenAI API key is configured
+      if (!process.env.OPENAI_API_KEY) {
+        return res.status(500).json({ error: "OpenAI API key is not configured" });
+      }
+
+      const { message } = req.body;
+      
+      if (!message || typeof message !== 'string') {
+        return res.status(400).json({ error: "Message is required and must be a string" });
+      }
+      
+      console.log("Enhanced business assistant chat request:", message);
+      
+      // Get user ID from session if available
+      const userId = req.isAuthenticated() ? req.user?.id : undefined;
+      
+      // Call the enhanced business assistant service
+      const response = await chatWithEnhancedBusinessAssistant(userId, message);
+      
+      res.json(response);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to communicate with the assistant';
+      console.error("Error in enhanced business assistant chat:", error);
+      res.status(500).json({ error: message });
+    }
+  });
+  
+  // Endpoint to initialize the assistant's memory with all existing data
+  app.post("/api/enhanced-business-assistant/initialize", async (req, res) => {
+    try {
+      console.log("Received request to initialize assistant memory with UAE free zone data");
+      
+      // Initialize the assistant's memory with all existing data
+      await initializeSystemKnowledge();
+      
+      res.json({ 
+        status: 'success', 
+        message: 'Assistant memory initialized successfully with all available UAE free zone data'
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to initialize assistant memory';
+      console.error("Error initializing assistant memory:", error);
+      res.status(500).json({ status: 'error', error: message });
     }
   });
 

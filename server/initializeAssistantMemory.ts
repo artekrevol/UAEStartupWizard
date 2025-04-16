@@ -391,16 +391,16 @@ ${doc.content?.substring(0, 1000) || 'No content available'}${doc.content?.lengt
 `;
 }
 
-// Run the initialization if this script is executed directly
-if (require.main === module) {
+// In ES modules, there's no direct equivalent to require.main === module
+// We'll export the initialization function to be called from elsewhere
+export async function runInitialization(): Promise<void> {
   console.log("Starting assistant memory initialization...");
-  initializeAssistantMemory()
-    .then(() => {
-      console.log("Assistant memory initialization successful.");
-      process.exit(0);
-    })
-    .catch(error => {
-      console.error("Assistant memory initialization failed:", error);
-      process.exit(1);
-    });
+  try {
+    await initializeAssistantMemory();
+    console.log("Assistant memory initialization successful.");
+    return Promise.resolve();
+  } catch (error) {
+    console.error("Assistant memory initialization failed:", error);
+    return Promise.reject(error);
+  }
 }

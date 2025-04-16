@@ -6,12 +6,13 @@ import {
   type BusinessSetup,
   type FreeZone,
   type EstablishmentGuide,
-  type SetupFlowStep
+  type SetupFlowStep,
+  conversations
 } from "../shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
-import { initializeAssistantMemory } from "./initializeAssistantMemory";
+import { initializeAssistantMemory, runInitialization } from "./initializeAssistantMemory";
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -599,7 +600,11 @@ export async function initializeDefaultSetupFlowSteps(): Promise<void> {
  */
 export async function initializeSystemKnowledge(): Promise<void> {
   try {
-    // Check if we need to initialize the system memory
+    console.log("Initializing system knowledge...");
+    // Call the ES module version of the initialization function
+    await runInitialization();
+    
+    // Create knowledge directory for caching if needed
     const knowledgeDir = path.join(process.cwd(), 'knowledge');
     const knowledgeFilePath = path.join(knowledgeDir, 'assistant-knowledge-base.json');
     
