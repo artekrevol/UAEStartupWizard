@@ -50,7 +50,11 @@ function NavLink({ href, icon, children, className = '', onClick }: NavLinkProps
 }
 
 export function NavBar() {
-  const { logout } = useAuth();
+  const { logoutMutation } = useAuth();
+  
+  const handleLogout = () => {
+    logoutMutation.mutate();
+  };
   
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background">
@@ -85,7 +89,7 @@ export function NavBar() {
             variant="ghost"
             size="icon"
             className="hidden md:flex"
-            onClick={() => logout()}
+            onClick={handleLogout}
           >
             <LogOut className="h-4 w-4" />
             <span className="sr-only">Logout</span>
@@ -131,7 +135,7 @@ export function NavBar() {
                   <Button
                     variant="ghost"
                     className="flex items-center gap-2 justify-start px-3 h-10 font-normal"
-                    onClick={() => logout()}
+                    onClick={handleLogout}
                   >
                     <LogOut className="h-4 w-4" />
                     <span>Logout</span>

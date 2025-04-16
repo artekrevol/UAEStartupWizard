@@ -47,7 +47,7 @@ export function DocumentList({ freeZoneId, category }: DocumentListProps) {
   // Build query parameters
   const queryParams = new URLSearchParams();
   if (freeZoneId) queryParams.append('freeZoneId', String(freeZoneId));
-  if (selectedCategory) queryParams.append('category', selectedCategory);
+  if (selectedCategory && selectedCategory !== 'all') queryParams.append('category', selectedCategory);
   
   // Fetch documents
   const { data, isLoading, error } = useQuery<Document[]>({
@@ -75,8 +75,8 @@ export function DocumentList({ freeZoneId, category }: DocumentListProps) {
   };
   
   // Format file size to readable format
-  const formatFileSize = (bytes?: number) => {
-    if (!bytes) return 'Unknown';
+  const formatFileSize = (bytes?: number | null) => {
+    if (bytes === undefined || bytes === null) return 'Unknown';
     if (bytes < 1024) return `${bytes} bytes`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -111,7 +111,7 @@ export function DocumentList({ freeZoneId, category }: DocumentListProps) {
                   <SelectValue placeholder="All Categories" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Categories</SelectItem>
+                  <SelectItem value="all">All Categories</SelectItem>
                   <SelectItem value="general">General</SelectItem>
                   <SelectItem value="company-setup">Company Setup</SelectItem>
                   <SelectItem value="licensing">Licensing</SelectItem>
