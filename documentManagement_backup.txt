@@ -362,7 +362,7 @@ export default function DocumentManagement() {
                       <SelectValue placeholder="Select Category" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Categories</SelectItem>
+                      <SelectItem value="">All Categories</SelectItem>
                       {docStats?.categoryCounts?.map((cat) => (
                         <SelectItem key={cat.category} value={cat.category}>
                           {cat.category.replace(/_/g, ' ')}
@@ -417,7 +417,7 @@ export default function DocumentManagement() {
                       <SelectValue placeholder="All Categories" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Categories</SelectItem>
+                      <SelectItem value="">All Categories</SelectItem>
                       {docStats?.categoryCounts?.map((cat) => (
                         <SelectItem key={cat.category} value={cat.category}>
                           {cat.category.replace(/_/g, ' ')}
@@ -437,7 +437,7 @@ export default function DocumentManagement() {
                       <SelectValue placeholder="All Subcategories" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Subcategories</SelectItem>
+                      <SelectItem value="">All Subcategories</SelectItem>
                       {subcategoryStats?.subcategoryCounts?.map((item) => (
                         <SelectItem key={`${item.category}-${item.subcategory}`} value={item.subcategory}>
                           {item.subcategory.replace(/_/g, ' ')}
