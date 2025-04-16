@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import DashboardLayout from "@/components/layout/dashboard-layout";
 import { FreeZoneDetails } from "@/components/freezone/freezone-details";
@@ -9,15 +9,17 @@ import { ChevronLeft } from "lucide-react";
 export default function FreeZonePage() {
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
+  const [freeZoneId, setFreeZoneId] = useState<number | null>(null);
   
-  // Safely extract the ID from the URL
-  const freeZoneId = (() => {
+  // Extract and validate the ID from the URL using useEffect instead of during render
+  useEffect(() => {
     try {
       const matches = location.match(/\/free-zone\/(\d+)/);
       if (matches && matches[1]) {
         const id = parseInt(matches[1], 10);
         if (!isNaN(id)) {
-          return id;
+          setFreeZoneId(id);
+          return;
         }
       }
       
@@ -31,12 +33,12 @@ export default function FreeZonePage() {
         setLocation("/free-zones");
       }
       
-      return null;
+      setFreeZoneId(null);
     } catch (e) {
       console.error("Error parsing free zone ID:", e);
-      return null;
+      setFreeZoneId(null);
     }
-  })();
+  }, [location, setLocation, toast]);
 
   return (
     <DashboardLayout>

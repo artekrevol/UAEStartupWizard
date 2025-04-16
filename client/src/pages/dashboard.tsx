@@ -4,7 +4,7 @@ import DashboardLayout from "@/components/layout/dashboard-layout";
 import ProgressTracker from "@/components/business-setup/progress-tracker";
 import RecommendationForm from "@/components/business-setup/recommendation-form";
 import { useQuery } from "@tanstack/react-query";
-import { BusinessSetup, FreeZone } from "@shared/schema";
+import { BusinessSetup, FreeZone } from "../../../shared/schema";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
