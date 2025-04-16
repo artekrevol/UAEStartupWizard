@@ -2,7 +2,7 @@ import React, { Component, ReactNode, ErrorInfo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ExclamationTriangleIcon, RotateCcw } from 'lucide-react';
+import { AlertTriangle, RotateCcw } from 'lucide-react';
 import { logComponentError } from '@/lib/issues-logger';
 
 interface ErrorBoundaryProps {
@@ -37,7 +37,9 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     // Log the error to our issues log system
-    logComponentError(error, errorInfo);
+    logComponentError(error, { 
+      componentStack: errorInfo.componentStack || 'Unknown component stack' 
+    });
     this.setState({ errorInfo });
   }
 
@@ -64,7 +66,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
         <Card className="my-4 border-red-200 bg-red-50">
           <CardHeader>
             <CardTitle className="flex items-center">
-              <ExclamationTriangleIcon className="h-5 w-5 text-red-500 mr-2" />
+              <AlertTriangle className="h-5 w-5 text-red-500 mr-2" />
               {componentName ? `Error in ${componentName}` : 'Something went wrong'}
             </CardTitle>
           </CardHeader>
