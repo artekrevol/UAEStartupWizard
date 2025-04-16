@@ -1949,6 +1949,124 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Web Research Assistant endpoints
+  
+  // Perform web research on a topic
+  app.post("/api/web-research", async (req, res) => {
+    try {
+      // Verify OpenAI API key is configured
+      if (!process.env.OPENAI_API_KEY) {
+        return res.status(500).json({ message: "OpenAI API key is not configured" });
+      }
+
+      const { topic } = req.body;
+      
+      if (!topic || typeof topic !== 'string') {
+        return res.status(400).json({ message: "Topic is required and must be a string" });
+      }
+      
+      // Get user ID if authenticated
+      const userId = req.isAuthenticated() ? (req.user as any).id : undefined;
+      
+      // Perform web research
+      const research = await performWebResearch(topic, userId);
+      
+      res.json(research);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error performing web research:", error);
+      res.status(500).json({ message });
+    }
+  });
+  
+  // Chat with web research assistant
+  app.post("/api/web-research/chat", async (req, res) => {
+    try {
+      // Verify OpenAI API key is configured
+      if (!process.env.OPENAI_API_KEY) {
+        return res.status(500).json({ message: "OpenAI API key is not configured" });
+      }
+
+      const { topic, message, conversationId } = req.body;
+      
+      if (!topic || typeof topic !== 'string') {
+        return res.status(400).json({ message: "Topic is required and must be a string" });
+      }
+      
+      if (!message || typeof message !== 'string') {
+        return res.status(400).json({ message: "Message is required and must be a string" });
+      }
+      
+      // Get user ID if authenticated
+      const userId = req.isAuthenticated() ? (req.user as any).id : undefined;
+      
+      // Chat with web research assistant
+      const response = await chatWithWebResearchAssistant(
+        topic,
+        message,
+        conversationId ? parseInt(conversationId) : undefined,
+        userId
+      );
+      
+      res.json(response);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error chatting with web research assistant:", error);
+      res.status(500).json({ message });
+    }
+  });
+  
+  // Create document from research
+  app.post("/api/web-research/create-document", async (req, res) => {
+    try {
+      const { topic, summary, category } = req.body;
+      
+      if (!topic || typeof topic !== 'string') {
+        return res.status(400).json({ message: "Topic is required and must be a string" });
+      }
+      
+      if (!summary || typeof summary !== 'string') {
+        return res.status(400).json({ message: "Summary is required and must be a string" });
+      }
+      
+      if (!category || typeof category !== 'string') {
+        return res.status(400).json({ message: "Category is required and must be a string" });
+      }
+      
+      // Get user ID if authenticated
+      const userId = req.isAuthenticated() ? (req.user as any).id : undefined;
+      
+      // Create document from research
+      const document = await createDocumentFromResearch(topic, summary, category, userId);
+      
+      res.json(document);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error creating document from research:", error);
+      res.status(500).json({ message });
+    }
+  });
+  
+  // Search documents for a topic
+  app.get("/api/web-research/search", async (req, res) => {
+    try {
+      const topic = req.query.topic as string;
+      
+      if (!topic) {
+        return res.status(400).json({ message: "Topic query parameter is required" });
+      }
+      
+      // Search documents
+      const results = await searchDocuments(topic);
+      
+      res.json(results);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error searching documents:", error);
+      res.status(500).json({ message });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

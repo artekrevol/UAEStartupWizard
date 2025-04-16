@@ -45,6 +45,7 @@ export interface IStorage {
   getDocumentsByFreeZone(freeZoneId: number): Promise<Document[]>;
   getDocumentsByCategory(category: string): Promise<Document[]>;
   getDocumentsByFilename(filename: string): Promise<Document[]>;
+  getAllDocuments(): Promise<Document[]>;
   createDocument(document: InsertDocument): Promise<Document>;
   updateDocument(id: number, document: Partial<Document>): Promise<void>;
   deleteDocument(id: number): Promise<void>;
@@ -156,6 +157,10 @@ export class DatabaseStorage implements IStorage {
 
   async getDocumentsByFilename(filename: string): Promise<Document[]> {
     return await db.select().from(documents).where(eq(documents.filename, filename));
+  }
+  
+  async getAllDocuments(): Promise<Document[]> {
+    return await db.select().from(documents);
   }
 
   async createDocument(document: InsertDocument): Promise<Document> {

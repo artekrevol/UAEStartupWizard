@@ -471,7 +471,7 @@ export async function searchDocuments(topic: string): Promise<Array<{
     
     // For each document, calculate a simple relevance score
     // and extract a snippet containing the topic
-    const results = documents.map(doc => {
+    const results = documents.map((doc) => {
       const content = doc.content || "";
       const relevance = calculateRelevanceScore(content, topic);
       
