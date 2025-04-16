@@ -6,7 +6,7 @@ import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { getBusinessRecommendations, generateDocumentRequirements, getUAEBusinessAssistantResponse } from "./openai";
 import { chatWithBusinessAssistant, getBusinessSetupFlow, getStepGuidance, chatWithEnhancedBusinessAssistant, initializeSystemKnowledge } from "./assistantService";
-import { performWebResearch, createDocumentFromResearch, chatWithWebResearchAssistant, searchDocuments } from "./WebResearchAssistant";
+import { performWebResearch, searchDocuments, premiumBusinessAnswer } from "./WebResearchAssistant";
 import { BusinessSetup, InsertDocument, InsertSaifZoneForm, InsertIssuesLog } from "../shared/schema";
 import { calculateBusinessScore } from "./scoring";
 import { db } from "./db";
@@ -1053,6 +1053,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const message = error instanceof Error ? error.message : 'Failed to initialize assistant memory';
       console.error("Error initializing assistant memory:", error);
       res.status(500).json({ status: 'error', error: message });
+    }
+  });
+
+  // Direct premium business answer endpoint (faster implementation)
+  app.post("/api/premium-business-answer", async (req, res) => {
+    try {
+      const { question } = req.body;
+      
+      if (!question) {
+        return res.status(400).json({ error: "Question is required" });
+      }
+      
+      console.log(`Processing premium business answer request: "${question}"`);
+      
+      // Use the direct function from WebResearchAssistant
+      const response = await premiumBusinessAnswer(question);
+      
+      res.json(response);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to generate premium business answer';
+      console.error("Error in premium business answer endpoint:", error);
+      res.status(500).json({ error: message });
     }
   });
 
