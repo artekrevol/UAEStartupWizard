@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { db } from "./db";
 import {
   users,
@@ -8,6 +8,7 @@ import {
   conversations,
   conversationMessages,
   setupFlowSteps,
+  issuesLog,
   type User,
   type InsertUser,
   type BusinessSetup,
@@ -21,6 +22,8 @@ import {
   type InsertMessage,
   type SetupFlowStep,
   type InsertSetupFlowStep,
+  type IssuesLog,
+  type InsertIssuesLog,
 } from "../shared/schema";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
@@ -69,6 +72,15 @@ export interface IStorage {
   getAllSetupFlowSteps(category: string): Promise<SetupFlowStep[]>;
   createSetupFlowStep(step: InsertSetupFlowStep): Promise<SetupFlowStep>;
   updateSetupFlowStep(id: number, step: Partial<SetupFlowStep>): Promise<void>;
+  
+  // Issues Log management methods
+  getIssue(id: number): Promise<IssuesLog | undefined>;
+  getIssuesByUser(userId: number): Promise<IssuesLog[]>;
+  getRecentIssues(limit?: number): Promise<IssuesLog[]>;
+  getUnresolvedIssues(): Promise<IssuesLog[]>;
+  createIssue(issue: InsertIssuesLog): Promise<IssuesLog>;
+  updateIssue(id: number, issue: Partial<IssuesLog>): Promise<void>;
+  resolveIssue(id: number): Promise<void>;
   
   sessionStore: session.Store;
 }
@@ -296,6 +308,61 @@ export class DatabaseStorage implements IStorage {
       .update(setupFlowSteps)
       .set(update)
       .where(eq(setupFlowSteps.id, id));
+  }
+
+  // Issues Log management methods implementation
+  async getIssue(id: number): Promise<IssuesLog | undefined> {
+    const [issue] = await db.select().from(issuesLog).where(eq(issuesLog.id, id));
+    return issue;
+  }
+
+  async getIssuesByUser(userId: number): Promise<IssuesLog[]> {
+    return await db
+      .select()
+      .from(issuesLog)
+      .where(eq(issuesLog.userId, userId))
+      .orderBy(desc(issuesLog.createdAt));
+  }
+
+  async getRecentIssues(limit: number = 100): Promise<IssuesLog[]> {
+    return await db
+      .select()
+      .from(issuesLog)
+      .orderBy(desc(issuesLog.createdAt))
+      .limit(limit);
+  }
+
+  async getUnresolvedIssues(): Promise<IssuesLog[]> {
+    return await db
+      .select()
+      .from(issuesLog)
+      .where(eq(issuesLog.resolved, false))
+      .orderBy(desc(issuesLog.createdAt));
+  }
+
+  async createIssue(issue: InsertIssuesLog): Promise<IssuesLog> {
+    const [createdIssue] = await db
+      .insert(issuesLog)
+      .values(issue)
+      .returning();
+    return createdIssue;
+  }
+
+  async updateIssue(id: number, update: Partial<IssuesLog>): Promise<void> {
+    await db
+      .update(issuesLog)
+      .set(update)
+      .where(eq(issuesLog.id, id));
+  }
+
+  async resolveIssue(id: number): Promise<void> {
+    await db
+      .update(issuesLog)
+      .set({ 
+        resolved: true,
+        resolvedAt: new Date()
+      })
+      .where(eq(issuesLog.id, id));
   }
 }
 

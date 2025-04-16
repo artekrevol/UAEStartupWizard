@@ -235,6 +235,28 @@ export const insertSaifZoneFormSchema = createInsertSchema(saifZoneForms).omit({
 export type InsertSaifZoneForm = z.infer<typeof insertSaifZoneFormSchema>;
 export type SaifZoneForm = typeof saifZoneForms.$inferSelect;
 
+// Issues log for tracking user behavior and errors
+export const issuesLog = pgTable("issues_log", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
+  type: text("type").notNull(), // "error", "crash", "behavior", "performance"
+  severity: text("severity").notNull(), // "low", "medium", "high", "critical"
+  message: text("message").notNull(),
+  stackTrace: text("stack_trace"),
+  url: text("url"),
+  userAgent: text("user_agent"),
+  component: text("component"),
+  action: text("action"),
+  metadata: jsonb("metadata"),
+  resolved: boolean("resolved").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  resolvedAt: timestamp("resolved_at"),
+});
+
+export const insertIssuesLogSchema = createInsertSchema(issuesLog).omit({ id: true });
+export type InsertIssuesLog = z.infer<typeof insertIssuesLogSchema>;
+export type IssuesLog = typeof issuesLog.$inferSelect;
+
 // Constants for business setup
 export const LEGAL_FORMS = [
   "Limited Liability Company (LLC)",

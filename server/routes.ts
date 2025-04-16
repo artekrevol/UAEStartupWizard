@@ -5,7 +5,7 @@ import * as fs from "fs";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { getBusinessRecommendations, generateDocumentRequirements, getUAEBusinessAssistantResponse } from "./openai";
-import { BusinessSetup, InsertDocument, InsertSaifZoneForm } from "@shared/schema";
+import { BusinessSetup, InsertDocument, InsertSaifZoneForm, InsertIssuesLog } from "../shared/schema";
 import { calculateBusinessScore } from "./scoring";
 import { db } from "./db";
 import { eq, sql } from "drizzle-orm";
