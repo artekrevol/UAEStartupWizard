@@ -11,7 +11,7 @@ import { BusinessSetup, InsertDocument, InsertSaifZoneForm, InsertIssuesLog } fr
 import { calculateBusinessScore } from "./scoring";
 import { db } from "./db";
 import { eq, sql } from "drizzle-orm";
-import { businessCategories, businessActivities, freeZones, establishmentGuides, documents, saifZoneForms, issuesLog } from "../shared/schema";
+import { businessActivityCategories, businessActivities, freeZones, documents, issuesLog } from "../shared/schema";
 import { documentUpload, processUploadedDocument, processDMCCDocuments, processSAIFZoneDocuments } from "./document-upload";
 import { spawn } from 'child_process';
 

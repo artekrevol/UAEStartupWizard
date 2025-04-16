@@ -2,7 +2,7 @@ import axios from "axios";
 import * as cheerio from "cheerio";
 import cron from "node-cron";
 import { db } from "./db";
-import { freeZones, establishmentGuides } from "@shared/schema";
+import { freeZones } from "@shared/schema";
 import { sql } from "drizzle-orm";
 import { log } from "./vite";
 import https from "https";
@@ -441,7 +441,9 @@ async function scrapeFreeZones() {
   log(`Processed ${freeZonesList.length} free zones`, "scraper");
 }
 
-// Helper to safely insert or update establishment guides
+// Note: Establishment guides functionality removed (table no longer exists)
+// This function is kept as a reference for when we implement document-based guides
+/*
 async function upsertEstablishmentGuide(guide: {
   category: string;
   title: string;
@@ -450,45 +452,9 @@ async function upsertEstablishmentGuide(guide: {
   documents: string[];
   steps: Array<{ title: string; description: string }>;
 }) {
-  try {
-    // Check if guide already exists
-    const existingGuides = await db
-      .select()
-      .from(establishmentGuides)
-      .where(sql`${establishmentGuides.title} = ${guide.title}`);
-
-    if (existingGuides.length > 0) {
-      // Update existing record
-      await db
-        .update(establishmentGuides)
-        .set({
-          category: guide.category,
-          content: guide.content,
-          requirements: guide.requirements,
-          documents: guide.documents,
-          steps: guide.steps,
-          lastUpdated: new Date()
-        })
-        .where(sql`${establishmentGuides.id} = ${existingGuides[0].id}`);
-      log(`Updated existing establishment guide: ${guide.title}`, "scraper");
-    } else {
-      // Insert new record
-      await db.insert(establishmentGuides).values({
-        category: guide.category,
-        title: guide.title,
-        content: guide.content,
-        requirements: guide.requirements,
-        documents: guide.documents,
-        steps: guide.steps,
-        lastUpdated: new Date()
-      });
-      log(`Inserted new establishment guide: ${guide.title}`, "scraper");
-    }
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    log(`Error upserting establishment guide ${guide.title}: ${errorMessage}`, "scraper");
-  }
+  // Implementation removed - table no longer exists
 }
+*/
 
 async function scrapeEstablishmentGuides() {
   const html = await fetchPage(ESTABLISHING_COMPANIES_URL);
@@ -670,7 +636,9 @@ async function scrapeEstablishmentGuides() {
   // Update database with new data
   for (const guide of guidesList) {
     if (guide.title && guide.content) {
-      await upsertEstablishmentGuide(guide);
+      // Note: upsertEstablishmentGuide function has been removed
+      // We'll process these guides differently now
+      log(`Found guide: ${guide.title} (not saving - table removed)`, "scraper");
     }
   }
 

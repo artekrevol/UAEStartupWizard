@@ -9,7 +9,7 @@ import { storage } from "./storage";
 import { db } from "./db";
 import * as fs from 'fs';
 import * as path from 'path';
-import { freeZones, documents, businessActivities, establishmentGuides, conversations } from "../shared/schema";
+import { freeZones, documents, businessActivities, conversations } from "../shared/schema";
 import { eq } from "drizzle-orm";
 
 // Initialize OpenAI with API key
@@ -82,25 +82,7 @@ export async function initializeAssistantMemory(): Promise<void> {
       console.log("Business activities knowledge added to memory");
     }
     
-    // 4. Load all establishment guides
-    const allGuides = await db.select().from(establishmentGuides);
-    if (allGuides.length > 0) {
-      console.log(`Loading ${allGuides.length} establishment guides into memory...`);
-      
-      // Format guides as structured knowledge
-      const guidesKnowledge = formatEstablishmentGuidesData(allGuides);
-      
-      // Add to conversation as a system message
-      await storage.addMessage({
-        conversationId: conversation.id,
-        role: "system",
-        content: guidesKnowledge,
-        tokenCount: Math.ceil(guidesKnowledge.length / 4),
-        metadata: { type: "establishment_guides_knowledge" }
-      });
-      
-      console.log("Establishment guides knowledge added to memory");
-    }
+    // Note: Establishment guides section removed as it's not in our current schema
     
     // 5. Process all documents in chunks to avoid token limits
     const allDocuments = await storage.getAllDocuments();

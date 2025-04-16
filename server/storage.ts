@@ -2,26 +2,32 @@ import { eq, and, desc } from "drizzle-orm";
 import { db } from "./db";
 import {
   users,
-  businessSetups,
+  businessSetup,
   documents,
-  saifZoneForms,
+  userDocuments,
+  documentTemplates,
+  templateSubmissions,
   conversations,
-  conversationMessages,
-  setupFlowSteps,
+  messages,
   issuesLog,
+  documentTypes,
   type User,
   type InsertUser,
   type BusinessSetup,
   type Document,
   type InsertDocument,
-  type SaifZoneForm,
-  type InsertSaifZoneForm,
+  type UserDocument,
+  type InsertUserDocument,
+  type DocumentTemplate,
+  type InsertDocumentTemplate,
+  type TemplateSubmission,
+  type InsertTemplateSubmission,
+  type DocumentType,
+  type InsertDocumentType,
   type Conversation,
   type InsertConversation,
-  type ConversationMessage,
+  type Message,
   type InsertMessage,
-  type SetupFlowStep,
-  type InsertSetupFlowStep,
   type IssuesLog,
   type InsertIssuesLog,
 } from "../shared/schema";
@@ -50,29 +56,51 @@ export interface IStorage {
   updateDocument(id: number, document: Partial<Document>): Promise<void>;
   deleteDocument(id: number): Promise<void>;
   
-  // SAIF Zone Forms management methods
-  getSaifZoneForm(id: number): Promise<SaifZoneForm | undefined>;
-  getSaifZoneFormsByType(formType: string): Promise<SaifZoneForm[]>;
-  getAllSaifZoneForms(): Promise<SaifZoneForm[]>;
-  createSaifZoneForm(form: InsertSaifZoneForm): Promise<SaifZoneForm>;
-  updateSaifZoneForm(id: number, form: Partial<SaifZoneForm>): Promise<void>;
-  deleteSaifZoneForm(id: number): Promise<void>;
+  // User Document management methods
+  getUserDocument(id: number): Promise<UserDocument | undefined>;
+  getUserDocumentsByUser(userId: number): Promise<UserDocument[]>;
+  getUserDocumentsByType(userId: number, documentType: string): Promise<UserDocument[]>;
+  getUserDocumentsByCategory(userId: number, category: string): Promise<UserDocument[]>;
+  createUserDocument(document: InsertUserDocument): Promise<UserDocument>;
+  updateUserDocument(id: number, document: Partial<UserDocument>): Promise<void>;
+  deleteUserDocument(id: number): Promise<void>;
+  
+  // Document Template management methods
+  getDocumentTemplate(id: number): Promise<DocumentTemplate | undefined>;
+  getDocumentTemplatesByFreeZone(freeZoneId: number): Promise<DocumentTemplate[]>;
+  getDocumentTemplatesByCategory(category: string): Promise<DocumentTemplate[]>;
+  getAllDocumentTemplates(): Promise<DocumentTemplate[]>;
+  createDocumentTemplate(template: InsertDocumentTemplate): Promise<DocumentTemplate>;
+  updateDocumentTemplate(id: number, template: Partial<DocumentTemplate>): Promise<void>;
+  deleteDocumentTemplate(id: number): Promise<void>;
+  
+  // Template Submission management methods
+  getTemplateSubmission(id: number): Promise<TemplateSubmission | undefined>;
+  getTemplateSubmissionsByUser(userId: number): Promise<TemplateSubmission[]>;
+  getTemplateSubmissionsByTemplate(templateId: number): Promise<TemplateSubmission[]>;
+  getTemplateSubmissionsByStatus(userId: number, status: string): Promise<TemplateSubmission[]>;
+  createTemplateSubmission(submission: InsertTemplateSubmission): Promise<TemplateSubmission>;
+  updateTemplateSubmission(id: number, submission: Partial<TemplateSubmission>): Promise<void>;
+  deleteTemplateSubmission(id: number): Promise<void>;
+  
+  // Document Type management methods
+  getDocumentType(id: number): Promise<DocumentType | undefined>;
+  getDocumentTypeByName(name: string): Promise<DocumentType | undefined>;
+  getAllDocumentTypes(): Promise<DocumentType[]>;
+  getDocumentTypesByCategory(category: string): Promise<DocumentType[]>;
+  createDocumentType(type: InsertDocumentType): Promise<DocumentType>;
+  updateDocumentType(id: number, type: Partial<DocumentType>): Promise<void>;
+  deleteDocumentType(id: number): Promise<void>;
   
   // Conversation management methods
   getConversation(id: number): Promise<Conversation | undefined>;
   getConversationsByUser(userId: number): Promise<Conversation[]>;
-  getActiveConversation(userId: number): Promise<Conversation | undefined>;
   createConversation(conversation: InsertConversation): Promise<Conversation>;
   updateConversation(id: number, conversation: Partial<Conversation>): Promise<void>;
-  getConversationMessages(conversationId: number): Promise<ConversationMessage[]>;
-  addMessage(message: InsertMessage): Promise<ConversationMessage>;
   
-  // Setup Flow Steps management methods
-  getSetupFlowStep(id: number): Promise<SetupFlowStep | undefined>;
-  getSetupFlowStepByNumber(stepNumber: number, category: string): Promise<SetupFlowStep | undefined>;
-  getAllSetupFlowSteps(category: string): Promise<SetupFlowStep[]>;
-  createSetupFlowStep(step: InsertSetupFlowStep): Promise<SetupFlowStep>;
-  updateSetupFlowStep(id: number, step: Partial<SetupFlowStep>): Promise<void>;
+  // Message management methods
+  getMessagesByConversation(conversationId: number): Promise<Message[]>;
+  addMessage(message: InsertMessage): Promise<Message>;
   
   // Issues Log management methods
   getIssue(id: number): Promise<IssuesLog | undefined>;
@@ -121,24 +149,24 @@ export class DatabaseStorage implements IStorage {
   async getBusinessSetup(userId: number): Promise<BusinessSetup | undefined> {
     const [setup] = await db
       .select()
-      .from(businessSetups)
-      .where(eq(businessSetups.userId, userId));
+      .from(businessSetup)
+      .where(eq(businessSetup.userId, userId));
     return setup;
   }
 
   async createBusinessSetup(setup: Omit<BusinessSetup, "id">): Promise<BusinessSetup> {
-    const [businessSetup] = await db
-      .insert(businessSetups)
+    const [createdSetup] = await db
+      .insert(businessSetup)
       .values(setup)
       .returning();
-    return businessSetup;
+    return createdSetup;
   }
 
   async updateBusinessSetup(id: number, update: Partial<BusinessSetup>): Promise<void> {
     await db
-      .update(businessSetups)
+      .update(businessSetup)
       .set(update)
-      .where(eq(businessSetups.id, id));
+      .where(eq(businessSetup.id, id));
   }
 
   // Document management methods implementation
@@ -182,6 +210,223 @@ export class DatabaseStorage implements IStorage {
     await db
       .delete(documents)
       .where(eq(documents.id, id));
+  }
+
+  // User Document management methods implementation
+  async getUserDocument(id: number): Promise<UserDocument | undefined> {
+    const [document] = await db.select().from(userDocuments).where(eq(userDocuments.id, id));
+    return document;
+  }
+
+  async getUserDocumentsByUser(userId: number): Promise<UserDocument[]> {
+    return await db
+      .select()
+      .from(userDocuments)
+      .where(eq(userDocuments.userId, userId))
+      .orderBy(desc(userDocuments.uploadedAt));
+  }
+
+  async getUserDocumentsByType(userId: number, documentType: string): Promise<UserDocument[]> {
+    return await db
+      .select()
+      .from(userDocuments)
+      .where(and(
+        eq(userDocuments.userId, userId),
+        eq(userDocuments.documentType, documentType)
+      ))
+      .orderBy(desc(userDocuments.uploadedAt));
+  }
+
+  async getUserDocumentsByCategory(userId: number, category: string): Promise<UserDocument[]> {
+    return await db
+      .select()
+      .from(userDocuments)
+      .where(and(
+        eq(userDocuments.userId, userId),
+        eq(userDocuments.documentCategory, category)
+      ))
+      .orderBy(desc(userDocuments.uploadedAt));
+  }
+
+  async createUserDocument(document: InsertUserDocument): Promise<UserDocument> {
+    const [createdDocument] = await db
+      .insert(userDocuments)
+      .values(document)
+      .returning();
+    return createdDocument;
+  }
+
+  async updateUserDocument(id: number, document: Partial<UserDocument>): Promise<void> {
+    await db
+      .update(userDocuments)
+      .set({
+        ...document,
+        updatedAt: new Date()
+      })
+      .where(eq(userDocuments.id, id));
+  }
+
+  async deleteUserDocument(id: number): Promise<void> {
+    await db
+      .delete(userDocuments)
+      .where(eq(userDocuments.id, id));
+  }
+
+  // Document Template management methods implementation
+  async getDocumentTemplate(id: number): Promise<DocumentTemplate | undefined> {
+    const [template] = await db.select().from(documentTemplates).where(eq(documentTemplates.id, id));
+    return template;
+  }
+
+  async getDocumentTemplatesByFreeZone(freeZoneId: number): Promise<DocumentTemplate[]> {
+    return await db
+      .select()
+      .from(documentTemplates)
+      .where(eq(documentTemplates.freeZoneId, freeZoneId))
+      .orderBy(documentTemplates.name);
+  }
+
+  async getDocumentTemplatesByCategory(category: string): Promise<DocumentTemplate[]> {
+    return await db
+      .select()
+      .from(documentTemplates)
+      .where(eq(documentTemplates.category, category))
+      .orderBy(documentTemplates.name);
+  }
+
+  async getAllDocumentTemplates(): Promise<DocumentTemplate[]> {
+    return await db
+      .select()
+      .from(documentTemplates)
+      .orderBy(documentTemplates.name);
+  }
+
+  async createDocumentTemplate(template: InsertDocumentTemplate): Promise<DocumentTemplate> {
+    const [createdTemplate] = await db
+      .insert(documentTemplates)
+      .values(template)
+      .returning();
+    return createdTemplate;
+  }
+
+  async updateDocumentTemplate(id: number, template: Partial<DocumentTemplate>): Promise<void> {
+    await db
+      .update(documentTemplates)
+      .set({
+        ...template,
+        updatedAt: new Date()
+      })
+      .where(eq(documentTemplates.id, id));
+  }
+
+  async deleteDocumentTemplate(id: number): Promise<void> {
+    await db
+      .delete(documentTemplates)
+      .where(eq(documentTemplates.id, id));
+  }
+
+  // Template Submission management methods implementation
+  async getTemplateSubmission(id: number): Promise<TemplateSubmission | undefined> {
+    const [submission] = await db.select().from(templateSubmissions).where(eq(templateSubmissions.id, id));
+    return submission;
+  }
+
+  async getTemplateSubmissionsByUser(userId: number): Promise<TemplateSubmission[]> {
+    return await db
+      .select()
+      .from(templateSubmissions)
+      .where(eq(templateSubmissions.userId, userId))
+      .orderBy(desc(templateSubmissions.updatedAt));
+  }
+
+  async getTemplateSubmissionsByTemplate(templateId: number): Promise<TemplateSubmission[]> {
+    return await db
+      .select()
+      .from(templateSubmissions)
+      .where(eq(templateSubmissions.templateId, templateId))
+      .orderBy(desc(templateSubmissions.updatedAt));
+  }
+
+  async getTemplateSubmissionsByStatus(userId: number, status: string): Promise<TemplateSubmission[]> {
+    return await db
+      .select()
+      .from(templateSubmissions)
+      .where(and(
+        eq(templateSubmissions.userId, userId),
+        eq(templateSubmissions.status, status)
+      ))
+      .orderBy(desc(templateSubmissions.updatedAt));
+  }
+
+  async createTemplateSubmission(submission: InsertTemplateSubmission): Promise<TemplateSubmission> {
+    const [createdSubmission] = await db
+      .insert(templateSubmissions)
+      .values(submission)
+      .returning();
+    return createdSubmission;
+  }
+
+  async updateTemplateSubmission(id: number, submission: Partial<TemplateSubmission>): Promise<void> {
+    await db
+      .update(templateSubmissions)
+      .set({
+        ...submission,
+        updatedAt: new Date()
+      })
+      .where(eq(templateSubmissions.id, id));
+  }
+
+  async deleteTemplateSubmission(id: number): Promise<void> {
+    await db
+      .delete(templateSubmissions)
+      .where(eq(templateSubmissions.id, id));
+  }
+
+  // Document Type management methods implementation
+  async getDocumentType(id: number): Promise<DocumentType | undefined> {
+    const [type] = await db.select().from(documentTypes).where(eq(documentTypes.id, id));
+    return type;
+  }
+
+  async getDocumentTypeByName(name: string): Promise<DocumentType | undefined> {
+    const [type] = await db.select().from(documentTypes).where(eq(documentTypes.name, name));
+    return type;
+  }
+
+  async getAllDocumentTypes(): Promise<DocumentType[]> {
+    return await db
+      .select()
+      .from(documentTypes)
+      .orderBy(documentTypes.name);
+  }
+
+  async getDocumentTypesByCategory(category: string): Promise<DocumentType[]> {
+    return await db
+      .select()
+      .from(documentTypes)
+      .where(eq(documentTypes.category, category))
+      .orderBy(documentTypes.name);
+  }
+
+  async createDocumentType(type: InsertDocumentType): Promise<DocumentType> {
+    const [createdType] = await db
+      .insert(documentTypes)
+      .values(type)
+      .returning();
+    return createdType;
+  }
+
+  async updateDocumentType(id: number, type: Partial<DocumentType>): Promise<void> {
+    await db
+      .update(documentTypes)
+      .set(type)
+      .where(eq(documentTypes.id, id));
+  }
+
+  async deleteDocumentType(id: number): Promise<void> {
+    await db
+      .delete(documentTypes)
+      .where(eq(documentTypes.id, id));
   }
 
   // SAIF Zone Forms management methods implementation
