@@ -21,8 +21,9 @@ export const users = pgTable('users', {
   id: serial('id').primaryKey(),
   username: text('username').notNull(),
   password: text('password').notNull(),
-  email: text('email'),
   role: text('role').default('user'),
+  company_name: text('company_name'),
+  progress: integer('progress').default(0),
   created_at: timestamp('created_at').defaultNow(),
 });
 
@@ -183,9 +184,15 @@ export const issuesLog = pgTable('issues_log', {
   type: text('type').notNull(), // 'error', 'behavior', 'crash', 'feedback'
   severity: text('severity').default('info'), // 'info', 'warning', 'error', 'critical'
   message: text('message'),
-  details: jsonb('details').default({}),
+  metadata: jsonb('metadata').default({}),
   resolved: boolean('resolved').default(false),
-  createdAt: timestamp('created_at').defaultNow(),
+  created_at: timestamp('created_at').defaultNow(),
+  resolved_at: timestamp('resolved_at'),
+  url: text('url'),
+  user_agent: text('user_agent'),
+  component: text('component'),
+  action: text('action'),
+  stack_trace: text('stack_trace'),
 });
 
 // Conversations

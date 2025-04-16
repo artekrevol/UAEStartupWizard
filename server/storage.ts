@@ -591,11 +591,37 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createIssue(issue: InsertIssuesLog): Promise<IssuesLog> {
-    const [createdIssue] = await db
-      .insert(issuesLog)
-      .values(issue)
-      .returning();
-    return createdIssue;
+    // Make sure we're using fields that exist in the database
+    const issueData = {
+      type: issue.type,
+      severity: issue.severity || 'info',
+      message: issue.message,
+      userId: issue.userId,
+      metadata: issue.metadata || {},
+      resolved: issue.resolved || false,
+      url: issue.url,
+      user_agent: issue.user_agent,
+      component: issue.component,
+      action: issue.action,
+      stack_trace: issue.stack_trace
+    };
+    
+    try {
+      const [createdIssue] = await db
+        .insert(issuesLog)
+        .values(issueData)
+        .returning();
+      return createdIssue;
+    } catch (error) {
+      console.error('Error creating issue:', error);
+      // Return a partial object so the application can continue
+      return {
+        id: -1,
+        type: issue.type,
+        message: issue.message || 'Error logging failed',
+        ...issueData
+      } as IssuesLog;
+    }
   }
 
   async updateIssue(id: number, update: Partial<IssuesLog>): Promise<void> {
