@@ -141,11 +141,10 @@ export default function DocumentManagement() {
       setIsRunningDownloader(true);
       setProcessingOutput('Starting comprehensive document downloader...\n');
       
-      const result = await apiRequest<ProcessingResult>('/api/documents/run-comprehensive-downloader', {
-        method: 'POST'
-      } as RequestInit);
+      const response = await apiRequest('POST', '/api/documents/run-comprehensive-downloader');
+      const result = await response.json();
       
-      setProcessingOutput(prev => prev + result.output + '\n');
+      setProcessingOutput(prev => prev + (result.output || '') + '\n');
       
       if (result.status === 'running') {
         toast({
@@ -185,16 +184,15 @@ export default function DocumentManagement() {
       setIsProcessingDocs(true);
       setProcessingOutput('Starting enhanced document processing...\n');
       
-      const result = await apiRequest<ProcessingResult>('/api/documents/process-enhanced', {
-        method: 'POST'
-      } as RequestInit);
+      const response = await apiRequest('POST', '/api/documents/process-enhanced');
+      const result = await response.json();
       
-      setProcessingOutput(prev => prev + result.output + '\n');
+      setProcessingOutput(prev => prev + (result.output || '') + '\n');
       
       if (result.status === 'success') {
         toast({
           title: 'Document Processing Complete',
-          description: `Successfully processed documents. Total documents: ${result.count}`,
+          description: `Successfully processed documents. Total documents: ${result.count || 0}`,
           variant: 'default',
         });
         
@@ -228,15 +226,14 @@ export default function DocumentManagement() {
       setIsProcessingDocs(true);
       setProcessingOutput('Starting standard document processing...\n');
       
-      const result = await apiRequest<ProcessingResult>('/api/documents/process-dmcc', {
-        method: 'POST'
-      } as RequestInit);
+      const response = await apiRequest('POST', '/api/documents/process-dmcc');
+      const result = await response.json();
       
-      setProcessingOutput(prev => prev + `Documents processed successfully. Total documents: ${result.count}\n`);
+      setProcessingOutput(prev => prev + `Documents processed successfully. Total documents: ${result.count || 0}\n`);
       
       toast({
         title: 'Document Processing Complete',
-        description: `Successfully processed documents. Total documents: ${result.count}`,
+        description: `Successfully processed documents. Total documents: ${result.count || 0}`,
         variant: 'default',
       });
       
