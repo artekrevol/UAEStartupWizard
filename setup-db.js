@@ -19,14 +19,15 @@ async function setupDatabase() {
     // Create tables using raw SQL
     console.log('Creating tables...');
     
-    // Create users table
+    // Create users table (if it doesn't exist, otherwise we'll use the existing one)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         username TEXT NOT NULL,
         password TEXT NOT NULL,
-        email TEXT,
         role TEXT DEFAULT 'user',
+        company_name TEXT,
+        progress INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT NOW()
       )
     `);
@@ -95,7 +96,75 @@ async function setupDatabase() {
       )
     `);
     
-    // Create issues_log table
+    // Create business_setup table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS business_setup (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) NOT NULL,
+        business_type TEXT,
+        business_name TEXT,
+        business_activity TEXT,
+        selected_free_zone INTEGER REFERENCES free_zones(id),
+        budget TEXT,
+        timeline TEXT,
+        requirements JSONB DEFAULT '{}',
+        progress JSONB DEFAULT '{}',
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    
+    // Create user_documents table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_documents (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        title TEXT NOT NULL,
+        description TEXT,
+        filename TEXT NOT NULL,
+        file_path TEXT NOT NULL,
+        file_size INTEGER,
+        document_type TEXT NOT NULL,
+        document_category TEXT,
+        status TEXT DEFAULT 'active',
+        expiry_date TIMESTAMP,
+        metadata JSONB DEFAULT '{}',
+        uploaded_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    
+    // Create document_templates table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS document_templates (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT,
+        free_zone_id INTEGER REFERENCES free_zones(id),
+        category TEXT,
+        template_file TEXT,
+        required_documents JSONB DEFAULT '[]',
+        form_fields JSONB DEFAULT '[]',
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    
+    // Create template_submissions table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS template_submissions (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id),
+        template_id INTEGER NOT NULL REFERENCES document_templates(id),
+        submission_data JSONB DEFAULT '{}',
+        attached_documents JSONB DEFAULT '[]',
+        status TEXT DEFAULT 'draft',
+        submitted_at TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    
+    // Create issues_log table (match existing table structure)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS issues_log (
         id SERIAL PRIMARY KEY,
@@ -103,17 +172,102 @@ async function setupDatabase() {
         type TEXT NOT NULL,
         severity TEXT DEFAULT 'info',
         message TEXT,
-        details JSONB DEFAULT '{}',
+        metadata JSONB DEFAULT '{}',
         resolved BOOLEAN DEFAULT false,
+        created_at TIMESTAMP DEFAULT NOW(),
+        resolved_at TIMESTAMP,
+        url TEXT,
+        user_agent TEXT,
+        component TEXT,
+        action TEXT,
+        stack_trace TEXT
+      )
+    `);
+    
+    // Create conversations table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS conversations (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id),
+        source TEXT NOT NULL,
+        title TEXT,
+        summary TEXT,
+        last_message_time TIMESTAMP DEFAULT NOW(),
+        metadata JSONB DEFAULT '{}',
         created_at TIMESTAMP DEFAULT NOW()
       )
     `);
     
-    // Create a test user
+    // Create messages table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS messages (
+        id SERIAL PRIMARY KEY,
+        conversation_id INTEGER NOT NULL REFERENCES conversations(id),
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        metadata JSONB DEFAULT '{}',
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    
+    // Create assistant_memory table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS assistant_memory (
+        id SERIAL PRIMARY KEY,
+        conversation_id TEXT NOT NULL,
+        thread_id TEXT,
+        assistant_id TEXT,
+        memory_type TEXT NOT NULL,
+        content JSONB NOT NULL,
+        metadata JSONB DEFAULT '{}',
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    
+    // Create web_research_items table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS web_research_items (
+        id SERIAL PRIMARY KEY,
+        query TEXT NOT NULL,
+        url TEXT NOT NULL,
+        title TEXT,
+        content TEXT,
+        search_engine TEXT,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    
+    // Create document_types table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS document_types (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT,
+        category TEXT,
+        required_fields JSONB DEFAULT '[]',
+        validation_rules JSONB DEFAULT '{}'
+      )
+    `);
+    
+    // Create ai_training_data table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ai_training_data (
+        id SERIAL PRIMARY KEY,
+        question TEXT NOT NULL,
+        answer TEXT NOT NULL,
+        category TEXT,
+        source TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    
+    // Create a test user if none exists
     console.log('Creating test user...');
     await pool.query(`
-      INSERT INTO users (username, password, email, role)
-      VALUES ('admin', 'password123', 'admin@example.com', 'admin')
+      INSERT INTO users (username, password, role, company_name)
+      VALUES ('admin', 'password123', 'admin', 'Test Company')
       ON CONFLICT DO NOTHING
     `);
     
