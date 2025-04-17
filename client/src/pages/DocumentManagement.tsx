@@ -97,7 +97,8 @@ export default function DocumentManagement() {
       const url = selectedCategory
         ? `/api/documents/stats/subcategories?category=${selectedCategory}`
         : '/api/documents/stats/subcategories';
-      return apiRequest<SubcategoryStats>(url);
+      const response = await apiRequest('GET', url);
+      return response.json();
     },
     staleTime: 60000, // 1 minute
   });
@@ -121,7 +122,8 @@ export default function DocumentManagement() {
         url += `?${params.join('&')}`;
       }
       
-      return apiRequest<Document[]>(url);
+      const response = await apiRequest('GET', url);
+      return response.json();
     },
     staleTime: 30000, // 30 seconds
   });
