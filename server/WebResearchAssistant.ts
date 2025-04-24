@@ -54,12 +54,12 @@ export async function searchDocuments(
     // Add free zone filter if provided
     if (freeZoneId) {
       sqlQuery += ` AND free_zone_id = $${params.length + 1}`;
-      params.push(freeZoneId);
+      params.push(freeZoneId.toString());
     }
     
     // Add limit
     sqlQuery += ` LIMIT $${params.length + 1}`;
-    params.push(MAX_RESULTS);
+    params.push(MAX_RESULTS.toString());
     
     const result = await db.query(sqlQuery, params);
     const results = result.rows;
@@ -92,7 +92,7 @@ export async function searchFreeZones(query: string): Promise<any[]> {
       LIMIT $2
     `;
     
-    const result = await db.query(sqlQuery, [searchPattern, MAX_RESULTS]);
+    const result = await db.query(sqlQuery, [searchPattern, MAX_RESULTS.toString()]);
     const results = result.rows;
     
     console.log(`Found ${results.length} matching free zones`);
@@ -247,12 +247,13 @@ export async function getFreeZoneKnowledge(freeZoneName: string): Promise<any> {
     // Find the free zone in the database using direct SQL
     const searchPattern = `%${freeZoneName.replace(/\s+/g, '%')}%`;
     
-    const freeZoneResult = await db.execute(sql`
+    const sqlQuery = `
       SELECT * FROM free_zones
-      WHERE LOWER(name) LIKE LOWER(${searchPattern})
+      WHERE LOWER(name) LIKE LOWER($1)
       LIMIT 1
-    `);
+    `;
     
+    const freeZoneResult = await db.query(sqlQuery, [searchPattern]);
     const freeZoneResults = freeZoneResult.rows;
     
     if (freeZoneResults.length === 0) {
@@ -263,7 +264,9 @@ export async function getFreeZoneKnowledge(freeZoneName: string): Promise<any> {
     const freeZone = freeZoneResults[0];
     
     // Find related documents
-    const relatedDocs = await searchDocuments(freeZoneName, undefined, freeZone.id);
+    // Convert id to number if it's not already
+    const freeZoneId = typeof freeZone.id === 'number' ? freeZone.id : parseInt(freeZone.id as string, 10);
+    const relatedDocs = await searchDocuments(freeZoneName, undefined, freeZoneId);
     
     // Compile information
     return {
