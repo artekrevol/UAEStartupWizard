@@ -7,6 +7,7 @@ import { storage } from "./storage";
 import { getBusinessRecommendations, generateDocumentRequirements, getUAEBusinessAssistantResponse } from "./openai";
 import { chatWithBusinessAssistant, getBusinessSetupFlow, getStepGuidance, chatWithEnhancedBusinessAssistant, initializeSystemKnowledge } from "./assistantService";
 import { performWebResearch, searchDocuments, premiumBusinessAnswer } from "./WebResearchAssistant";
+import { findBestStaticResponse } from "./static-responses";
 import { BusinessSetup, InsertDocument, InsertSaifZoneForm, InsertIssuesLog } from "../shared/schema";
 import { calculateBusinessScore } from "./scoring";
 import { db } from "./db";
@@ -1030,11 +1031,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Endpoint for chatting with the enhanced business assistant
   app.post("/api/enhanced-business-assistant/chat", async (req, res) => {
     try {
-      // Verify OpenAI API key is configured
-      if (!process.env.OPENAI_API_KEY) {
-        return res.status(500).json({ error: "OpenAI API key is not configured" });
-      }
-
       const { message } = req.body;
       
       if (!message || typeof message !== 'string') {
@@ -1042,17 +1038,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       console.log("Enhanced business assistant chat request:", message);
+
+      // First, try to match the query against our static response database
+      const staticResponse = findBestStaticResponse(message);
+      
+      // If we have a static response that matches, use it directly
+      if (staticResponse) {
+        console.log("Using static response for:", message);
+        
+        // Create a conversation for tracking purposes if user is authenticated
+        const userId = req.isAuthenticated() ? req.user?.id : undefined;
+        let conversationId = 123; // Default for anonymous users
+        
+        if (userId) {
+          try {
+            const conversation = await getOrCreateConversation(userId);
+            conversationId = conversation.id;
+            
+            // Log the message to the conversation
+            await storage.addMessage({
+              conversationId,
+              role: "user",
+              content: message
+            });
+            
+            // Log the static response
+            await storage.addMessage({
+              conversationId,
+              role: "assistant",
+              content: staticResponse,
+              metadata: { source: "static_response" }
+            });
+          } catch (error) {
+            console.error("Error saving conversation:", error);
+            // Continue with the response even if saving fails
+          }
+        }
+        
+        return res.json({
+          conversationId,
+          message: staticResponse,
+          memory: {
+            key_topics: ["Business setup", "UAE free zones"],
+            next_steps: ["Research specific requirements", "Compare free zone options"],
+            business_setup_info: {}
+          }
+        });
+      }
+      
+      // Verify OpenAI API key is configured for dynamic responses
+      if (!process.env.OPENAI_API_KEY) {
+        return res.status(500).json({ error: "OpenAI API key is not configured" });
+      }
       
       // Get user ID from session if available
       const userId = req.isAuthenticated() ? req.user?.id : undefined;
       
-      // Temporary solution: use regular business assistant for faster response
-      // const response = await chatWithEnhancedBusinessAssistant(userId, message);
-      
-      // This is quicker than loading the entire system knowledge
+      // Fall back to regular business assistant for unknown questions
+      console.log("No static match found, using regular business assistant");
       const response = await chatWithBusinessAssistant(userId, message);
       
-      // Enhance the response with a simulated memory object to match API
+      // Enhance the response with a memory object
       const enhancedResponse = {
         conversationId: response.conversationId,
         message: response.message,
