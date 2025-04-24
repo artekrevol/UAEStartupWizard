@@ -19,7 +19,8 @@ import {
 } from './search-service';
 import {
   getActivityLogs,
-  clearActivityLogs
+  clearActivityLogs,
+  logActivity
 } from './logger';
 import {
   generateEnrichmentTasks,
@@ -279,6 +280,26 @@ router.get('/deep-audit/:freeZoneId/latest', async (req, res) => {
     res.json(auditResult);
   } catch (error) {
     console.error('Error getting latest deep audit:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// Test endpoint for logging
+router.post('/logs/test', async (req, res) => {
+  try {
+    const { message = 'Test log entry' } = req.body;
+    
+    // Log a test entry
+    const logType = 'test-log';
+    const metadata = { source: 'test-endpoint', timestamp: new Date().toISOString() };
+    const severity = 'info';
+    
+    // Use the updated logActivity function with correct parameter names
+    await logActivity(logType, message, metadata, 'test-component', severity);
+    
+    res.json({ success: true, message: 'Test log created' });
+  } catch (error) {
+    console.error('Error creating test log:', error);
     res.status(500).json({ error: String(error) });
   }
 });
