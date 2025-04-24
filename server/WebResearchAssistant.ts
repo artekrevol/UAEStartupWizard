@@ -33,36 +33,32 @@ export async function searchDocuments(
   try {
     console.log(`Searching documents for: "${query}"`);
     
-    // For complex queries, use direct SQL to avoid ORM issues
     // Create a safe search pattern based on the query
     const searchPattern = `%${query.replace(/\s+/g, '%')}%`;
     
-    // Build query conditions based on parameters
-    let sqlQuery = `
-      SELECT * FROM documents 
-      WHERE (LOWER(title) LIKE LOWER($1) OR LOWER(content) LIKE LOWER($1))
-    `;
-    
-    const params = [searchPattern];
+    // Start with a base query using Drizzle ORM
+    let dbQuery = db
+      .select()
+      .from(documents)
+      .where(
+        or(
+          sql`LOWER(${documents.title}) LIKE LOWER(${searchPattern})`,
+          sql`LOWER(${documents.content}) LIKE LOWER(${searchPattern})`
+        )
+      );
     
     // Add category filter if provided
     if (category) {
-      sqlQuery += ` AND category = $${params.length + 1}`;
-      params.push(category);
+      dbQuery = dbQuery.where(eq(documents.category, category));
     }
     
     // Add free zone filter if provided
-    if (freeZoneId) {
-      sqlQuery += ` AND free_zone_id = $${params.length + 1}`;
-      params.push(freeZoneId.toString());
+    if (freeZoneId !== undefined) {
+      dbQuery = dbQuery.where(eq(documents.freeZoneId, freeZoneId));
     }
     
-    // Add limit
-    sqlQuery += ` LIMIT $${params.length + 1}`;
-    params.push(MAX_RESULTS.toString());
-    
-    const result = await db.query(sqlQuery, params);
-    const results = result.rows;
+    // Execute query with limit
+    const results = await dbQuery.limit(MAX_RESULTS);
     
     console.log(`Found ${results.length} matching documents`);
     return results;
@@ -81,19 +77,20 @@ export async function searchFreeZones(query: string): Promise<any[]> {
   try {
     console.log(`Searching free zones for: "${query}"`);
     
-    // Use direct SQL for consistency with the document search approach
+    // Create a safe search pattern based on the query
     const searchPattern = `%${query.replace(/\s+/g, '%')}%`;
     
-    const sqlQuery = `
-      SELECT * FROM free_zones 
-      WHERE 
-        LOWER(name) LIKE LOWER($1) OR
-        LOWER(description) LIKE LOWER($1)
-      LIMIT $2
-    `;
-    
-    const result = await db.query(sqlQuery, [searchPattern, MAX_RESULTS.toString()]);
-    const results = result.rows;
+    // Use Drizzle ORM for the query
+    const results = await db
+      .select()
+      .from(freeZones)
+      .where(
+        or(
+          sql`LOWER(${freeZones.name}) LIKE LOWER(${searchPattern})`,
+          sql`LOWER(${freeZones.description}) LIKE LOWER(${searchPattern})`
+        )
+      )
+      .limit(MAX_RESULTS);
     
     console.log(`Found ${results.length} matching free zones`);
     return results;
@@ -244,17 +241,14 @@ export async function getFreeZoneKnowledge(freeZoneName: string): Promise<any> {
   try {
     console.log(`Getting comprehensive knowledge about: ${freeZoneName}`);
     
-    // Find the free zone in the database using direct SQL
+    // Find the free zone in the database using Drizzle ORM
     const searchPattern = `%${freeZoneName.replace(/\s+/g, '%')}%`;
     
-    const sqlQuery = `
-      SELECT * FROM free_zones
-      WHERE LOWER(name) LIKE LOWER($1)
-      LIMIT 1
-    `;
-    
-    const freeZoneResult = await db.query(sqlQuery, [searchPattern]);
-    const freeZoneResults = freeZoneResult.rows;
+    const freeZoneResults = await db
+      .select()
+      .from(freeZones)
+      .where(sql`LOWER(${freeZones.name}) LIKE LOWER(${searchPattern})`)
+      .limit(1);
     
     if (freeZoneResults.length === 0) {
       console.log(`Free zone not found: ${freeZoneName}`);
