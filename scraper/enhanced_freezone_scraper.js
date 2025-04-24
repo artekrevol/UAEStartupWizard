@@ -16,7 +16,7 @@
 import { PlaywrightScraper } from './utils/playwright_scraper_base.js';
 import { db } from '../server/db.js';
 import { freeZones } from '../shared/schema.js';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 
 class EnhancedFreeZoneScraper extends PlaywrightScraper {
   constructor(options = {}) {
@@ -188,7 +188,7 @@ class EnhancedFreeZoneScraper extends PlaywrightScraper {
       const allFreeZones = await db
         .select()
         .from(freeZones)
-        .where(db.sql`${freeZones.website} IS NOT NULL AND ${freeZones.website} != ''`);
+        .where(sql`${freeZones.website} IS NOT NULL AND ${freeZones.website} != ''`);
       
       console.log(`Found ${allFreeZones.length} free zones with websites to scrape`);
       
