@@ -437,8 +437,25 @@ export async function enrichFreeZoneData(
     
     // Update the free_zones table directly with the enriched data
     try {
-      // Convert snake_case field to camelCase for the database column
-      const columnName = field.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+      // Map fields to their actual column names in the database
+      const columnNameMap: Record<string, string> = {
+        'license_types': 'license_types',
+        'setup_process': 'setup_process',
+        'legal_requirements': 'legal_requirements',
+        'fee_structure': 'fee_structure',
+        'visa_information': 'visa_information',
+        'facilities': 'facilities',
+        'benefits': 'benefits',
+        'faqs': 'faqs',
+        'templates': 'templates',
+        'timelines': 'timelines',
+        'setup_cost': 'setup_cost'
+      };
+      
+      // Get the correct column name for this field
+      const columnName = columnNameMap[field] || field;
+      
+      console.log(`[AI-PM] Mapped field "${field}" to database column "${columnName}"`);
       
       // Format the content appropriately based on field type
       let formattedContent: any;
@@ -473,7 +490,7 @@ export async function enrichFreeZoneData(
             answer: content.substring(0, 500) + '...'
           }]);
         }
-      } else if (['benefits', 'facilities', 'requirements', 'licenseTypes'].includes(columnName)) {
+      } else if (['benefits', 'facilities', 'requirements', 'license_types'].includes(field)) {
         // Parse as array of items
         const items = content
           .split(/\n-|\n\d+\./)
