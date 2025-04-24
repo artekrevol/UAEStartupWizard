@@ -33,49 +33,36 @@ export async function searchDocuments(
   try {
     console.log(`Searching documents for: "${query}"`);
     
-    // Split query into keywords for better matching
-    const keywords = query
-      .toLowerCase()
-      .split(/\s+/)
-      .filter(k => k.length > 3);
+    // For complex queries, use direct SQL to avoid ORM issues
+    // Create a safe search pattern based on the query
+    const searchPattern = `%${query.replace(/\s+/g, '%')}%`;
     
-    // Build base query
-    let dbQuery = db
-      .select()
-      .from(documents);
+    // Build query conditions based on parameters
+    let sqlQuery = `
+      SELECT * FROM documents 
+      WHERE (LOWER(title) LIKE LOWER($1) OR LOWER(content) LIKE LOWER($1))
+    `;
     
-    // Add conditions
-    const conditions = [];
-    
-    // Add content search conditions for each keyword
-    if (keywords.length > 0) {
-      keywords.forEach(keyword => {
-        conditions.push(
-          or(
-            like(documents.title, `%${keyword}%`),
-            like(documents.content, `%${keyword}%`)
-          )
-        );
-      });
-    }
+    const params = [searchPattern];
     
     // Add category filter if provided
     if (category) {
-      conditions.push(eq(documents.category, category));
+      sqlQuery += ` AND category = $${params.length + 1}`;
+      params.push(category);
     }
     
     // Add free zone filter if provided
     if (freeZoneId) {
-      conditions.push(eq(documents.freeZoneId, freeZoneId));
+      sqlQuery += ` AND free_zone_id = $${params.length + 1}`;
+      params.push(freeZoneId);
     }
     
-    // Apply conditions to query
-    if (conditions.length > 0) {
-      dbQuery = dbQuery.where(and(...conditions));
-    }
+    // Add limit
+    sqlQuery += ` LIMIT $${params.length + 1}`;
+    params.push(MAX_RESULTS);
     
-    // Execute query with limit
-    const results = await dbQuery.limit(MAX_RESULTS);
+    const result = await db.query(sqlQuery, params);
+    const results = result.rows;
     
     console.log(`Found ${results.length} matching documents`);
     return results;
@@ -94,32 +81,19 @@ export async function searchFreeZones(query: string): Promise<any[]> {
   try {
     console.log(`Searching free zones for: "${query}"`);
     
-    // Split query into keywords
-    const keywords = query
-      .toLowerCase()
-      .split(/\s+/)
-      .filter(k => k.length > 3);
+    // Use direct SQL for consistency with the document search approach
+    const searchPattern = `%${query.replace(/\s+/g, '%')}%`;
     
-    // Build conditions for each keyword
-    const conditions = [];
-    if (keywords.length > 0) {
-      keywords.forEach(keyword => {
-        conditions.push(
-          or(
-            like(freeZones.name, `%${keyword}%`),
-            like(freeZones.description, `%${keyword}%`)
-          )
-        );
-      });
-    }
+    const sqlQuery = `
+      SELECT * FROM free_zones 
+      WHERE 
+        LOWER(name) LIKE LOWER($1) OR
+        LOWER(description) LIKE LOWER($1)
+      LIMIT $2
+    `;
     
-    // Execute query
-    let dbQuery = db.select().from(freeZones);
-    if (conditions.length > 0) {
-      dbQuery = dbQuery.where(and(...conditions));
-    }
-    
-    const results = await dbQuery.limit(MAX_RESULTS);
+    const result = await db.query(sqlQuery, [searchPattern, MAX_RESULTS]);
+    const results = result.rows;
     
     console.log(`Found ${results.length} matching free zones`);
     return results;
@@ -270,12 +244,16 @@ export async function getFreeZoneKnowledge(freeZoneName: string): Promise<any> {
   try {
     console.log(`Getting comprehensive knowledge about: ${freeZoneName}`);
     
-    // Find the free zone in the database
-    const freeZoneResults = await db
-      .select()
-      .from(freeZones)
-      .where(like(freeZones.name, `%${freeZoneName}%`))
-      .limit(1);
+    // Find the free zone in the database using direct SQL
+    const searchPattern = `%${freeZoneName.replace(/\s+/g, '%')}%`;
+    
+    const freeZoneResult = await db.execute(sql`
+      SELECT * FROM free_zones
+      WHERE LOWER(name) LIKE LOWER(${searchPattern})
+      LIMIT 1
+    `);
+    
+    const freeZoneResults = freeZoneResult.rows;
     
     if (freeZoneResults.length === 0) {
       console.log(`Free zone not found: ${freeZoneName}`);
