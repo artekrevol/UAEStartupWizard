@@ -11,6 +11,113 @@ export interface StaticResponse {
 
 export const staticResponses: StaticResponse[] = [
   {
+    question: "What is the process of setting up a business in Dubai?",
+    response: `# Step-by-Step Guide to Setting Up a Business in Dubai
+
+## 1. Choose Your Business Structure
+- **Mainland company**: 100% foreign ownership now allowed in most sectors
+- **Free zone company**: 100% foreign ownership with specific free zone benefits
+- **Offshore company**: For holding assets and investments only
+
+## 2. Select Business Activities
+- Identify your primary and secondary business activities
+- Ensure activities align with your chosen jurisdiction (mainland/free zone)
+- Each business activity requires appropriate licensing
+
+## 3. Choose a Trade Name
+- Check name availability through DED (mainland) or relevant free zone
+- Reserve your trade name by paying registration fees
+- Consider name restrictions (prohibited terms, existing names)
+
+## 4. Select Your Location
+- **Free zone**: Use the free zone's physical or virtual office solutions
+- **Mainland**: Lease commercial space or use an approved business center
+- Obtain Ejari (lease registration) for your chosen premises
+
+## 5. Apply for Initial Approval
+- Submit business plan, activities, and ownership details
+- Pay initial approval fees
+- Receive preliminary approval to proceed
+
+## 6. Prepare Legal Documents
+- Draft Memorandum of Association (MOA)
+- Prepare other required legal documents based on company type
+- Have documents notarized by a UAE Notary Public
+
+## 7. Open a Corporate Bank Account
+- Select from numerous local and international banks
+- Prepare minimum capital deposit (if required)
+- Complete bank's KYC process and documentation
+
+## 8. Apply for Business License
+- Submit all documentation to relevant authority:
+  - Department of Economic Development (DED) for mainland
+  - Free zone authority for free zone businesses
+- Pay license fees
+- Receive business license
+
+## 9. Register for Tax Purposes
+- Obtain Tax Registration Number (TRN) from Federal Tax Authority
+- Register for VAT if applicable (mandatory if turnover exceeds AED 375,000)
+
+## 10. Apply for Immigration Establishment Card
+- Required for sponsoring visas for staff and dependents
+- Apply through General Directorate of Residency and Foreign Affairs (GDRFA)
+
+## Typical Timeframes & Costs:
+- **Free zone setup**: 1-2 weeks, starting from AED 15,000-50,000
+- **Mainland setup**: 2-4 weeks, starting from AED 20,000-50,000
+- **Offshore setup**: 1-2 weeks, starting from AED 15,000-25,000
+
+These processes may vary depending on your specific business type, nationality, and the jurisdiction you choose. Professional business setup services can streamline this process significantly.`,
+    keywords: ["process", "setup", "setting up", "set up", "business", "Dubai", "steps", "guide", "how to"]
+  },
+  {
+    question: "Compare DMCC and DIC for a small tech startup",
+    response: `# Comparing DMCC and DIC for a Small Tech Startup
+
+## Dubai Multi Commodities Centre (DMCC)
+**Advantages for tech startups:**
+- More flexible licensing options that can accommodate various tech activities
+- Strong community networking opportunities through events and programs
+- DMCC Innovation Hub specifically designed for tech companies
+- Prestigious business address in Jumeirah Lakes Towers
+- Access to shared working spaces and cost-effective flexi-desk options
+- Comprehensive support services for new businesses
+
+**Considerations:**
+- Generally higher setup costs compared to DIC (starting around AED 30,000-50,000)
+- Less tech-specific ecosystem than DIC
+- Location may be less central for tech industry networking
+
+## Dubai Internet City (DIC)
+**Advantages for tech startups:**
+- Purpose-built for technology companies with a tech-focused ecosystem
+- Proximity to major tech companies and potential clients/partners
+- Industry-specific knowledge sharing and networking opportunities
+- In5 Tech innovation center providing incubation services
+- Strategic location in the technology corridor with Dubai Media City
+- More established tech community with industry events
+
+**Considerations:**
+- More rigid in activity classifications for tech businesses
+- Physical office space may be more expensive
+- May have stricter requirements for approval of tech activities
+
+## Cost Comparison
+- **DMCC**: Starting from AED 30,000 for basic flexi-desk package
+- **DIC**: Starting from AED 35,000 for basic setup
+
+## Recommendation for Small Tech Startups
+- **For pure tech/software/IT services**: DIC typically offers better ecosystem benefits
+- **For tech with trading elements**: DMCC offers more flexibility
+- **For budget-conscious startups**: DMCC flexible desk options might be more economical
+- **For networking with tech giants**: DIC provides better proximity to major tech players
+
+The best choice ultimately depends on your specific tech niche, growth plans, and budget constraints.`,
+    keywords: ["compare", "DMCC", "DIC", "tech", "startup", "difference"]
+  },
+  {
     question: "What are the best free zones for a technology consulting company in UAE?",
     response: `For technology consulting companies in the UAE, these free zones are particularly suitable:
 

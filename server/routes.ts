@@ -1014,18 +1014,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Simple lightweight test endpoint for business assistant
   app.post("/api/business-assistant/quick-test", (req, res) => {
-    // Non-blocking response with static data
-    res.json({
-      conversationId: 123,
-      message: "For technology consulting companies in the UAE, the best free zones are typically Dubai Internet City (DIC), Dubai Multi Commodities Centre (DMCC), and Dubai Silicon Oasis. These free zones offer benefits like 100% foreign ownership, tax exemptions, and specialized infrastructure for technology businesses.",
-      memory: {
-        key_topics: ["Technology consulting", "UAE free zones", "Business setup"],
-        next_steps: ["Research visa requirements", "Compare office space options", "Understand licensing costs"],
-        business_setup_info: {
-          recommended_zones: "DIC, DMCC, Dubai Silicon Oasis"
-        }
+    try {
+      const { message } = req.body;
+      if (!message) {
+        return res.status(400).json({ error: "Message is required" });
       }
-    });
+      
+      // Try to find a matching static response first
+      const staticResponse = findBestStaticResponse(message);
+      
+      // If we found a static response, use it
+      if (staticResponse) {
+        console.log("Using static response for quick test");
+        return res.json({
+          conversationId: 123,
+          message: staticResponse,
+          memory: {
+            key_topics: ["Technology consulting", "UAE free zones", "Business setup"],
+            next_steps: ["Research visa requirements", "Compare office space options", "Understand licensing costs"],
+            business_setup_info: {
+              recommended_zones: "DIC, DMCC, Dubai Silicon Oasis"
+            }
+          }
+        });
+      }
+      
+      // Fall back to the default test response
+      console.log("No static response found for quick test, using default");
+      res.json({
+        conversationId: 123,
+        message: "For technology consulting companies in the UAE, the best free zones are typically Dubai Internet City (DIC), Dubai Multi Commodities Centre (DMCC), and Dubai Silicon Oasis. These free zones offer benefits like 100% foreign ownership, tax exemptions, and specialized infrastructure for technology businesses.",
+        memory: {
+          key_topics: ["Technology consulting", "UAE free zones", "Business setup"],
+          next_steps: ["Research visa requirements", "Compare office space options", "Understand licensing costs"],
+          business_setup_info: {
+            recommended_zones: "DIC, DMCC, Dubai Silicon Oasis"
+          }
+        }
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({ error: message });
+    }
+  });
+  
+  // Endpoint to list all available static responses
+  app.get("/api/static-responses", (req, res) => {
+    try {
+      // Return a list of questions and sample snippets
+      const responseList = staticResponses.map(item => ({
+        question: item.question,
+        preview: item.response.substring(0, 100) + "...", // Just return the first 100 chars
+        keywords: item.keywords
+      }));
+      
+      res.json({
+        count: responseList.length,
+        responses: responseList
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      res.status(500).json({ error: message });
+    }
   });
   
   // Endpoint for chatting with the enhanced business assistant
