@@ -25,7 +25,7 @@ import {
   Layers,
   Lightbulb,
   Loader2,
-  MagicWand,
+  Wand2 as MagicWand, // Using Wand2 as MagicWand is not in lucide-react
   RefreshCw,
   Search,
   Settings,
@@ -422,12 +422,12 @@ export default function AIProductManagerPage() {
                   {analysisResults ? (
                     <div className="flex justify-between items-center">
                       <span>{analysisResults.freeZoneName} - Data Completeness Analysis</span>
-                      <Badge variant={
-                        analysisResults.overallCompleteness > 80 ? "success" : 
-                        analysisResults.overallCompleteness > 50 ? "default" : 
-                        "destructive"
-                      }>
-                        {analysisResults.overallCompleteness.toFixed(0)}% Complete
+                      <Badge className={`
+                        ${analysisResults.overallCompleteness > 80 ? "bg-green-100 text-green-800 hover:bg-green-100" : 
+                        analysisResults.overallCompleteness > 50 ? "bg-amber-100 text-amber-800 hover:bg-amber-100" : 
+                        "bg-red-100 text-red-800 hover:bg-red-100"}
+                      `}>
+                        {analysisResults.overallCompleteness.toFixed(1)}% Complete
                       </Badge>
                     </div>
                   ) : (
@@ -443,39 +443,77 @@ export default function AIProductManagerPage() {
                   </div>
                 ) : analysisResults ? (
                   <div className="space-y-6">
-                    <Progress 
-                      value={analysisResults.overallCompleteness} 
-                      className="h-2"
-                    />
+                    {/* Enhanced progress display with breakdown */}
+                    <div className="space-y-4">
+                      <div className="flex justify-between mb-1 text-sm">
+                        <span>Data Completeness</span>
+                        <span className="font-semibold">{analysisResults.overallCompleteness.toFixed(1)}%</span>
+                      </div>
+                      <Progress 
+                        value={analysisResults.overallCompleteness} 
+                        className="h-3"
+                      />
+                      
+                      {/* Field status summary */}
+                      <div className="grid grid-cols-3 gap-2 mt-4">
+                        <div className="rounded-md bg-green-50 p-2 text-center">
+                          <div className="text-xs text-green-600 font-medium">Complete</div>
+                          <div className="text-lg font-bold text-green-700">
+                            {analysisResults.fields.filter(f => f.status === 'complete').length}
+                            <span className="text-xs ml-1 font-normal">/ {analysisResults.fields.length}</span>
+                          </div>
+                        </div>
+                        <div className="rounded-md bg-amber-50 p-2 text-center">
+                          <div className="text-xs text-amber-600 font-medium">Incomplete</div>
+                          <div className="text-lg font-bold text-amber-700">
+                            {analysisResults.fields.filter(f => f.status === 'incomplete').length}
+                            <span className="text-xs ml-1 font-normal">/ {analysisResults.fields.length}</span>
+                          </div>
+                        </div>
+                        <div className="rounded-md bg-red-50 p-2 text-center">
+                          <div className="text-xs text-red-600 font-medium">Missing</div>
+                          <div className="text-lg font-bold text-red-700">
+                            {analysisResults.fields.filter(f => f.status === 'missing').length}
+                            <span className="text-xs ml-1 font-normal">/ {analysisResults.fields.length}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                     
-                    <div className="grid gap-4">
-                      {analysisResults.fields.map((field) => (
-                        <div 
-                          key={field.field} 
-                          className="grid grid-cols-5 items-center py-2 border-b border-border"
-                        >
-                          <div className="col-span-2 font-medium capitalize">
-                            {field.field.replace(/([A-Z])/g, ' $1').trim()}
-                          </div>
-                          <div className="col-span-1 flex items-center">
-                            <Badge 
-                              variant={
-                                field.status === 'complete' ? "success" : 
-                                field.status === 'incomplete' ? "warning" : 
-                                "destructive"
-                              }
-                            >
-                              {field.status}
-                            </Badge>
-                          </div>
-                          <div className="col-span-2 flex justify-end">
-                            {field.status !== 'complete' && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleEnrichField(field.field)}
-                                disabled={enrichMutation.isPending}
+                    <div className="border rounded-md mt-4">
+                      <div className="py-2 px-4 bg-muted font-medium text-sm">Field Status Details</div>
+                      <div className="divide-y">
+                        {analysisResults.fields.map((field) => (
+                          <div 
+                            key={field.field} 
+                            className="grid grid-cols-5 items-center p-3"
+                          >
+                            <div className="col-span-2 font-medium capitalize">
+                              {field.field ? field.field.replace(/_/g, ' ') : 'Unknown field'}
+                            </div>
+                            <div className="col-span-1 flex items-center">
+                              <Badge 
+                                className={`
+                                  ${field.status === 'complete' ? "bg-green-100 text-green-800 hover:bg-green-100" : 
+                                    field.status === 'incomplete' ? "bg-amber-100 text-amber-800 hover:bg-amber-100" : 
+                                    "bg-red-100 text-red-800 hover:bg-red-100"}
+                                `}
                               >
+                                {field.status} 
+                                {field.confidence && 
+                                  <span className="ml-1 opacity-70">({(field.confidence * 100).toFixed(0)}%)</span>
+                                }
+                              </Badge>
+                            </div>
+                            <div className="col-span-2 flex justify-end">
+                              {field.status !== 'complete' && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleEnrichField(field.field)}
+                                  disabled={enrichMutation.isPending}
+                                  className="gap-1"
+                                >
                                 {enrichMutation.isPending && enrichMutation.variables?.field === field.field ? (
                                   <Loader2 className="h-3 w-3 mr-1 animate-spin" />
                                 ) : (
