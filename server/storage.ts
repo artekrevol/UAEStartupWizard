@@ -500,17 +500,17 @@ export class DatabaseStorage implements IStorage {
       .where(eq(conversations.id, id));
   }
 
-  async getConversationMessages(conversationId: number): Promise<ConversationMessage[]> {
+  async getConversationMessages(conversationId: number): Promise<Message[]> {
     return await db
       .select()
-      .from(conversationMessages)
-      .where(eq(conversationMessages.conversationId, conversationId))
-      .orderBy(conversationMessages.timestamp);
+      .from(messages)
+      .where(eq(messages.conversationId, conversationId))
+      .orderBy(messages.createdAt);
   }
 
-  async addMessage(message: InsertMessage): Promise<ConversationMessage> {
+  async addMessage(message: InsertMessage): Promise<Message> {
     const [createdMessage] = await db
-      .insert(conversationMessages)
+      .insert(messages)
       .values(message)
       .returning();
     return createdMessage;
