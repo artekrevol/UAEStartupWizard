@@ -15,7 +15,7 @@ import { eq, sql } from "drizzle-orm";
 import { businessActivityCategories, businessActivities, freeZones, documents, issuesLog } from "../shared/schema";
 import { documentUpload, processUploadedDocument, processDMCCDocuments, processSAIFZoneDocuments } from "./document-upload";
 import { spawn } from 'child_process';
-import { registerAIProductManagerRoutes } from "./ai-product-manager/routes";
+import { registerAIProductManagerRoutes } from "./ai-product-manager/register-routes";
 
 // Middleware to check if user is admin
 function requireAdmin(req: Request, res: Response, next: NextFunction) {

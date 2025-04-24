@@ -9,7 +9,7 @@
 import fs from 'fs';
 import path from 'path';
 import axios from 'axios';
-import cheerio from 'cheerio';
+import * as cheerio from 'cheerio';
 import { PlaywrightScraper } from './utils/playwright_scraper_base.js';
 import { chromium } from 'playwright';
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
 import axios from 'axios';
+import AuditReport from '@/components/ai-product-manager/AuditReport';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,6 +17,7 @@ import {
   AlertCircle,
   Search,
   FileSearch,
+  FileText,
   Database,
   Globe,
   RefreshCw,
@@ -578,6 +580,10 @@ const AIProductManager: React.FC = () => {
             <ArrowUpRight className="h-4 w-4 mr-2" />
             Enrichment
           </TabsTrigger>
+          <TabsTrigger value="audit">
+            <FileText className="h-4 w-4 mr-2" />
+            Deep Audit
+          </TabsTrigger>
           <TabsTrigger value="research">
             <Globe className="h-4 w-4 mr-2" />
             Web Research
@@ -784,6 +790,54 @@ const AIProductManager: React.FC = () => {
                       </CardContent>
                     </Card>
                   ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="audit" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Deep Free Zone Audit</CardTitle>
+              <CardDescription>
+                Run deep audits comparing database content with official free zone websites for accuracy and completeness.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <Label htmlFor="auditFreeZone">Select Free Zone to Audit:</Label>
+                  <select
+                    id="auditFreeZone"
+                    className="w-full p-2 border rounded mt-1"
+                    value={selectedFreeZone || ''}
+                    onChange={(e) => setSelectedFreeZone(parseInt(e.target.value))}
+                  >
+                    <option value="">Select a Free Zone</option>
+                    {freeZones.map((zone) => (
+                      <option key={zone.id} value={zone.id}>
+                        {zone.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              
+              {selectedFreeZone && (
+                <div className="mt-4">
+                  <AuditReport 
+                    freeZoneId={selectedFreeZone} 
+                    freeZoneName={freeZones.find(zone => zone.id === selectedFreeZone)?.name || 'Selected Free Zone'} 
+                    onComplete={(result) => {
+                      fetchLogs();
+                      toast({
+                        title: "Deep Audit Complete",
+                        description: `Successfully ran deep audit for ${result.freeZoneName}.`,
+                        variant: "default",
+                      });
+                    }}
+                  />
                 </div>
               )}
             </CardContent>

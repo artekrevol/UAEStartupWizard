@@ -98,5 +98,22 @@ export async function setupActivityLogsTable() {
   }
 }
 
+/**
+ * Clear all activity logs
+ */
+export async function clearActivityLogs() {
+  try {
+    await db.execute(sql`
+      DELETE FROM activity_logs
+    `);
+    
+    console.log('[AI-PM] Activity logs cleared');
+    return true;
+  } catch (error) {
+    console.error(`Error clearing activity logs: ${error}`);
+    return false;
+  }
+}
+
 // Initialize the activity logs table when this module is imported
 setImmediate(setupActivityLogsTable);
