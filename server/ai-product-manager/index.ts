@@ -700,7 +700,31 @@ async function analyzeFieldsCompleteness(
           - "complete" (comprehensive information available)
           
           Also provide a confidence score from 0.0 to 1.0 for your assessment, where 1.0 means absolute certainty.
-          And provide a brief recommendation for improving incomplete or missing fields.`
+          And provide a brief recommendation for improving incomplete or missing fields.
+          
+          IMPORTANT: You MUST return your analysis as a valid JSON object with a "fields" array containing objects with exactly these keys: 
+          - field (string)
+          - status (one of "missing", "incomplete", or "complete")
+          - confidence (number between 0 and 1)
+          - recommendation (string)
+          
+          Example of correct format:
+          {
+            "fields": [
+              {
+                "field": "setup_process",
+                "status": "complete",
+                "confidence": 0.9,
+                "recommendation": "No recommendation needed"
+              },
+              {
+                "field": "legal_requirements",
+                "status": "incomplete",
+                "confidence": 0.7,
+                "recommendation": "Add details about visa requirements"
+              }
+            ]
+          }`
         },
         {
           role: "user",
@@ -711,16 +735,17 @@ async function analyzeFieldsCompleteness(
           ${JSON.stringify(freeZoneData, null, 2)}
           
           For each field, provide:
-          1. Field name
-          2. Status (missing/incomplete/complete)
+          1. Field name (exactly as provided)
+          2. Status (must be one of: "missing", "incomplete", "complete")
           3. Confidence score (0.0-1.0)
           4. Recommendation for improvement (if not complete)
           
-          Return in JSON format as an array of objects with exactly these fields: field, status, confidence, recommendation.`
+          Return your analysis as a JSON object with a 'fields' array containing objects for each field analyzed.
+          IMPORTANT: You MUST include the exact field name as provided and ensure your response is valid JSON.`
         }
       ],
       response_format: { type: "json_object" },
-      temperature: 0.3,
+      temperature: 0.2,
       max_tokens: 1000
     });
     
@@ -729,7 +754,32 @@ async function analyzeFieldsCompleteness(
     try {
       const content = analysisResponse.choices[0].message.content || '{"fields": []}';
       console.log(`[AI-PM] Analysis response for ${freeZoneData.name}: ${content.substring(0, 100)}...`);
+      
+      // Log the full JSON response for debugging
+      console.log(`[AI-PM] Full analysis response: ${content}`);
+      
       analysisResult = JSON.parse(content);
+      
+      // Check for alternate field names in the response
+      if (!analysisResult.fields && analysisResult.result) {
+        console.log('[AI-PM] Found result array instead of fields, remapping');
+        analysisResult.fields = analysisResult.result;
+      } else if (!analysisResult.fields && analysisResult.analysis) {
+        console.log('[AI-PM] Found analysis array instead of fields, remapping');
+        analysisResult.fields = analysisResult.analysis;
+      }
+      
+      // If still no fields array, check for other potential formats
+      if (!analysisResult.fields && Array.isArray(analysisResult)) {
+        console.log('[AI-PM] Found array at root level, using as fields');
+        analysisResult = { fields: analysisResult };
+      }
+      
+      // Last resort if we still have no fields
+      if (!analysisResult.fields || !Array.isArray(analysisResult.fields)) {
+        console.log('[AI-PM] No valid fields array found in response, creating default');
+        analysisResult.fields = [];
+      }
     } catch (parseError) {
       console.error(`[AI-PM] Error parsing analysis response: ${parseError}`);
       // Create a default analysis if parsing fails
@@ -752,6 +802,22 @@ async function analyzeFieldsCompleteness(
         : 0.5,
       recommendation: field?.recommendation || `Gather more information about this field.`
     }));
+    
+    // If we have no valid fields but have the requested fields list,
+    // create a default entry for each requested field
+    if (validatedFields.length === 0 && fields.length > 0) {
+      console.log(`[AI-PM] No valid fields returned from analysis, creating defaults for ${fields.length} fields`);
+      
+      // Create default entries for each field
+      for (const fieldName of fields) {
+        validatedFields.push({
+          field: fieldName,
+          status: 'missing' as 'missing' | 'incomplete' | 'complete',
+          confidence: 0.5,
+          recommendation: `No data found for ${fieldName}. Consider scraping specific information about this aspect.`
+        });
+      }
+    }
     
     // Log analysis results for debugging
     const completeFields = validatedFields.filter(f => f.status === 'complete').length;
