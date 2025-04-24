@@ -228,6 +228,17 @@ export const webResearchItems = pgTable('web_research_items', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
+// Activity Logs
+export const activityLogs = pgTable('activity_logs', {
+  id: serial('id').primaryKey(),
+  type: text('type').notNull(),
+  component: text('component').notNull(),
+  message: text('message').notNull(),
+  severity: text('severity').default('info'),
+  metadata: jsonb('metadata').default({}),
+  created_at: timestamp('created_at').defaultNow(),
+});
+
 // Schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertFreeZoneSchema = createInsertSchema(freeZones).omit({ id: true });
@@ -245,6 +256,7 @@ export const insertIssuesLogSchema = createInsertSchema(issuesLog).omit({ id: tr
 export const insertConversationSchema = createInsertSchema(conversations).omit({ id: true });
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true });
 export const insertWebResearchItemSchema = createInsertSchema(webResearchItems).omit({ id: true });
+export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({ id: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -263,6 +275,7 @@ export type IssuesLog = typeof issuesLog.$inferSelect;
 export type Conversation = typeof conversations.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type WebResearchItem = typeof webResearchItems.$inferSelect;
+export type ActivityLog = typeof activityLogs.$inferSelect;
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertFreeZone = z.infer<typeof insertFreeZoneSchema>;
@@ -280,3 +293,4 @@ export type InsertIssuesLog = z.infer<typeof insertIssuesLogSchema>;
 export type InsertConversation = z.infer<typeof insertConversationSchema>;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type InsertWebResearchItem = z.infer<typeof insertWebResearchItemSchema>;
+export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
