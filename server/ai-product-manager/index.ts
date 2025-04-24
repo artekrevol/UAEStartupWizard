@@ -98,27 +98,9 @@ export async function analyzeFreeZoneData(freeZoneId: number): Promise<FreeZoneA
     // Use OpenAI to analyze the completeness of each field
     const fieldsAnalysis = await analyzeFieldsCompleteness(freeZone, documents, keyFields);
     
-    // Calculate overall completeness with data quality weighting
-    let totalWeight = 0;
-    let weightedComplete = 0;
-    
-    // Calculate weighted completeness (fields with higher confidence scores get more weight)
-    for (const field of fieldsAnalysis) {
-      const weight = field.confidence || 0.5; // Default weight if confidence is missing
-      totalWeight += weight;
-      
-      if (field.status === 'complete') {
-        weightedComplete += weight;
-      } else if (field.status === 'incomplete') {
-        // Give partial credit for incomplete fields
-        weightedComplete += (weight * 0.5);
-      }
-    }
-    
-    // Calculate weighted overall completeness (0-100%)
-    let overallCompleteness = totalWeight > 0 
-      ? (weightedComplete / totalWeight) * 100 
-      : 0;
+    // Initialize overall completeness to 0, we'll directly calculate from documents
+    // SKIP the GPT-based completeness calculation which is unreliable
+    let overallCompleteness = 0;
       
     // DIRECTLY calculate completeness based on document count
     // Don't check if overallCompleteness === 0, we'll just REPLACE the score
