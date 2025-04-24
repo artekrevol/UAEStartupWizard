@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { CircularProgress, Badge } from "@/components/ui/progress";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -268,7 +269,7 @@ export default function EnrichmentWorkflow() {
             <CardContent>
               {isLoadingTasks ? (
                 <div className="flex justify-center py-8">
-                  <CircularProgress aria-label="Loading tasks..." />
+                  <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" aria-label="Loading tasks..." />
                 </div>
               ) : tasks?.tasks && tasks.tasks.length > 0 ? (
                 <div className="space-y-4">
@@ -333,7 +334,7 @@ export default function EnrichmentWorkflow() {
               >
                 {executeEnrichmentMutation.isPending ? (
                   <>
-                    <CircularProgress className="mr-2 h-4 w-4" />
+                    <div className="mr-2 h-4 w-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />
                     Processing...
                   </>
                 ) : (
@@ -391,7 +392,7 @@ export default function EnrichmentWorkflow() {
               >
                 {runWorkflowMutation.isPending ? (
                   <>
-                    <CircularProgress className="mr-2 h-4 w-4" />
+                    <div className="mr-2 h-4 w-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />
                     Running Workflow...
                   </>
                 ) : (
@@ -417,7 +418,7 @@ export default function EnrichmentWorkflow() {
             <CardContent>
               {isLoadingMetrics ? (
                 <div className="flex justify-center py-8">
-                  <CircularProgress aria-label="Loading metrics..." />
+                  <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" aria-label="Loading metrics..." />
                 </div>
               ) : metrics ? (
                 <div className="space-y-6">
