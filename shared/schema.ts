@@ -77,8 +77,9 @@ export const documents = pgTable('documents', {
   documentType: text('document_type'),
   category: text('category'),
   subcategory: text('subcategory'),
+  content: text('content'),
   freeZoneId: integer('free_zone_id').references(() => freeZones.id),
-  userId: integer('user_id').references(() => users.id),
+  // Note: userId is not in the actual database table
   metadata: jsonb('metadata').default({}),
   uploadedAt: timestamp('uploaded_at').defaultNow(),
 });
