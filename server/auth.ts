@@ -28,6 +28,22 @@ async function comparePasswords(supplied: string, stored: string) {
   return timingSafeEqual(hashedBuf, suppliedBuf);
 }
 
+import { Request, Response, NextFunction } from "express";
+
+// Middleware to check if user is admin
+export function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  
+  const user = req.user as Express.User;
+  if (!user || user.role !== 'admin') {
+    return res.status(403).json({ message: "Forbidden: Admin access required" });
+  }
+  
+  next();
+}
+
 export function setupAuth(app: Express) {
   const sessionSettings: session.SessionOptions = {
     secret: process.env.SESSION_SECRET!,

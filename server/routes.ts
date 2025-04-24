@@ -14,6 +14,7 @@ import { eq, sql } from "drizzle-orm";
 import { businessActivityCategories, businessActivities, freeZones, documents, issuesLog } from "../shared/schema";
 import { documentUpload, processUploadedDocument, processDMCCDocuments, processSAIFZoneDocuments } from "./document-upload";
 import { spawn } from 'child_process';
+import { registerAIProductManagerRoutes } from "./ai-product-manager/routes";
 
 // Middleware to check if user is admin
 function requireAdmin(req: Request, res: Response, next: NextFunction) {
@@ -39,6 +40,9 @@ const ESTABLISHMENT_STEPS = [
 
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
+  
+  // Register AI Product Manager routes
+  registerAIProductManagerRoutes(app);
 
   // Fetch business categories
   app.get("/api/business-categories", async (req, res) => {
@@ -2139,6 +2143,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message });
     }
   });
+
+  // Register AI Product Manager routes
+  registerAIProductManagerRoutes(app);
 
   const httpServer = createServer(app);
   return httpServer;
