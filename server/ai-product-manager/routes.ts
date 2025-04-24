@@ -266,6 +266,9 @@ router.post('/deep-audit/:freeZoneId', async (req, res) => {
   }
 });
 
+// Store the latest test result
+let latestTestResult = null;
+
 // Test endpoint for the deep audit with fallback functionality
 router.get('/test-deep-audit/:freeZoneId', async (req, res) => {
   try {
@@ -280,16 +283,25 @@ router.get('/test-deep-audit/:freeZoneId', async (req, res) => {
     // Run the deep audit and wait for the result
     const result = await runDeepAudit(freeZoneId);
     
+    // Store the result for later retrieval
+    latestTestResult = {
+      freeZoneId,
+      timestamp: new Date().toISOString(),
+      result,
+      fallbackUsed: result.liveWebsiteData?.fallbackUsed === true || false
+    };
+    
     // Log success details
     console.log(`[Test API] Deep audit completed for free zone ID ${freeZoneId}`);
     console.log(`[Test API] Website URL: ${result.liveWebsiteData?.url || 'Not available'}`);
     console.log(`[Test API] Fields found: ${result.liveWebsiteData?.fieldsFound?.length || 0}`);
-    console.log(`[Test API] Fallback used: ${result.liveWebsiteData?.fallbackUsed || false}`);
+    console.log(`[Test API] Fallback used: ${result.liveWebsiteData?.fallbackUsed === true || false}`);
     
     // Return the result
     res.json({
       success: true,
       result,
+      fallbackUsed: result.liveWebsiteData?.fallbackUsed === true || false,
       message: 'Deep audit test completed successfully.'
     });
   } catch (error) {
@@ -299,6 +311,14 @@ router.get('/test-deep-audit/:freeZoneId', async (req, res) => {
       stack: error.stack 
     });
   }
+});
+
+// Add an endpoint to retrieve the latest test result
+router.get('/test-result', (req, res) => {
+  if (!latestTestResult) {
+    return res.status(404).json({ error: 'No test has been run yet' });
+  }
+  res.json(latestTestResult);
 });
 
 // Get recent deep audit results

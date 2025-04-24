@@ -295,7 +295,8 @@ async function analyzeLiveWebsite(freeZoneId: number, freeZoneName: string, webs
       'fee_structure': 'Fee structure information would be extracted from the website.',
       'facilities': 'Facilities information would be extracted from the website.',
       'benefits': 'Benefits information would be extracted from the website.'
-    }
+    },
+    fallbackUsed: true
   };
   
   let browser = null;
