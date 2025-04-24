@@ -4,7 +4,8 @@
  * This script creates the activity_logs table for the AI Product Manager
  */
 
-const { Pool } = require('pg');
+import pg from 'pg';
+const { Pool } = pg;
 
 async function setupActivityLogsTable() {
   try {
@@ -31,9 +32,10 @@ async function setupActivityLogsTable() {
     console.log('Activity logs table created successfully');
     
     // Create a test log
+    const timestamp = new Date().toISOString();
     const insertQuery = `
       INSERT INTO activity_logs (type, component, message, severity, metadata)
-      VALUES ('test', 'setup-script', 'Initial setup completed', 'info', '{"setupTime": "' + new Date().toISOString() + '"}')
+      VALUES ('test', 'setup-script', 'Initial setup completed', 'info', '{"setupTime": "${timestamp}"}')
     `;
     
     await pool.query(insertQuery);
