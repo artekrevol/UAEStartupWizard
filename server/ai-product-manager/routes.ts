@@ -266,6 +266,41 @@ router.post('/deep-audit/:freeZoneId', async (req, res) => {
   }
 });
 
+// Test endpoint for the deep audit with fallback functionality
+router.get('/test-deep-audit/:freeZoneId', async (req, res) => {
+  try {
+    const freeZoneId = parseInt(req.params.freeZoneId);
+    
+    if (isNaN(freeZoneId)) {
+      return res.status(400).json({ error: 'Invalid free zone ID' });
+    }
+    
+    console.log(`[Test API] Running deep audit test for free zone ID ${freeZoneId}`);
+    
+    // Run the deep audit and wait for the result
+    const result = await runDeepAudit(freeZoneId);
+    
+    // Log success details
+    console.log(`[Test API] Deep audit completed for free zone ID ${freeZoneId}`);
+    console.log(`[Test API] Website URL: ${result.liveWebsiteData?.url || 'Not available'}`);
+    console.log(`[Test API] Fields found: ${result.liveWebsiteData?.fieldsFound?.length || 0}`);
+    console.log(`[Test API] Fallback used: ${result.liveWebsiteData?.fallbackUsed || false}`);
+    
+    // Return the result
+    res.json({
+      success: true,
+      result,
+      message: 'Deep audit test completed successfully.'
+    });
+  } catch (error) {
+    console.error('[Test API] Error in deep audit test:', error);
+    res.status(500).json({ 
+      error: error.message,
+      stack: error.stack 
+    });
+  }
+});
+
 // Get recent deep audit results
 router.get('/deep-audit/:freeZoneId/latest', async (req, res) => {
   try {
