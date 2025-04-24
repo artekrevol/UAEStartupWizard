@@ -435,6 +435,70 @@ export async function enrichFreeZoneData(
       `);
     }
     
+    // Update the free_zones table directly with the enriched data
+    try {
+      // Convert snake_case field to camelCase for the database column
+      const columnName = field.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+      
+      // Format the content appropriately based on field type
+      let formattedContent: any;
+      if (field === 'faqs') {
+        // Try to parse the content as FAQs
+        try {
+          // Extract Q&A format from content
+          const extractedFaqs = content.match(/Q:(.+?)A:(.+?)(?=Q:|$)/gs)?.map(qa => {
+            const question = qa.match(/Q:(.*?)(?=A:)/s)?.[1]?.trim() || '';
+            const answer = qa.match(/A:(.*?)(?=$)/s)?.[1]?.trim() || '';
+            return { question, answer };
+          }) || [];
+          
+          // If extraction didn't work well, try an alternative approach
+          const faqs = extractedFaqs.length > 0 ? extractedFaqs : 
+            content.split('\n\n').map(paragraph => {
+              const parts = paragraph.split('\n');
+              if (parts.length >= 2) {
+                return { 
+                  question: parts[0].replace(/^Q:\s*|-\s*|^\d+\.\s*/, ''),
+                  answer: parts.slice(1).join('\n').replace(/^A:\s*/, '')
+                };
+              }
+              return null;
+            }).filter(Boolean);
+          
+          formattedContent = JSON.stringify(faqs);
+        } catch (err) {
+          console.error('Error parsing FAQs', err);
+          formattedContent = JSON.stringify([{ 
+            question: 'What information is available about this free zone?', 
+            answer: content.substring(0, 500) + '...'
+          }]);
+        }
+      } else if (['benefits', 'facilities', 'requirements', 'licenseTypes'].includes(columnName)) {
+        // Parse as array of items
+        const items = content
+          .split(/\n-|\n\d+\./)
+          .map(item => item.trim())
+          .filter(item => item.length > 0);
+        
+        formattedContent = JSON.stringify(items);
+      } else {
+        // Use as plain text for other fields
+        formattedContent = content;
+      }
+      
+      // Update the free zone record with this data
+      await db.execute(sql`
+        UPDATE free_zones
+        SET ${sql.raw(`${columnName} = ${formattedContent ? `'${formattedContent.replace(/'/g, "''")}'` : 'NULL'}`)}
+        WHERE id = ${freeZoneId}
+      `);
+      
+      console.log(`[AI-PM] Updated free zone table directly with field "${field}" for ${freeZone.name}`);
+    } catch (updateError) {
+      console.error(`Error updating free zone record: ${updateError}`);
+      // Don't fail the overall process if this update fails
+    }
+    
     // Log the successful enrichment
     await logActivity(
       'enrich-complete',
