@@ -18,7 +18,8 @@ import {
   searchAndScrape 
 } from './search-service';
 import {
-  getActivityLogs
+  getActivityLogs,
+  clearActivityLogs
 } from './logger';
 import {
   generateEnrichmentTasks,
@@ -155,11 +156,12 @@ router.get('/logs', async (req, res) => {
 // Clear activity logs
 router.delete('/logs', async (req, res) => {
   try {
-    await getActivityLogs(0); // Temporary fix until clearActivityLogs is implemented
-    res.json({ success: true });
+    // Use the new clearActivityLogs function
+    const success = await clearActivityLogs();
+    res.json({ success });
   } catch (error) {
     console.error('Error clearing activity logs:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: String(error) });
   }
 });
 
@@ -220,7 +222,7 @@ router.post('/execute-tasks', async (req, res) => {
     res.json(batchResult);
   } catch (error) {
     console.error('Error executing enrichment tasks:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: String(error) });
   }
 });
 
@@ -259,7 +261,7 @@ router.post('/deep-audit/:freeZoneId', async (req, res) => {
     res.json(auditResult);
   } catch (error) {
     console.error('Error running deep audit:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: String(error) });
   }
 });
 
@@ -277,7 +279,7 @@ router.get('/deep-audit/:freeZoneId/latest', async (req, res) => {
     res.json(auditResult);
   } catch (error) {
     console.error('Error getting latest deep audit:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: String(error) });
   }
 });
 

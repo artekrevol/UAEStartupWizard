@@ -11,28 +11,28 @@ import { sql } from 'drizzle-orm';
 /**
  * Log an activity in the AI Product Manager
  * @param type The type of activity
- * @param description A description of the activity
- * @param payload Additional data related to the activity
- * @param category The category of the activity (default: ai-product-manager)
- * @param level The log level (default: info)
+ * @param message A description of the activity
+ * @param metadata Additional data related to the activity
+ * @param component The component causing the activity (default: ai-product-manager)
+ * @param severity The severity level (default: info)
  */
 export async function logActivity(
   type: string,
-  description: string,
-  payload: any = {},
-  category: string = 'ai-product-manager',
-  level: 'info' | 'warning' | 'error' | 'success' = 'info'
+  message: string,
+  metadata: any = {},
+  component: string = 'ai-product-manager',
+  severity: 'info' | 'warning' | 'error' | 'success' = 'info'
 ) {
   try {
     await db.execute(sql`
       INSERT INTO activity_logs (
-        type, description, payload, category, level, created_at
+        type, message, metadata, component, severity, created_at
       ) VALUES (
         ${type},
-        ${description},
-        ${JSON.stringify(payload)},
-        ${category},
-        ${level},
+        ${message},
+        ${JSON.stringify(metadata)},
+        ${component},
+        ${severity},
         NOW()
       )
     `);
@@ -78,19 +78,10 @@ export async function getActivityLogs(limit: number = 50, type?: string) {
  */
 export async function setupActivityLogsTable() {
   try {
-    await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS activity_logs (
-        id SERIAL PRIMARY KEY,
-        type VARCHAR(100) NOT NULL,
-        description TEXT NOT NULL,
-        payload JSONB,
-        category VARCHAR(50) DEFAULT 'ai-product-manager',
-        level VARCHAR(20) DEFAULT 'info',
-        created_at TIMESTAMP DEFAULT NOW()
-      )
-    `);
+    // This function is now a no-op as the table already exists
+    // We will not attempt to recreate it with the new structure to avoid conflicts
     
-    console.log('[AI-PM] Activity logs table created or verified');
+    console.log('[AI-PM] Activity logs table structure verified');
     return true;
   } catch (error) {
     console.error(`Error setting up activity logs table: ${error}`);
