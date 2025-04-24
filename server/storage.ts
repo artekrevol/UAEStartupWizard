@@ -31,6 +31,9 @@ import {
   type IssuesLog,
   type InsertIssuesLog,
 } from "../shared/schema";
+
+// For backward compatibility with existing code
+type ConversationMessage = Message;
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
@@ -100,6 +103,7 @@ export interface IStorage {
   
   // Message management methods
   getMessagesByConversation(conversationId: number): Promise<Message[]>;
+  getConversationMessages(conversationId: number): Promise<Message[]>;
   addMessage(message: InsertMessage): Promise<Message>;
   
   // Issues Log management methods
@@ -506,6 +510,11 @@ export class DatabaseStorage implements IStorage {
       .from(messages)
       .where(eq(messages.conversationId, conversationId))
       .orderBy(messages.createdAt);
+  }
+  
+  async getMessagesByConversation(conversationId: number): Promise<Message[]> {
+    // Call the existing implementation for consistency
+    return await this.getConversationMessages(conversationId);
   }
 
   async addMessage(message: InsertMessage): Promise<Message> {
