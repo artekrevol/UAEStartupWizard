@@ -7,7 +7,7 @@ import { storage } from "./storage";
 import { getBusinessRecommendations, generateDocumentRequirements, getUAEBusinessAssistantResponse } from "./openai";
 import { chatWithBusinessAssistant, getBusinessSetupFlow, getStepGuidance, chatWithEnhancedBusinessAssistant, initializeSystemKnowledge } from "./assistantService";
 import { performWebResearch, searchDocuments, premiumBusinessAnswer } from "./WebResearchAssistant";
-import { findBestStaticResponse } from "./static-responses";
+import { findBestStaticResponse, staticResponses } from "./static-responses";
 import { BusinessSetup, InsertDocument, InsertSaifZoneForm, InsertIssuesLog } from "../shared/schema";
 import { calculateBusinessScore } from "./scoring";
 import { db } from "./db";
