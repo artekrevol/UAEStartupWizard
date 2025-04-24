@@ -5,7 +5,7 @@ import * as fs from "fs";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { getBusinessRecommendations, generateDocumentRequirements, getUAEBusinessAssistantResponse } from "./openai";
-import { chatWithBusinessAssistant, getBusinessSetupFlow, getStepGuidance, chatWithEnhancedBusinessAssistant, initializeSystemKnowledge } from "./assistantService";
+import { chatWithBusinessAssistant, getBusinessSetupFlow, getStepGuidance, chatWithEnhancedBusinessAssistant, initializeSystemKnowledge, getOrCreateConversation } from "./assistantService";
 import { performWebResearch, searchDocuments, premiumBusinessAnswer } from "./WebResearchAssistant";
 import { findBestStaticResponse, staticResponses } from "./static-responses";
 import { BusinessSetup, InsertDocument, InsertSaifZoneForm, InsertIssuesLog } from "../shared/schema";
@@ -1013,7 +1013,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Enhanced AI Assistant routes
   
   // Simple lightweight test endpoint for business assistant
-  app.post("/api/business-assistant/quick-test", (req, res) => {
+  app.post("/api/business-assistant/quick-test", async (req, res) => {
     try {
       const { message } = req.body;
       if (!message) {
@@ -1039,19 +1039,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Fall back to the default test response
-      console.log("No static response found for quick test, using default");
-      res.json({
-        conversationId: 123,
-        message: "For technology consulting companies in the UAE, the best free zones are typically Dubai Internet City (DIC), Dubai Multi Commodities Centre (DMCC), and Dubai Silicon Oasis. These free zones offer benefits like 100% foreign ownership, tax exemptions, and specialized infrastructure for technology businesses.",
-        memory: {
-          key_topics: ["Technology consulting", "UAE free zones", "Business setup"],
-          next_steps: ["Research visa requirements", "Compare office space options", "Understand licensing costs"],
-          business_setup_info: {
-            recommended_zones: "DIC, DMCC, Dubai Silicon Oasis"
-          }
+      // Verify OpenAI API key is configured for dynamic responses
+      if (!process.env.OPENAI_API_KEY) {
+        return res.status(500).json({ error: "OpenAI API key is not configured" });
+      }
+      
+      // Get user ID from session if available
+      const userId = req.isAuthenticated() ? req.user?.id : undefined;
+      let conversationId = 123; // Default for anonymous users
+      
+      if (userId) {
+        try {
+          const conversation = await getOrCreateConversation(userId);
+          conversationId = conversation.id;
+          
+          // Log the user message to the conversation
+          await storage.addMessage({
+            conversationId,
+            role: "user",
+            content: message
+          });
+        } catch (error) {
+          console.error("Error saving conversation:", error);
+          // Continue even if saving fails
         }
-      });
+      }
+      
+      // Fall back to regular business assistant for unknown questions
+      console.log("No static response found for quick test, using OpenAI");
+      const response = await chatWithBusinessAssistant(userId, message);
+      
+      // Log the assistant's response if we have a valid conversation
+      if (userId && conversationId !== 123) {
+        try {
+          await storage.addMessage({
+            conversationId,
+            role: "assistant",
+            content: response.message,
+            metadata: { source: "openai_fallback" }
+          });
+        } catch (error) {
+          console.error("Error saving assistant response:", error);
+        }
+      }
+      
+      // Enhance the response with a memory object
+      const enhancedResponse = {
+        conversationId: response.conversationId || conversationId,
+        message: response.message,
+        memory: {
+          key_topics: ["Business setup", "UAE"],
+          next_steps: ["Research free zones", "Compare options"],
+          business_setup_info: {}
+        }
+      };
+      
+      res.json(enhancedResponse);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       res.status(500).json({ error: message });
