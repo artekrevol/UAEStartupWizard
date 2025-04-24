@@ -1,78 +1,102 @@
 /**
- * AI Product Manager Logger
+ * AI Product Manager - Activity Logger
  * 
- * This module handles logging for the AI Product Manager activities.
+ * This module provides logging functionality for the AI Product Manager,
+ * recording all activities for auditing, monitoring and debugging.
  */
 
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 
-interface LogParams {
-  component?: string;
-  severity?: string;
-  message: string;
-  metadata?: any;
-}
-
 /**
- * Log an activity performed by the AI Product Manager
+ * Log an activity in the AI Product Manager
+ * @param type The type of activity
+ * @param description A description of the activity
+ * @param payload Additional data related to the activity
+ * @param category The category of the activity (default: ai-product-manager)
+ * @param level The log level (default: info)
  */
 export async function logActivity(
   type: string,
-  message: string,
-  metadata: any = {},
-  component: string = 'ai-product-manager',
-  severity: string = 'info'
-): Promise<void> {
+  description: string,
+  payload: any = {},
+  category: string = 'ai-product-manager',
+  level: 'info' | 'warning' | 'error' | 'success' = 'info'
+) {
   try {
     await db.execute(sql`
-      INSERT INTO activity_logs 
-      (type, component, message, severity, metadata, created_at)
-      VALUES 
-      (${type}, ${component}, ${message}, ${severity}, ${JSON.stringify(metadata)}, NOW())
+      INSERT INTO activity_logs (
+        type, description, payload, category, level, created_at
+      ) VALUES (
+        ${type},
+        ${description},
+        ${JSON.stringify(payload)},
+        ${category},
+        ${level},
+        NOW()
+      )
     `);
-    
-    console.log(`[AI-PM] ${type}: ${message}`);
   } catch (error) {
-    console.error('Error logging activity:', error);
+    console.error(`Error logging activity: ${error}`);
+    // Don't throw here to prevent logging errors from affecting the application
   }
 }
 
 /**
- * Get recent logs for the AI Product Manager
+ * Get activity logs, optionally filtered by type
+ * @param limit Maximum number of logs to return
+ * @param type Optional type filter
+ * @returns Array of activity logs
  */
-export async function getRecentLogs(limit: number = 50): Promise<any[]> {
+export async function getActivityLogs(limit: number = 50, type?: string) {
   try {
-    const result = await db.execute(sql`
+    let query = sql`
       SELECT * FROM activity_logs
-      WHERE component = 'ai-product-manager'
       ORDER BY created_at DESC
       LIMIT ${limit}
-    `);
+    `;
     
+    if (type) {
+      query = sql`
+        SELECT * FROM activity_logs
+        WHERE type = ${type}
+        ORDER BY created_at DESC
+        LIMIT ${limit}
+      `;
+    }
+    
+    const result = await db.execute(query);
     return result.rows;
   } catch (error) {
-    console.error('Error fetching recent logs:', error);
+    console.error(`Error retrieving activity logs: ${error}`);
     return [];
   }
 }
 
 /**
- * Clear all logs for the AI Product Manager
+ * Setup the activity logs table if it doesn't exist
  */
-export async function clearLogs(): Promise<{ success: boolean; message: string }> {
+export async function setupActivityLogsTable() {
   try {
     await db.execute(sql`
-      DELETE FROM activity_logs
-      WHERE component = 'ai-product-manager'
+      CREATE TABLE IF NOT EXISTS activity_logs (
+        id SERIAL PRIMARY KEY,
+        type VARCHAR(100) NOT NULL,
+        description TEXT NOT NULL,
+        payload JSONB,
+        category VARCHAR(50) DEFAULT 'ai-product-manager',
+        level VARCHAR(20) DEFAULT 'info',
+        created_at TIMESTAMP DEFAULT NOW()
+      )
     `);
     
-    return { success: true, message: 'Logs cleared successfully' };
+    console.log('[AI-PM] Activity logs table created or verified');
+    return true;
   } catch (error) {
-    console.error('Error clearing logs:', error);
-    return { 
-      success: false, 
-      message: `Failed to clear logs: ${(error as Error).message}` 
-    };
+    console.error(`Error setting up activity logs table: ${error}`);
+    return false;
   }
 }
+
+// Initialize the activity logs table when this module is imported
+setImmediate(setupActivityLogsTable);
