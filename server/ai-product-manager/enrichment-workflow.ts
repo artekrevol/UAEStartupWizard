@@ -62,9 +62,9 @@ export async function generateEnrichmentTasks(): Promise<EnrichmentTask[]> {
       freeZones.map(async (zone: any) => {
         // Get latest analysis from activity_logs
         const analysisLogResult = await db.execute(sql`
-          SELECT payload FROM activity_logs 
+          SELECT metadata FROM activity_logs 
           WHERE type = 'analyze-complete' 
-          AND payload->>'freeZoneId' = ${zone.id.toString()}
+          AND metadata->>'freeZoneId' = ${zone.id.toString()}
           ORDER BY created_at DESC
           LIMIT 1
         `);
@@ -385,12 +385,12 @@ export async function analyzeEnrichmentPerformance(): Promise<{
     let contentLengthCount = 0;
     
     for (const log of successfulLogs) {
-      const payload = typeof log.payload === 'string' 
-        ? JSON.parse(log.payload) 
-        : log.payload;
+      const metadata = typeof log.metadata === 'string' 
+        ? JSON.parse(log.metadata) 
+        : log.metadata;
       
-      if (payload && payload.contentLength) {
-        totalContentLength += payload.contentLength;
+      if (metadata && metadata.contentLength) {
+        totalContentLength += metadata.contentLength;
         contentLengthCount++;
       }
     }
@@ -402,17 +402,17 @@ export async function analyzeEnrichmentPerformance(): Promise<{
     const freeZoneCounts = {};
     
     for (const log of successfulLogs) {
-      const payload = typeof log.payload === 'string' 
-        ? JSON.parse(log.payload) 
-        : log.payload;
+      const metadata = typeof log.metadata === 'string' 
+        ? JSON.parse(log.metadata) 
+        : log.metadata;
       
-      if (payload) {
-        if (payload.field) {
-          fieldCounts[payload.field] = (fieldCounts[payload.field] || 0) + 1;
+      if (metadata) {
+        if (metadata.field) {
+          fieldCounts[metadata.field] = (fieldCounts[metadata.field] || 0) + 1;
         }
         
-        if (payload.freeZoneName) {
-          freeZoneCounts[payload.freeZoneName] = (freeZoneCounts[payload.freeZoneName] || 0) + 1;
+        if (metadata.freeZoneName) {
+          freeZoneCounts[metadata.freeZoneName] = (freeZoneCounts[metadata.freeZoneName] || 0) + 1;
         }
       }
     }
