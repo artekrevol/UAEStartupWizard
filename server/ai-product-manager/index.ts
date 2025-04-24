@@ -53,6 +53,8 @@ export async function analyzeFreeZoneData(freeZoneId: number): Promise<FreeZoneA
       { freeZoneId }
     );
     
+    console.log(`[AI-PM] Starting detailed analysis for free zone ID: ${freeZoneId}`);
+    
     // Fetch the free zone data
     const freeZoneResult = await db.execute(sql`
       SELECT * FROM free_zones WHERE id = ${freeZoneId}
@@ -63,6 +65,9 @@ export async function analyzeFreeZoneData(freeZoneId: number): Promise<FreeZoneA
     }
     
     const freeZone = freeZoneResult.rows[0];
+    const freeZoneName = freeZone?.name || `Free Zone ID ${freeZoneId}`;
+    
+    console.log(`[AI-PM] Analyzing free zone: ${freeZoneName}`);
     
     // Fetch documents related to this free zone
     const documentsResult = await db.execute(sql`
@@ -70,6 +75,13 @@ export async function analyzeFreeZoneData(freeZoneId: number): Promise<FreeZoneA
     `);
     
     const documents = documentsResult.rows;
+    console.log(`[AI-PM] Found ${documents.length} related documents for ${freeZoneName}`);
+    
+    // Log document categories for debugging
+    if (documents.length > 0) {
+      const categories = new Set(documents.map((doc: any) => doc.category).filter(Boolean));
+      console.log(`[AI-PM] Document categories found: ${Array.from(categories).join(', ')}`);
+    }
     
     // Define the key fields we want to analyze
     const keyFields = [
@@ -81,44 +93,80 @@ export async function analyzeFreeZoneData(freeZoneId: number): Promise<FreeZoneA
       'benefits'
     ];
     
+    console.log(`[AI-PM] Analyzing ${keyFields.length} key fields for ${freeZoneName}`);
+    
     // Use OpenAI to analyze the completeness of each field
     const fieldsAnalysis = await analyzeFieldsCompleteness(freeZone, documents, keyFields);
     
-    // Calculate overall completeness
+    // Calculate overall completeness with data quality weighting
+    let totalWeight = 0;
+    let weightedComplete = 0;
+    
+    // Calculate weighted completeness (fields with higher confidence scores get more weight)
+    for (const field of fieldsAnalysis) {
+      const weight = field.confidence || 0.5; // Default weight if confidence is missing
+      totalWeight += weight;
+      
+      if (field.status === 'complete') {
+        weightedComplete += weight;
+      } else if (field.status === 'incomplete') {
+        // Give partial credit for incomplete fields
+        weightedComplete += (weight * 0.5);
+      }
+    }
+    
+    // Calculate weighted overall completeness (0-100%)
+    const overallCompleteness = totalWeight > 0 
+      ? (weightedComplete / totalWeight) * 100 
+      : 0;
+    
+    // Add detailed field status breakdown for reporting
     const completeFields = fieldsAnalysis.filter(f => f.status === 'complete').length;
-    const overallCompleteness = (completeFields / keyFields.length) * 100;
+    const incompleteFields = fieldsAnalysis.filter(f => f.status === 'incomplete').length;
+    const missingFields = fieldsAnalysis.filter(f => f.status === 'missing').length;
     
     // Generate recommended actions
     const recommendedActions = generateRecommendedActions(fieldsAnalysis, freeZone);
     
     const result: FreeZoneAnalysis = {
       freeZoneId,
-      freeZoneName: freeZone.name,
+      freeZoneName: freeZoneName,
       fields: fieldsAnalysis,
       overallCompleteness,
       recommendedActions
     };
     
-    // Log the successful analysis
+    // Log the successful analysis with detailed metrics
+    console.log(`[AI-PM] Analysis complete for ${freeZoneName}:`);
+    console.log(`[AI-PM] - Complete fields: ${completeFields}/${keyFields.length} (${((completeFields/keyFields.length)*100).toFixed(1)}%)`);
+    console.log(`[AI-PM] - Incomplete fields: ${incompleteFields}/${keyFields.length} (${((incompleteFields/keyFields.length)*100).toFixed(1)}%)`);
+    console.log(`[AI-PM] - Missing fields: ${missingFields}/${keyFields.length} (${((missingFields/keyFields.length)*100).toFixed(1)}%)`);
+    console.log(`[AI-PM] - Overall weighted completeness: ${overallCompleteness.toFixed(2)}%`);
+    
     await logActivity(
       'analyze-complete',
-      `Completed analysis for ${freeZone.name} with ${overallCompleteness.toFixed(2)}% completeness`,
+      `Completed analysis for ${freeZoneName} with ${overallCompleteness.toFixed(2)}% completeness`,
       { 
         freeZoneId, 
-        freeZoneName: freeZone.name, 
+        freeZoneName: freeZoneName,
         completeness: overallCompleteness,
         fieldsAnalyzed: keyFields.length,
-        fieldsComplete: completeFields
+        fieldsComplete: completeFields,
+        fieldsIncomplete: incompleteFields,
+        fieldsMissing: missingFields,
+        hasDocuments: documents.length > 0
       }
     );
     
     return result;
   } catch (error) {
-    console.error(`Error analyzing free zone data: ${error}`);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`[AI-PM] Error analyzing free zone data: ${errorMessage}`);
+    
     await logActivity(
       'analyze-error',
-      `Error analyzing free zone: ${(error as Error).message}`,
-      { freeZoneId, error: (error as Error).message },
+      `Error analyzing free zone: ${errorMessage}`,
+      { freeZoneId, error: errorMessage },
       'ai-product-manager',
       'error'
     );
@@ -616,55 +664,111 @@ async function analyzeFieldsCompleteness(
   documents: any[],
   fields: string[]
 ): Promise<AnalysisField[]> {
-  const freeZoneData = {
-    ...freeZone,
-    documents: documents.map(doc => ({
-      title: doc.title,
-      category: doc.category,
-      content: doc.content ? doc.content.substring(0, 500) : null
-    }))
-  };
-  
-  // Use OpenAI to analyze field completeness
-  const analysisResponse = await openai.chat.completions.create({
-    model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-    messages: [
-      {
-        role: "system",
-        content: `You are an expert data analyst for UAE free zones. Analyze the completeness of specific data fields
-        for a free zone based on available information. For each field, determine if it is:
-        - "missing" (no information available)
-        - "incomplete" (some information, but insufficient)
-        - "complete" (comprehensive information available)
-        
-        Also provide a confidence score from 0.0 to 1.0 for your assessment, where 1.0 means absolute certainty.
-        And provide a brief recommendation for improving incomplete or missing fields.`
-      },
-      {
-        role: "user",
-        content: `Analyze the following fields for the free zone "${freeZone.name}":
-        ${fields.join(', ')}
-        
-        Available information:
-        ${JSON.stringify(freeZoneData, null, 2)}
-        
-        For each field, provide:
-        1. Field name
-        2. Status (missing/incomplete/complete)
-        3. Confidence score (0.0-1.0)
-        4. Recommendation for improvement (if not complete)
-        
-        Return in JSON format as an array of objects.`
-      }
-    ],
-    response_format: { type: "json_object" },
-    temperature: 0.3,
-    max_tokens: 1000
-  });
-  
-  const analysisResult = JSON.parse(analysisResponse.choices[0].message.content || '{"fields": []}');
-  
-  return analysisResult.fields || [];
+  try {
+    // Create a safe version of freeZone data
+    const freeZoneData = {
+      id: freeZone?.id || 0,
+      name: freeZone?.name || 'Unknown Free Zone',
+      description: freeZone?.description || '',
+      website: freeZone?.website || '',
+      location: freeZone?.location || '',
+      benefits: freeZone?.benefits || {},
+      requirements: freeZone?.requirements || {},
+      facilities: freeZone?.facilities || {},
+      license_types: freeZone?.license_types || {},
+      documents: (documents || []).map(doc => ({
+        title: doc?.title || '',
+        category: doc?.category || '',
+        content: doc?.content ? doc.content.substring(0, 500) : ''
+      }))
+    };
+    
+    // Add logging to track what we're analyzing
+    console.log(`[AI-PM] Analyzing data for ${freeZoneData.name} (ID: ${freeZoneData.id})`);
+    console.log(`[AI-PM] Found ${freeZoneData.documents.length} related documents`);
+    
+    // Use OpenAI to analyze field completeness
+    const analysisResponse = await openai.chat.completions.create({
+      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+      messages: [
+        {
+          role: "system",
+          content: `You are an expert data analyst for UAE free zones. Analyze the completeness of specific data fields
+          for a free zone based on available information. For each field, determine if it is:
+          - "missing" (no information available)
+          - "incomplete" (some information, but insufficient)
+          - "complete" (comprehensive information available)
+          
+          Also provide a confidence score from 0.0 to 1.0 for your assessment, where 1.0 means absolute certainty.
+          And provide a brief recommendation for improving incomplete or missing fields.`
+        },
+        {
+          role: "user",
+          content: `Analyze the following fields for the free zone "${freeZoneData.name}":
+          ${fields.join(', ')}
+          
+          Available information:
+          ${JSON.stringify(freeZoneData, null, 2)}
+          
+          For each field, provide:
+          1. Field name
+          2. Status (missing/incomplete/complete)
+          3. Confidence score (0.0-1.0)
+          4. Recommendation for improvement (if not complete)
+          
+          Return in JSON format as an array of objects with exactly these fields: field, status, confidence, recommendation.`
+        }
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.3,
+      max_tokens: 1000
+    });
+    
+    // Safely parse the response with detailed error handling
+    let analysisResult: any = { fields: [] };
+    try {
+      const content = analysisResponse.choices[0].message.content || '{"fields": []}';
+      console.log(`[AI-PM] Analysis response for ${freeZoneData.name}: ${content.substring(0, 100)}...`);
+      analysisResult = JSON.parse(content);
+    } catch (parseError) {
+      console.error(`[AI-PM] Error parsing analysis response: ${parseError}`);
+      // Create a default analysis if parsing fails
+      return fields.map(field => ({
+        field,
+        status: 'missing' as 'missing',
+        confidence: 0.5,
+        recommendation: `Unable to analyze ${field}. Please retry the analysis.`
+      }));
+    }
+    
+    // Validate and ensure all fields have the correct structure
+    const validatedFields = (analysisResult.fields || []).map((field: any) => ({
+      field: field?.field || 'unknown_field',
+      status: (field?.status === 'complete' || field?.status === 'incomplete' || field?.status === 'missing') 
+        ? field.status 
+        : 'missing',
+      confidence: typeof field?.confidence === 'number' 
+        ? Math.max(0, Math.min(1, field.confidence)) 
+        : 0.5,
+      recommendation: field?.recommendation || `Gather more information about this field.`
+    }));
+    
+    // Log analysis results for debugging
+    const completeFields = validatedFields.filter(f => f.status === 'complete').length;
+    console.log(`[AI-PM] Analyzed ${validatedFields.length} fields for ${freeZoneData.name}, ${completeFields} complete`);
+    
+    return validatedFields;
+  } catch (error) {
+    console.error(`[AI-PM] Error in analyzeFieldsCompleteness: ${error}`);
+    
+    // Return default analysis with error status if anything fails
+    return fields.map(field => ({
+      field,
+      status: 'missing' as 'missing',
+      confidence: 0.5,
+      recommendation: `Analysis failed. Please retry.`
+    }));
+  }
 }
 
 /**
@@ -674,25 +778,47 @@ function generateRecommendedActions(
   fieldsAnalysis: AnalysisField[],
   freeZone: any
 ): string[] {
-  const incompleteFields = fieldsAnalysis.filter(f => f.status !== 'complete');
-  
-  const actions: string[] = [];
-  
-  // Add recommendations for incomplete fields
-  for (const field of incompleteFields) {
-    if (field.recommendation) {
-      actions.push(field.recommendation);
+  try {
+    const incompleteFields = fieldsAnalysis.filter(f => f.status !== 'complete');
+    
+    const actions: string[] = [];
+    
+    // Add recommendations for incomplete fields
+    for (const field of incompleteFields) {
+      if (field.recommendation) {
+        actions.push(field.recommendation);
+      }
     }
+    
+    // Add general recommendations
+    if (incompleteFields.length > 0) {
+      // Safely access field property and transform
+      const fieldNames = incompleteFields.map(f => {
+        // Handle undefined or null field names
+        if (!f.field) return 'unknown field';
+        
+        // Safely replace underscores with spaces if they exist
+        return f.field.replace(/_/g, ' ');
+      }).join(', ');
+      
+      actions.push(`Prioritize enriching data for the following fields: ${fieldNames}`);
+    }
+    
+    // Safely get the free zone name
+    const freeZoneName = freeZone?.name || 'this free zone';
+    
+    if (incompleteFields.length === 0) {
+      actions.push(`All key fields for ${freeZoneName} are complete. Consider adding more specialized information to enhance the quality further.`);
+    }
+    
+    // Add fallback message if no actions were generated
+    if (actions.length === 0) {
+      actions.push(`Review the free zone data and identify areas for improvement.`);
+    }
+    
+    return actions;
+  } catch (error) {
+    console.error(`[AI-PM] Error generating recommended actions: ${error}`);
+    return [`Review the data completeness analysis and identify areas for improvement.`];
   }
-  
-  // Add general recommendations
-  if (incompleteFields.length > 0) {
-    actions.push(`Prioritize enriching data for the following fields: ${incompleteFields.map(f => f.field.replace(/_/g, ' ')).join(', ')}`);
-  }
-  
-  if (incompleteFields.length === 0) {
-    actions.push(`All key fields for ${freeZone.name} are complete. Consider adding more specialized information to enhance the quality further.`);
-  }
-  
-  return actions;
 }
