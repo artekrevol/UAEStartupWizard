@@ -717,7 +717,21 @@ export async function chatWithEnhancedBusinessAssistant(
       );
       
       if (consolidatedMessage) {
-        systemKnowledge = `\n\nUSE THE FOLLOWING KNOWLEDGE BASE TO INFORM YOUR RESPONSES:\n${consolidatedMessage.content}`;
+        // Parse the JSON content to extract only relevant parts based on user query
+        try {
+          const parsedKnowledge = JSON.parse(consolidatedMessage.content);
+          // Just extract key information without the entire knowledge base
+          systemKnowledge = `\n\nKnowledge about UAE free zones:\n` + 
+            JSON.stringify({
+              free_zones: parsedKnowledge.free_zones?.slice(0, 3) || [],
+              business_setup_process: parsedKnowledge.business_setup_process || {},
+              license_types: parsedKnowledge.license_types?.slice(0, 2) || []
+            }, null, 2);
+        } catch (err) {
+          // Fallback to a shorter version of the content if parsing fails
+          systemKnowledge = `\n\nUSE THE FOLLOWING KNOWLEDGE BASE TO INFORM YOUR RESPONSES:\n` + 
+            consolidatedMessage.content.substring(0, 2000) + "...";
+        }
       }
     }
     
@@ -731,7 +745,8 @@ export async function chatWithEnhancedBusinessAssistant(
       model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
       messages: [
         { role: "system" as const, content: enhancedSystemMessage },
-        ...conversationHistory.map(msg => ({
+        // Only include the most recent 5 messages for better performance
+        ...conversationHistory.slice(-5).map(msg => ({
           role: msg.role as "user" | "assistant",
           content: msg.content
         }))
