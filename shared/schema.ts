@@ -200,12 +200,16 @@ export const issuesLog = pgTable('issues_log', {
 export const conversations = pgTable('conversations', {
   id: serial('id').primaryKey(),
   userId: integer('user_id').references(() => users.id),
-  source: text('source').notNull(), // 'chat', 'setup-flow', 'premium-agent'
-  title: text('title'),
+  sessionId: text('session_id'),
+  // Note: source column is not in the actual database table
+  // source: text('source').notNull(), // 'chat', 'setup-flow', 'premium-agent'
   summary: text('summary'),
-  lastMessageTime: timestamp('last_message_time').defaultNow(),
+  isActive: boolean('is_active'),
+  // Note: lastMessageTime column is not in the actual database table
+  // lastMessageTime: timestamp('last_message_time').defaultNow(),
   metadata: jsonb('metadata').default({}),
   createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
 });
 
 // Messages
