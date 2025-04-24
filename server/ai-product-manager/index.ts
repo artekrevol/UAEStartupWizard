@@ -208,6 +208,17 @@ export async function analyzeFreeZoneData(freeZoneId: number): Promise<FreeZoneA
       console.log(`[AI-PM] Document-based completeness score: ${docBasedScore}%`);
       // REPLACE the completeness score entirely
       overallCompleteness = docBasedScore;
+      
+      // Also ensure recommendation fields are consistent with status
+      fieldsAnalysis.forEach(field => {
+        if (field.status === 'complete') {
+          field.recommendation = "No recommendation needed";
+        } else if (field.status === 'missing' && !field.recommendation) {
+          field.recommendation = `Add comprehensive information about ${field.field.replace(/_/g, ' ')}.`;
+        } else if (field.status === 'incomplete' && !field.recommendation) {
+          field.recommendation = `Enhance existing information about ${field.field.replace(/_/g, ' ')}.`;
+        }
+      });
     }
     
     // Add detailed field status breakdown for reporting
@@ -345,7 +356,11 @@ export async function enrichFreeZoneData(
     
     const fieldStatus = fieldsAnalysis[0].status as 'missing' | 'incomplete';
     
-    if (fieldStatus === 'complete') {
+    // Check if the field has a recommendation to determine if it really needs enrichment
+    // Only block enrichment if the field is marked complete AND has no recommendation
+    if (fieldStatus === 'complete' && 
+        (!fieldsAnalysis[0].recommendation || 
+         fieldsAnalysis[0].recommendation === 'No recommendation needed')) {
       throw new Error(`Field "${field}" is already complete for free zone ${freeZone.name}`);
     }
     
