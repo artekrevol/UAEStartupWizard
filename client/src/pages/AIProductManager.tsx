@@ -554,7 +554,15 @@ const AIProductManager: React.FC = () => {
 
   return (
     <div className="container mx-auto py-6">
-      <h1 className="text-3xl font-bold mb-6">AI Product Manager</h1>
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-3xl font-bold">AI Product Manager</h1>
+        <Link href="/enrichment-workflow">
+          <Button className="flex items-center gap-2">
+            <PlayCircle className="h-4 w-4" />
+            Go to Enrichment Workflow
+          </Button>
+        </Link>
+      </div>
       <p className="mb-6 text-gray-600">
         The AI Product Manager helps analyze and enhance your free zone data, providing insights
         and automatically enriching missing information through web research.
