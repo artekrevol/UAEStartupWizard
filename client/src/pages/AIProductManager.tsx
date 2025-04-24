@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
+import { Link } from "wouter";
 import axios from 'axios';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,8 @@ import {
   Sparkles,
   FileQuestion,
   List,
-  Clock
+  Clock,
+  PlayCircle
 } from "lucide-react";
 
 // Define types for the data we'll be working with
