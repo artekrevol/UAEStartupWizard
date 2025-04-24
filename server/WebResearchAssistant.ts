@@ -210,7 +210,7 @@ Keep your response concise and focus on actionable information.
     // Call OpenAI API
     console.log("Calling OpenAI for business question answer");
     const response = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo-16k", // Using 3.5 Turbo for faster responses
+      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
       messages: [
         { role: "system", content: systemMessage },
         { role: "user", content: `${context ? context + "\n" : ""}Please answer this question: ${question}` }

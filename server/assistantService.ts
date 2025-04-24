@@ -726,9 +726,9 @@ export async function chatWithEnhancedBusinessAssistant(
     
     console.log("Calling OpenAI API with enhanced context...");
     
-    // Call OpenAI API with enhanced context - using faster GPT-3.5 for better performance
+    // Call OpenAI API with enhanced context - using gpt-4o for better performance
     const response = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo-16k", // Using 3.5 Turbo with larger context window for faster responses
+      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
       messages: [
         { role: "system" as const, content: enhancedSystemMessage },
         ...conversationHistory.map(msg => ({
