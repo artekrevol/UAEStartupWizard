@@ -449,7 +449,8 @@ export async function enrichFreeZoneData(
         'faqs': 'faqs',
         'templates': 'templates',
         'timelines': 'timelines',
-        'setup_cost': 'setup_cost'
+        'setup_cost': 'setup_cost',
+        'industries': 'industries'
       };
       
       // Get the correct column name for this field
