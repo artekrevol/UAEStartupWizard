@@ -14,6 +14,13 @@ import { exec } from 'child_process';
 import util from 'util';
 import { freeZones } from '../shared/schema';
 
+// Define type for free zone data
+type FreeZoneData = {
+  id: number;
+  name: string;
+  completeness_score?: number;
+};
+
 const execPromise = util.promisify(exec);
 const router = express.Router();
 
@@ -151,7 +158,7 @@ router.post('/api/enrichment/run-cycle/:freeZoneId', requireAdmin, async (req, r
       return res.status(404).json({ error: 'Free zone not found' });
     }
     
-    const freeZone = freeZoneResult.rows[0];
+    const freeZone = freeZoneResult.rows[0] as FreeZoneData;
     const freeZoneName = freeZone.name.toLowerCase().replace(/\s+/g, '_');
     
     // Start enrichment cycle process 
@@ -221,7 +228,7 @@ router.post('/api/enrichment/run-complete/:freeZoneId', requireAdmin, async (req
       return res.status(404).json({ error: 'Free zone not found' });
     }
     
-    const freeZone = freeZoneResult.rows[0];
+    const freeZone = freeZoneResult.rows[0] as FreeZoneData;
     
     // Start complete enrichment process
     // Right now only supports Ajman Free Zone (hardcoded)
@@ -250,7 +257,8 @@ router.post('/api/enrichment/run-complete/:freeZoneId', requireAdmin, async (req
           // Using inner function for async DB operation inside exec callback
           const updateCompleteness = async () => {
             try {
-              const freeZoneName = freeZone.name.toLowerCase().replace(/\s+/g, '_');
+              // Make a copy of the freezone name to keep it in this closure
+              const freeZoneName = String(freeZone.name).toLowerCase().replace(/\s+/g, '_');
               const auditPath = path.join('freezone_docs', freeZoneName, 'audit_results.json');
               if (fs.existsSync(auditPath)) {
                 const auditData = JSON.parse(fs.readFileSync(auditPath, 'utf8'));
