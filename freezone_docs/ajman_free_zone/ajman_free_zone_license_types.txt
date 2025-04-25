@@ -1,0 +1,38 @@
+# Ajman Free Zone License Types
+
+## Commercial License
+- Trading activities (import, export, distribution)
+- Allows multiple product lines within same category
+- Re-export and local market distribution
+- E-commerce operations
+- Retail activities (within specified areas)
+
+## Service License
+- Professional and consulting services
+- IT and technology services
+- Educational services
+- Healthcare services
+- Management services
+- Marketing and advertising
+
+## Industrial License
+- Manufacturing activities
+- Processing and assembly
+- Packaging and production
+- Industrial workshops
+- Food processing
+- Chemical production (non-hazardous)
+
+## E-Commerce License
+- Online retail platforms
+- Digital marketplaces
+- Online services
+- Digital content creation and distribution
+- Technology applications and solutions
+
+## General Trading License
+- Multiple, diverse product categories
+- Higher capital requirements
+- Expanded trading capabilities
+- International trading operations
+- Broad scope of permitted goods

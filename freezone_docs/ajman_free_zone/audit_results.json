@@ -1,0 +1,144 @@
+{
+  "freeZoneId": 9,
+  "freeZoneName": "Ajman Free Zone",
+  "totalDocuments": 9,
+  "categoryCounts": {
+    "benefits": "1",
+    "business_setup": "2",
+    "compliance": "1",
+    "facilities": "1",
+    "financial": "1",
+    "legal": "1",
+    "license_types": "1",
+    "visa_information": "1"
+  },
+  "categoryCompleteness": {
+    "business_setup": 33,
+    "legal": 20,
+    "compliance": 20,
+    "financial": 20,
+    "visa_information": 33,
+    "license_types": 33,
+    "facilities": 33,
+    "benefits": 33,
+    "faq": 0,
+    "templates": 0,
+    "timelines": 0,
+    "industries": 0,
+    "trade": 0,
+    "requirements": 0,
+    "managing_your_business": 0
+  },
+  "completenessScore": 15,
+  "priorityFields": [
+    "faq",
+    "templates",
+    "timelines",
+    "industries",
+    "trade",
+    "requirements",
+    "managing_your_business",
+    "legal",
+    "compliance",
+    "financial",
+    "business_setup",
+    "visa_information",
+    "license_types",
+    "facilities",
+    "benefits"
+  ],
+  "categoryDetails": [
+    {
+      "category": "faq",
+      "count": 0,
+      "targetCount": 2,
+      "completeness": 0
+    },
+    {
+      "category": "templates",
+      "count": 0,
+      "targetCount": 2,
+      "completeness": 0
+    },
+    {
+      "category": "timelines",
+      "count": 0,
+      "targetCount": 2,
+      "completeness": 0
+    },
+    {
+      "category": "industries",
+      "count": 0,
+      "targetCount": 2,
+      "completeness": 0
+    },
+    {
+      "category": "trade",
+      "count": 0,
+      "targetCount": 3,
+      "completeness": 0
+    },
+    {
+      "category": "requirements",
+      "count": 0,
+      "targetCount": 2,
+      "completeness": 0
+    },
+    {
+      "category": "managing_your_business",
+      "count": 0,
+      "targetCount": 5,
+      "completeness": 0
+    },
+    {
+      "category": "legal",
+      "count": "1",
+      "targetCount": 5,
+      "completeness": 20
+    },
+    {
+      "category": "compliance",
+      "count": "1",
+      "targetCount": 5,
+      "completeness": 20
+    },
+    {
+      "category": "financial",
+      "count": "1",
+      "targetCount": 5,
+      "completeness": 20
+    },
+    {
+      "category": "business_setup",
+      "count": "2",
+      "targetCount": 6,
+      "completeness": 33
+    },
+    {
+      "category": "visa_information",
+      "count": "1",
+      "targetCount": 3,
+      "completeness": 33
+    },
+    {
+      "category": "license_types",
+      "count": "1",
+      "targetCount": 3,
+      "completeness": 33
+    },
+    {
+      "category": "facilities",
+      "count": "1",
+      "targetCount": 3,
+      "completeness": 33
+    },
+    {
+      "category": "benefits",
+      "count": "1",
+      "targetCount": 3,
+      "completeness": 33
+    }
+  ],
+  "timestamp": "2025-04-25T13:16:31.777Z",
+  "isComplete": false
+}
