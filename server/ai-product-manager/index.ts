@@ -439,18 +439,34 @@ export async function enrichFreeZoneData(
     try {
       // Map fields to their actual column names in the database
       const columnNameMap: Record<string, string> = {
-        'license_types': 'license_types',
+        // Core fields
+        'license_types': 'licenseTypes',
         'setup_process': 'setup_process',
-        'legal_requirements': 'legal_requirements',
-        'fee_structure': 'fee_structure',
+        'legal_requirements': 'requirements',
+        'fee_structure': 'setupCost',
         'visa_information': 'visa_information',
         'facilities': 'facilities',
         'benefits': 'benefits',
         'faqs': 'faqs',
         'templates': 'templates',
         'timelines': 'timelines',
-        'setup_cost': 'setup_cost',
-        'industries': 'industries'
+        'setup_cost': 'setupCost',
+        'industries': 'industries',
+        
+        // Alternative field names (for flexibility)
+        'requirements': 'requirements',
+        'visas': 'visa_information',
+        'visa': 'visa_information',
+        'costs': 'setupCost',
+        'fees': 'setupCost',
+        'office_spaces': 'facilities',
+        'warehouses': 'facilities',
+        'business_activities': 'industries',
+        'sectors': 'industries',
+        'description': 'description',
+        'overview': 'description',
+        'about': 'description',
+        'advantages': 'benefits'
       };
       
       // Get the correct column name for this field
@@ -460,7 +476,7 @@ export async function enrichFreeZoneData(
       
       // Format the content appropriately based on field type
       let formattedContent: any;
-      if (field === 'faqs') {
+      if (field === 'faqs' || columnName === 'faqs') {
         // Try to parse the content as FAQs
         try {
           // Extract Q&A format from content
@@ -470,14 +486,21 @@ export async function enrichFreeZoneData(
             return { question, answer };
           }) || [];
           
-          // If extraction didn't work well, try an alternative approach
+          // If extraction didn't work well, try an alternative approach with question detection
           const faqs = extractedFaqs.length > 0 ? extractedFaqs : 
-            content.split('\n\n').map(paragraph => {
-              const parts = paragraph.split('\n');
+            content.split(/\n\n|\*\*Q:|(?=\*\*[^*]+\?)/g).map(paragraph => {
+              // Clean up the paragraph
+              const cleanParagraph = paragraph.trim().replace(/^\*\*|\*\*$/g, '');
+              
+              // Check if it contains a question mark
+              const parts = cleanParagraph.split(/\n|\*\*A:|\?/);
               if (parts.length >= 2) {
+                // Found a question and answer pattern
+                const questionPart = parts[0].trim() + (parts[0].trim().endsWith('?') ? '' : '?');
+                const answerPart = parts.slice(1).join(' ').trim();
                 return { 
-                  question: parts[0].replace(/^Q:\s*|-\s*|^\d+\.\s*/, ''),
-                  answer: parts.slice(1).join('\n').replace(/^A:\s*/, '')
+                  question: questionPart.replace(/^Q:\s*|-\s*|^\d+\.\s*/, ''),
+                  answer: answerPart.replace(/^A:\s*/, '')
                 };
               }
               return null;
@@ -491,14 +514,46 @@ export async function enrichFreeZoneData(
             answer: content.substring(0, 500) + '...'
           }]);
         }
-      } else if (['benefits', 'facilities', 'requirements', 'license_types', 'industries'].includes(field)) {
+      } else if (['benefits', 'facilities', 'requirements', 'licenseTypes', 'industries', 'license_types'].includes(columnName)) {
         // Parse as array of items
-        const items = content
-          .split(/\n-|\n\d+\./)
-          .map(item => item.trim())
-          .filter(item => item.length > 0);
-        
-        formattedContent = JSON.stringify(items);
+        // First check if the content already contains structured bullet points or numbered lists
+        if (content.match(/\n-|\n\d+\.|\n\*|\*\*/)) {
+          // Content has bullet points, split by them
+          const items = content
+            .split(/\n-|\n\d+\.|\n\*|\*\*(?=[A-Z])/)
+            .map(item => item.trim())
+            .filter(item => item.length > 0);
+          
+          formattedContent = JSON.stringify(items);
+        } else {
+          // No clear bullet structure, try to split by sentences or paragraphs
+          const items = content
+            .split(/\.\s|\n\n/)
+            .map(item => item.trim() + (item.trim().endsWith('.') ? '' : '.'))
+            .filter(item => item.length > 5); // Ensure we have meaningful items
+          
+          formattedContent = JSON.stringify(items);
+        }
+      } else if (columnName === 'setupCost') {
+        // Try to parse as a structured object if it appears to have categories
+        try {
+          // Check if content has structure
+          if (content.match(/\n-|\n\d+\.|\n\*|\*\*/)) {
+            // Use the same array format for consistency
+            const items = content
+              .split(/\n-|\n\d+\.|\n\*|\*\*(?=[A-Z])/)
+              .map(item => item.trim())
+              .filter(item => item.length > 0);
+            
+            formattedContent = JSON.stringify(items);
+          } else {
+            // Try to create a simple object
+            formattedContent = JSON.stringify({ details: content });
+          }
+        } catch (err) {
+          console.error('Error parsing costs', err);
+          formattedContent = JSON.stringify({ details: content });
+        }
       } else {
         // Use as plain text for other fields
         formattedContent = content;
