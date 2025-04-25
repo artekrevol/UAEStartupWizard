@@ -16,6 +16,7 @@ import { businessActivityCategories, businessActivities, freeZones, documents, i
 import { documentUpload, processUploadedDocument, processDMCCDocuments, processSAIFZoneDocuments } from "./document-upload";
 import { spawn } from 'child_process';
 import { registerAIProductManagerRoutes } from "./ai-product-manager/register-routes";
+import { registerDocumentFetcherRoutes } from "./document-fetcher-routes";
 
 // Middleware to check if user is admin
 function requireAdmin(req: Request, res: Response, next: NextFunction) {
@@ -44,6 +45,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Register AI Product Manager routes
   registerAIProductManagerRoutes(app);
+  
+  // Register Document Fetcher routes
+  registerDocumentFetcherRoutes(app);
 
   // Fetch business categories
   app.get("/api/business-categories", async (req, res) => {
