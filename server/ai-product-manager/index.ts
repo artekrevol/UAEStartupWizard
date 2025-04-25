@@ -491,7 +491,7 @@ export async function enrichFreeZoneData(
             answer: content.substring(0, 500) + '...'
           }]);
         }
-      } else if (['benefits', 'facilities', 'requirements', 'license_types'].includes(field)) {
+      } else if (['benefits', 'facilities', 'requirements', 'license_types', 'industries'].includes(field)) {
         // Parse as array of items
         const items = content
           .split(/\n-|\n\d+\./)
