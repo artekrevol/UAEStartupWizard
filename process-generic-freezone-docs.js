@@ -8,42 +8,17 @@
  * 4. Generates a comprehensive import report
  */
 
-const fs = require('fs');
-const path = require('path');
-const { db } = require('./server/db');
-const { documents } = require('./shared/schema');
-const { eq, sql } = require('drizzle-orm');
+import * as fs from 'fs';
+import * as path from 'path';
+import * as url from 'url';
+import * as crypto from 'crypto';
 
-// Mapping of categories to subcategories
-const SUBCATEGORY_MAPPING = {
-  'business_setup': [
-    'company_formation', 'registration', 'incorporation', 'startup',
-    'licensing', 'costs', 'timeline'
-  ],
-  'legal': [
-    'regulations', 'compliance', 'laws', 'legal_structure', 'contracts'
-  ],
-  'financial': [
-    'banking', 'tax', 'accounting', 'payment', 'fees', 'costs'
-  ],
-  'visa': [
-    'residence', 'employment', 'family', 'investor', 'dependent'
-  ],
-  'license': [
-    'commercial', 'industrial', 'professional', 'e_commerce', 'trading'
-  ],
-  'trade': [
-    'import', 'export', 'customs', 'logistics', 'warehousing'
-  ],
-  'forms': [
-    'application', 'registration', 'request', 'template', 'declaration'
-  ],
-  'compliance': [
-    'kyc', 'aml', 'due_diligence', 'policy', 'procedures'
-  ],
-  'knowledge_bank': [
-    'guide', 'manual', 'handbook', 'faq', 'resources'
-  ]
+// Import db connection
+let db;
+const importDb = async () => {
+  const dbModule = await import('./server/db.js');
+  db = dbModule.db;
+  return db;
 };
 
 /**
@@ -51,13 +26,15 @@ const SUBCATEGORY_MAPPING = {
  */
 async function checkDocumentExists(filename, freeZoneId) {
   try {
-    const result = await db
-      .select()
-      .from(documents)
-      .where(sql`filename = ${filename} AND free_zone_id = ${freeZoneId}`)
-      .limit(1);
+    if (!db) await importDb();
     
-    return result.length > 0;
+    const query = `
+      SELECT id FROM documents 
+      WHERE filename = $1 AND free_zone_id = $2
+    `;
+    
+    const result = await db.execute(query, [filename, freeZoneId]);
+    return result.rows && result.rows.length > 0;
   } catch (error) {
     console.error(`Error checking if document exists: ${error.message}`);
     return false;
@@ -68,321 +45,449 @@ async function checkDocumentExists(filename, freeZoneId) {
  * Determine the subcategory based on document title, content, and category
  */
 function determineSubcategory(title, filePath, category) {
-  // Combine title and file path for analysis
-  const textToAnalyze = `${title} ${filePath}`.toLowerCase();
+  const titleLower = title.toLowerCase();
   
-  // Get potential subcategories for this category
-  const subcategories = SUBCATEGORY_MAPPING[category] || [];
+  // Map of common subcategories by main category
+  const subcategoryMappings = {
+    'business_setup': {
+      'licens': 'Licensing',
+      'regist': 'Registration',
+      'incorporation': 'Incorporation',
+      'form': 'Company Formation',
+      'startup': 'Startup',
+      'establish': 'Establishment',
+      'setup process': 'Setup Process',
+      'procedure': 'Procedures',
+      'overview': 'Overview',
+      'guide': 'Guide',
+      'package': 'Package Options',
+      'structure': 'Legal Structure'
+    },
+    'compliance': {
+      'regulation': 'Regulations',
+      'law': 'Legal',
+      'kyc': 'KYC',
+      'aml': 'AML',
+      'rule': 'Rules',
+      'policy': 'Policies',
+      'guideline': 'Guidelines',
+      'visa': 'Visa Information'
+    },
+    'financial': {
+      'fee': 'Fees',
+      'payment': 'Payments',
+      'banking': 'Banking',
+      'tax': 'Taxation',
+      'accounting': 'Accounting',
+      'invoice': 'Invoicing',
+      'service': 'Financial Services'
+    },
+    'forms': {
+      'application': 'Applications',
+      'license': 'License Applications',
+      'visa': 'Visa Applications',
+      'general': 'General'
+    },
+    'knowledge_bank': {
+      'faq': 'FAQs',
+      'guide': 'Guides',
+      'handbook': 'Handbooks',
+      'research': 'Research',
+      'article': 'Articles',
+      'publication': 'Publications'
+    }
+  };
   
-  // Look for subcategory keywords in the text
-  for (const subcategory of subcategories) {
-    // Convert subcategory from snake_case to space-separated words for matching
-    const subcategoryWords = subcategory.replace(/_/g, ' ').split(' ');
-    
-    // Check if any of the words appear in the text
-    if (subcategoryWords.some(word => textToAnalyze.includes(word))) {
-      return subcategory;
+  // Check for subcategory keywords in the title
+  const categoryMap = subcategoryMappings[category];
+  
+  if (categoryMap) {
+    for (const [keyword, subcategory] of Object.entries(categoryMap)) {
+      if (titleLower.includes(keyword)) {
+        return subcategory;
+      }
     }
   }
   
-  // Default to "general" subcategory if no match found
-  return 'general';
+  // Default to null if no subcategory matched
+  return null;
 }
 
 /**
  * Determine document type based on file extension
  */
 function determineDocumentType(filePath) {
-  const extension = path.extname(filePath).toLowerCase();
+  const ext = path.extname(filePath).toLowerCase();
   
-  switch (extension) {
-    case '.pdf':
-      return 'pdf';
-    case '.doc':
-    case '.docx':
-      return 'word';
-    case '.xls':
-    case '.xlsx':
-      return 'excel';
-    case '.ppt':
-    case '.pptx':
-      return 'powerpoint';
-    case '.txt':
-      return 'text';
-    case '.zip':
-      return 'archive';
-    default:
-      return 'other';
-  }
+  const typeMap = {
+    '.pdf': 'PDF',
+    '.doc': 'Word',
+    '.docx': 'Word',
+    '.xls': 'Excel',
+    '.xlsx': 'Excel',
+    '.ppt': 'PowerPoint',
+    '.pptx': 'PowerPoint',
+    '.txt': 'Text',
+    '.rtf': 'Text',
+    '.zip': 'Archive',
+    '.rar': 'Archive',
+    '.jpg': 'Image',
+    '.jpeg': 'Image',
+    '.png': 'Image',
+    '.gif': 'Image'
+  };
+  
+  return typeMap[ext] || 'Other';
 }
 
 /**
  * Read document content or return placeholder for binary files
  */
 function readDocumentContent(filePath) {
-  const extension = path.extname(filePath).toLowerCase();
+  const ext = path.extname(filePath).toLowerCase();
+  const textExtensions = ['.txt', '.html', '.htm', '.md', '.csv'];
   
-  // Only read text-based files
-  if (extension === '.txt') {
+  if (textExtensions.includes(ext)) {
+    // Read text file content
     try {
       return fs.readFileSync(filePath, 'utf8');
     } catch (error) {
-      console.error(`Error reading file content: ${error.message}`);
-      return 'File content could not be read.';
+      console.error(`Error reading text file ${filePath}: ${error.message}`);
+      return `[Content extraction failed: ${error.message}]`;
     }
+  } else {
+    // Return placeholder for binary files
+    return `[Binary content: ${ext.substring(1)} file]`;
   }
-  
-  // For binary files, return placeholder
-  return `This is a ${extension.replace('.', '')} file. Access the original file for content.`;
 }
 
 /**
  * Process and import documents for a specific free zone
  */
-async function processFreeZoneDocuments(freeZoneId, baseDir = null) {
+export async function processFreeZoneDocuments(freeZoneId, baseDir = null) {
   try {
-    console.log(`Processing documents for free zone ID: ${freeZoneId}`);
+    if (!db) await importDb();
     
-    // Get free zone details
-    const freeZoneResult = await db.execute(
-      sql`SELECT id, name FROM free_zones WHERE id = ${freeZoneId}`
-    );
+    console.log(`Processing documents for free zone ID ${freeZoneId}`);
     
-    if (!freeZoneResult.rows || freeZoneResult.rows.length === 0) {
-      console.error(`Free zone with ID ${freeZoneId} not found`);
-      return { success: false, message: 'Free zone not found' };
+    // If baseDir not provided, construct it from free zone name
+    if (!baseDir) {
+      // Get free zone details
+      const freeZoneResult = await db.execute(`
+        SELECT id, name FROM free_zones WHERE id = ${freeZoneId}
+      `);
+      
+      if (!freeZoneResult.rows || freeZoneResult.rows.length === 0) {
+        console.error(`Free zone with ID ${freeZoneId} not found`);
+        return {
+          success: false,
+          freeZoneId,
+          error: 'Free zone not found'
+        };
+      }
+      
+      const freeZone = freeZoneResult.rows[0];
+      const freeZoneDirName = freeZone.name.toLowerCase().replace(/\s+/g, '_');
+      baseDir = path.resolve('./freezone_docs', freeZoneDirName);
     }
     
-    const freeZone = freeZoneResult.rows[0];
-    console.log(`Processing documents for ${freeZone.name}`);
-    
-    // Determine the documents directory
-    const freeZoneDirName = freeZone.name.toLowerCase().replace(/\s+/g, '_');
-    const documentsDir = baseDir || path.resolve(`./freezone_docs/${freeZoneDirName}`);
-    
-    // Check if documents directory exists
-    if (!fs.existsSync(documentsDir)) {
-      console.error(`Documents directory not found: ${documentsDir}`);
-      return { success: false, message: 'Documents directory not found' };
+    // Check if directory exists
+    if (!fs.existsSync(baseDir)) {
+      console.error(`Directory not found: ${baseDir}`);
+      return {
+        success: false,
+        freeZoneId,
+        error: 'Directory not found'
+      };
     }
     
-    // Look for download summary file
-    const summaryPath = path.join(documentsDir, 'download_summary.json');
+    // Find the summary file
+    const summaryPath = path.join(baseDir, 'download_summary.json');
     if (!fs.existsSync(summaryPath)) {
       console.error(`Summary file not found: ${summaryPath}`);
-      return { success: false, message: 'Summary file not found' };
+      return {
+        success: false,
+        freeZoneId,
+        error: 'Summary file not found'
+      };
     }
     
-    // Read summary file
-    const summary = JSON.parse(fs.readFileSync(summaryPath, 'utf8'));
-    console.log(`Found ${summary.documents.length} documents in summary`);
+    // Read the summary file
+    console.log(`Reading summary file: ${summaryPath}`);
+    const summaryContent = fs.readFileSync(summaryPath, 'utf8');
+    const summary = JSON.parse(summaryContent);
     
     // Process each document
     const results = {
-      total: summary.documents.length,
-      imported: 0,
-      skipped: 0,
-      errors: 0,
-      documentsByCategory: {}
+      freeZoneId,
+      documentsProcessed: 0,
+      successCount: 0,
+      skippedCount: 0,
+      errorCount: 0,
+      documents: []
     };
     
-    for (const doc of summary.documents) {
+    if (!summary.documents || !Array.isArray(summary.downloadResults)) {
+      console.error(`Invalid summary file format`);
+      return {
+        success: false,
+        freeZoneId,
+        error: 'Invalid summary file format'
+      };
+    }
+    
+    // Process each document in the download results
+    for (const doc of summary.downloadResults) {
+      results.documentsProcessed++;
+      
       try {
-        // Check if document exists
-        const fileName = path.basename(doc.filePath);
-        const exists = await checkDocumentExists(fileName, freeZoneId);
-        
-        if (exists) {
-          console.log(`Document already exists: ${fileName}`);
-          results.skipped++;
+        if (!doc.downloadSuccess || !doc.filePath) {
+          console.log(`Skipping document with failed download: ${doc.url}`);
+          results.skippedCount++;
+          results.documents.push({
+            ...doc,
+            success: false,
+            action: 'skipped',
+            reason: 'Download failed'
+          });
           continue;
         }
         
-        // Determine document properties
-        const documentType = determineDocumentType(doc.filePath);
-        const category = doc.category;
-        const subcategory = determineSubcategory(doc.title, doc.filePath, category);
+        // Check if file exists
+        if (!fs.existsSync(doc.filePath)) {
+          console.log(`Skipping missing file: ${doc.filePath}`);
+          results.skippedCount++;
+          results.documents.push({
+            ...doc,
+            success: false,
+            action: 'skipped',
+            reason: 'File missing'
+          });
+          continue;
+        }
         
-        // Read content if possible
+        // Get file stats
+        const stats = fs.statSync(doc.filePath);
+        
+        // Check if document already exists in database
+        const exists = await checkDocumentExists(doc.filename, freeZoneId);
+        if (exists) {
+          console.log(`Skipping existing document: ${doc.filename}`);
+          results.skippedCount++;
+          results.documents.push({
+            ...doc,
+            success: false,
+            action: 'skipped',
+            reason: 'Document already exists'
+          });
+          continue;
+        }
+        
+        // Determine document type
+        const docType = determineDocumentType(doc.filePath);
+        
+        // Determine subcategory
+        const subcategory = determineSubcategory(doc.title, doc.filePath, doc.category);
+        
+        // Read content for text files or use placeholder for binary files
         const content = readDocumentContent(doc.filePath);
         
-        // Prepare document data
+        // Generate hash for document content
+        const contentHash = crypto.createHash('md5').update(content).digest('hex');
+        
+        // Prepare document for database insertion
         const documentData = {
           title: doc.title,
-          filename: fileName,
-          filePath: doc.filePath.replace(/^\.\//, '/'),
-          category: category,
-          subcategory: subcategory,
-          freeZoneId: freeZoneId,
-          documentType: documentType,
-          content: content,
-          fileSize: doc.size || 0,
-          metadata: JSON.stringify({
-            source: 'generic_downloader',
-            originalUrl: doc.url,
-            downloadDate: doc.downloadDate,
-            fileType: doc.fileType
-          }),
-          createdAt: new Date(),
-          updatedAt: new Date()
+          filename: doc.filename,
+          file_path: doc.filePath,
+          document_type: docType,
+          category: doc.category,
+          subcategory,
+          content,
+          file_size: stats.size,
+          free_zone_id: freeZoneId,
+          metadata: {
+            source_url: doc.url,
+            download_timestamp: new Date().toISOString(),
+            content_hash: contentHash
+          },
+          uploaded_at: new Date()
         };
         
         // Insert document into database
-        await db.execute(sql`
+        const query = `
           INSERT INTO documents (
-            title, filename, file_path, category, subcategory, 
-            free_zone_id, document_type, content, file_size, metadata,
-            created_at, updated_at
+            title, filename, file_path, document_type, category, subcategory, 
+            content, file_size, free_zone_id, metadata, uploaded_at
           ) VALUES (
-            ${documentData.title}, ${documentData.filename}, ${documentData.filePath}, 
-            ${documentData.category}, ${documentData.subcategory}, ${documentData.freeZoneId},
-            ${documentData.documentType}, ${documentData.content}, ${documentData.fileSize}, 
-            ${documentData.metadata}, ${documentData.createdAt}, ${documentData.updatedAt}
-          )
-        `);
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+          ) RETURNING id
+        `;
         
-        console.log(`Imported document: ${documentData.title}`);
-        results.imported++;
+        const result = await db.execute(query, [
+          documentData.title,
+          documentData.filename,
+          documentData.file_path,
+          documentData.document_type,
+          documentData.category,
+          documentData.subcategory,
+          documentData.content,
+          documentData.file_size,
+          documentData.free_zone_id,
+          JSON.stringify(documentData.metadata),
+          documentData.uploaded_at
+        ]);
         
-        // Track category stats
-        results.documentsByCategory[category] = (results.documentsByCategory[category] || 0) + 1;
-        
+        if (result.rows && result.rows.length > 0) {
+          console.log(`Document imported: ${doc.filename} (ID: ${result.rows[0].id})`);
+          results.successCount++;
+          results.documents.push({
+            ...doc,
+            success: true,
+            action: 'imported',
+            id: result.rows[0].id
+          });
+        } else {
+          console.error(`Failed to import document: ${doc.filename}`);
+          results.errorCount++;
+          results.documents.push({
+            ...doc,
+            success: false,
+            action: 'error',
+            reason: 'Database insertion failed'
+          });
+        }
       } catch (error) {
-        console.error(`Error processing document ${doc.title}: ${error.message}`);
-        results.errors++;
+        console.error(`Error processing document: ${error.message}`);
+        results.errorCount++;
+        results.documents.push({
+          ...doc,
+          success: false,
+          action: 'error',
+          reason: error.message
+        });
       }
     }
     
-    console.log(`\nImport Results for ${freeZone.name}:`);
-    console.log(`Total: ${results.total}`);
-    console.log(`Imported: ${results.imported}`);
-    console.log(`Skipped: ${results.skipped}`);
-    console.log(`Errors: ${results.errors}`);
-    console.log('Documents by category:');
-    Object.entries(results.documentsByCategory).forEach(([category, count]) => {
-      console.log(`  ${category}: ${count}`);
-    });
+    // Write processing results to file
+    const resultsPath = path.join(baseDir, 'processing_results.json');
+    fs.writeFileSync(resultsPath, JSON.stringify(results, null, 2));
+    
+    console.log(`Document processing completed for free zone ID ${freeZoneId}`);
+    console.log(`Documents processed: ${results.documentsProcessed}`);
+    console.log(`Documents imported: ${results.successCount}`);
+    console.log(`Documents skipped: ${results.skippedCount}`);
+    console.log(`Errors: ${results.errorCount}`);
     
     return {
       success: true,
-      freeZoneId,
-      freeZoneName: freeZone.name,
-      results
+      ...results
     };
-    
   } catch (error) {
-    console.error(`Error processing documents: ${error.message}`);
-    return { success: false, error: error.message };
+    console.error(`Error processing documents for free zone ID ${freeZoneId}: ${error.message}`);
+    return {
+      success: false,
+      freeZoneId,
+      error: error.message,
+      stack: error.stack
+    };
   }
 }
 
 /**
  * Process documents for all free zones
  */
-async function processAllFreeZoneDocuments() {
+export async function processAllFreeZoneDocuments() {
   try {
-    const baseDir = path.resolve('./freezone_docs');
+    if (!db) await importDb();
     
-    // Check if base directory exists
-    if (!fs.existsSync(baseDir)) {
-      console.error(`Base directory not found: ${baseDir}`);
-      return { success: false, message: 'Base directory not found' };
-    }
+    console.log('Processing documents for all free zones');
     
-    // Get all free zones
-    const freeZonesResult = await db.execute(sql`SELECT id, name FROM free_zones`);
+    // Get all free zones with websites
+    const freeZonesResult = await db.execute(`
+      SELECT id, name, website FROM free_zones 
+      WHERE website IS NOT NULL AND website != '' 
+      ORDER BY name
+    `);
     
     if (!freeZonesResult.rows || freeZonesResult.rows.length === 0) {
-      console.error('No free zones found');
-      return { success: false, message: 'No free zones found' };
+      console.error('No free zones with websites found');
+      return {
+        success: false,
+        error: 'No free zones with websites found'
+      };
     }
     
-    const results = [];
+    const results = {
+      totalFreeZones: freeZonesResult.rows.length,
+      processedFreeZones: 0,
+      totalSuccessCount: 0,
+      totalSkippedCount: 0,
+      totalErrorCount: 0,
+      freeZones: []
+    };
     
-    // Process each free zone
     for (const freeZone of freeZonesResult.rows) {
-      console.log(`\n========== Processing ${freeZone.name} ==========\n`);
+      console.log(`Processing documents for ${freeZone.name} (ID: ${freeZone.id})`);
       
       const freeZoneDirName = freeZone.name.toLowerCase().replace(/\s+/g, '_');
-      const freeZoneDir = path.join(baseDir, freeZoneDirName);
+      const freeZoneDir = path.resolve('./freezone_docs', freeZoneDirName);
       
-      // Skip if directory doesn't exist
       if (!fs.existsSync(freeZoneDir)) {
-        console.log(`No document directory for ${freeZone.name}, skipping`);
+        console.log(`Skipping ${freeZone.name} - directory not found: ${freeZoneDir}`);
+        results.freeZones.push({
+          id: freeZone.id,
+          name: freeZone.name,
+          success: false,
+          error: 'Directory not found'
+        });
         continue;
       }
       
-      const result = await processFreeZoneDocuments(freeZone.id, freeZoneDir);
-      results.push({
-        freeZoneId: freeZone.id,
-        freeZoneName: freeZone.name,
-        success: result.success,
-        imported: result.results?.imported || 0,
-        skipped: result.results?.skipped || 0,
-        errors: result.results?.errors || 0
+      const freeZoneResult = await processFreeZoneDocuments(freeZone.id, freeZoneDir);
+      results.processedFreeZones++;
+      
+      if (freeZoneResult.success) {
+        results.totalSuccessCount += freeZoneResult.successCount;
+        results.totalSkippedCount += freeZoneResult.skippedCount;
+        results.totalErrorCount += freeZoneResult.errorCount;
+      }
+      
+      results.freeZones.push({
+        id: freeZone.id,
+        name: freeZone.name,
+        ...freeZoneResult
       });
     }
     
-    // Generate summary
-    const summary = {
-      totalFreeZones: results.length,
-      successfulImports: results.filter(r => r.success).length,
-      failedImports: results.filter(r => !r.success).length,
-      totalDocumentsImported: results.reduce((sum, r) => sum + (r.imported || 0), 0),
-      results
+    // Write overall results to file
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const resultsPath = path.resolve('./freezone_docs/results', `all_processing_results_${timestamp}.json`);
+    
+    // Ensure results directory exists
+    const resultsDir = path.dirname(resultsPath);
+    if (!fs.existsSync(resultsDir)) {
+      fs.mkdirSync(resultsDir, { recursive: true });
+    }
+    
+    fs.writeFileSync(resultsPath, JSON.stringify(results, null, 2));
+    
+    console.log('Document processing completed for all free zones');
+    console.log(`Free zones processed: ${results.processedFreeZones}`);
+    console.log(`Total documents imported: ${results.totalSuccessCount}`);
+    console.log(`Total documents skipped: ${results.totalSkippedCount}`);
+    console.log(`Total errors: ${results.totalErrorCount}`);
+    
+    return {
+      success: true,
+      ...results
     };
-    
-    // Save summary to file
-    fs.writeFileSync(
-      path.resolve('./freezone_docs/all_imports_summary.json'),
-      JSON.stringify(summary, null, 2)
-    );
-    
-    console.log(`\n===== Document Import Summary =====`);
-    console.log(`Total Free Zones: ${summary.totalFreeZones}`);
-    console.log(`Successful Imports: ${summary.successfulImports}`);
-    console.log(`Failed Imports: ${summary.failedImports}`);
-    console.log(`Total Documents Imported: ${summary.totalDocumentsImported}`);
-    
-    return summary;
-    
   } catch (error) {
-    console.error(`Error processing all free zone documents: ${error.message}`);
-    return { success: false, error: error.message };
+    console.error(`Error processing documents for all free zones: ${error.message}`);
+    return {
+      success: false,
+      error: error.message,
+      stack: error.stack
+    };
   }
 }
-
-// If running as main script
-if (require.main === module) {
-  const args = process.argv.slice(2);
-  
-  if (args.length > 0 && !isNaN(parseInt(args[0]))) {
-    // Process specific free zone
-    const freeZoneId = parseInt(args[0]);
-    processFreeZoneDocuments(freeZoneId)
-      .then(result => {
-        console.log('Process complete');
-        process.exit(0);
-      })
-      .catch(error => {
-        console.error('Process failed:', error);
-        process.exit(1);
-      });
-  } else {
-    // Process all free zones
-    processAllFreeZoneDocuments()
-      .then(result => {
-        console.log('Process complete');
-        process.exit(0);
-      })
-      .catch(error => {
-        console.error('Process failed:', error);
-        process.exit(1);
-      });
-  }
-}
-
-module.exports = {
-  processFreeZoneDocuments,
-  processAllFreeZoneDocuments
-};

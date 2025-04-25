@@ -1,562 +1,426 @@
 /**
  * Generic Free Zone Document Downloader
  * 
- * This script downloads documents from any free zone website.
- * It detects common document patterns and downloads PDFs, guides, forms and other
- * document types into appropriate category folders.
+ * This module provides functions to download documents from any free zone website.
+ * It uses a combination of Axios and Playwright to crawl and download documents.
  */
 
-const axios = require('axios');
-const cheerio = require('cheerio');
-const fs = require('fs');
-const path = require('path');
-const { chromium } = require('playwright');
-const { db } = require('../server/db');
-const { PlaywrightScraper } = require('./utils/playwright_scraper');
+import * as fs from 'fs';
+import * as path from 'path';
+import * as url from 'url';
+import axios from 'axios';
+import { chromium } from 'playwright';
+import * as cheerio from 'cheerio';
 
-class GenericFreeZoneDocumentDownloader extends PlaywrightScraper {
-  constructor(options = {}) {
-    super(options);
-    this.freeZoneId = options.freeZoneId;
-    this.freeZoneName = options.freeZoneName;
-    this.websiteUrl = options.websiteUrl;
-    this.maxDocuments = options.maxDocuments || 50; // Limit documents to prevent excessive downloads
-    this.baseOutputDir = options.outputDir || path.resolve(`./freezone_docs/${this.freeZoneName.toLowerCase().replace(/\s+/g, '_')}`);
-    this.downloadedUrls = new Set(); // Track downloaded URLs to prevent duplicates
-    this.documentsByCategory = {};
-    this.totalDownloaded = 0;
-    
-    // Common document extensions
-    this.documentExtensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.zip', '.txt'];
-    
-    // Common document path keywords by category
-    this.categoryKeywords = {
-      'business_setup': ['setup', 'establish', 'register', 'incorporate', 'formation', 'start', 'company'],
-      'legal': ['legal', 'law', 'regulation', 'compliance', 'rules'],
-      'financial': ['financial', 'finance', 'banking', 'tax', 'vat', 'payment'],
-      'visa': ['visa', 'residence', 'immigration', 'employment'],
-      'license': ['license', 'permit', 'activity', 'business type'],
-      'trade': ['trade', 'import', 'export', 'customs', 'logistics'],
-      'forms': ['form', 'application', 'template', 'document'],
-      'compliance': ['compliance', 'kyc', 'aml', 'policy'],
-      'knowledge_bank': ['guide', 'manual', 'handbook', 'knowledge']
-    };
-  }
+// File types to target for download
+const TARGET_FILE_EXTENSIONS = [
+  '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.zip', '.rar', '.txt'
+];
 
-  /**
-   * Main scrape method to download documents
-   */
-  async scrape() {
-    console.log(`Starting document download for ${this.freeZoneName} (${this.websiteUrl})`);
-    
-    if (!this.websiteUrl) {
-      console.error(`No website URL provided for ${this.freeZoneName}`);
-      return { success: false, message: 'No website URL provided' };
-    }
-    
-    // Create base output directory
-    if (!fs.existsSync(this.baseOutputDir)) {
-      fs.mkdirSync(this.baseOutputDir, { recursive: true });
-    }
-    
-    // Initialize category directories
-    Object.keys(this.categoryKeywords).forEach(category => {
-      const categoryDir = path.join(this.baseOutputDir, category);
-      if (!fs.existsSync(categoryDir)) {
-        fs.mkdirSync(categoryDir, { recursive: true });
-      }
-      this.documentsByCategory[category] = [];
-    });
-    
-    try {
-      // Launch browser
-      this.browser = await chromium.launch({ 
-        headless: true,
-        executablePath: process.env.PLAYWRIGHT_BROWSERS_PATH || undefined
-      });
-      this.context = await this.browser.newContext({
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36',
-        viewport: { width: 1366, height: 768 }
-      });
-      this.page = await this.context.newPage();
-      this.page.setDefaultTimeout(60000);
-      
-      // Visit main page
-      console.log(`Visiting ${this.websiteUrl}`);
-      await this.page.goto(this.websiteUrl, { waitUntil: 'domcontentloaded' });
-      
-      // Build sitemap with key pages
-      const sitemap = await this.buildSitemap();
-      
-      // Process main page first
-      await this.processPageForDocuments(this.websiteUrl, 'root');
-      
-      // Process key sections from sitemap
-      for (const [section, url] of Object.entries(sitemap)) {
-        if (this.totalDownloaded >= this.maxDocuments) {
-          console.log(`Reached maximum document limit (${this.maxDocuments}). Stopping.`);
-          break;
-        }
-        
-        if (this.downloadedUrls.has(url)) continue;
-        
-        await this.processPageForDocuments(url, section);
-      }
-      
-      // Generate summary
-      const summary = {
-        freeZoneId: this.freeZoneId,
-        freeZoneName: this.freeZoneName,
-        websiteUrl: this.websiteUrl,
-        totalDocuments: this.totalDownloaded,
-        documentsByCategory: Object.fromEntries(
-          Object.entries(this.documentsByCategory).map(
-            ([category, docs]) => [category, docs.length]
-          )
-        ),
-        documents: Object.values(this.documentsByCategory).flat()
-      };
-      
-      // Save summary to file
-      fs.writeFileSync(
-        path.join(this.baseOutputDir, 'download_summary.json'), 
-        JSON.stringify(summary, null, 2)
-      );
-      
-      console.log(`Downloaded ${this.totalDownloaded} documents from ${this.freeZoneName}`);
-      return {
-        success: true,
-        totalDocuments: this.totalDownloaded,
-        documentsByCategory: summary.documentsByCategory,
-        outputDir: this.baseOutputDir
-      };
-      
-    } catch (error) {
-      console.error(`Error in document scraper for ${this.freeZoneName}:`, error);
-      return { success: false, error: error.message };
-    } finally {
-      // Close browser
-      if (this.browser) await this.browser.close();
-    }
-  }
-  
-  /**
-   * Build a sitemap of important pages to scan
-   */
-  async buildSitemap() {
-    console.log('Building sitemap of key pages');
-    const sitemap = {};
-    
-    try {
-      // Get all navigation links
-      const navLinks = await this.page.evaluate(() => {
-        const links = Array.from(document.querySelectorAll('nav a, header a, .menu a, .navigation a, [role="navigation"] a'))
-          .map(a => {
-            const href = a.getAttribute('href');
-            const text = a.textContent?.trim().toLowerCase();
-            return { href, text };
-          })
-          .filter(link => link.href && link.text);
-          
-        return links;
-      });
-      
-      // Keywords for important sections
-      const importantSections = [
-        'business', 'setup', 'license', 'services', 'document', 'download', 
-        'form', 'guide', 'apply', 'establish', 'company', 'registration',
-        'visa', 'permit', 'legal', 'regulation', 'compliance', 'trade',
-        'resource', 'knowledge', 'support'
-      ];
-      
-      // Process navigation links
-      for (const link of navLinks) {
-        if (!link.href || !link.text) continue;
-        
-        // Check if link text matches important sections
-        const matchesImportant = importantSections.some(keyword => 
-          link.text.includes(keyword)
-        );
-        
-        if (matchesImportant) {
-          let fullUrl = link.href;
-          
-          // Handle relative URLs
-          if (link.href.startsWith('/') || !link.href.startsWith('http')) {
-            fullUrl = new URL(link.href, this.websiteUrl).href;
-          }
-          
-          // Only include links from the same domain
-          if (fullUrl.includes(new URL(this.websiteUrl).hostname)) {
-            // Use link text as section name
-            const sectionName = link.text.replace(/\W+/g, '_').toLowerCase();
-            sitemap[sectionName] = fullUrl;
-          }
-        }
-      }
-      
-      console.log(`Found ${Object.keys(sitemap).length} important sections`);
-      return sitemap;
-      
-    } catch (error) {
-      console.error('Error building sitemap:', error);
-      return {};
-    }
-  }
-  
-  /**
-   * Process a page for documents
-   */
-  async processPageForDocuments(url, section) {
-    if (this.totalDownloaded >= this.maxDocuments) return;
-    
-    console.log(`Processing ${section} page: ${url}`);
-    
-    try {
-      // Visit page
-      await this.page.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
-      this.downloadedUrls.add(url);
-      
-      // Extract document links
-      const documentLinks = await this.extractDocumentLinks();
-      
-      if (documentLinks.length === 0) {
-        console.log(`No document links found on ${url}`);
-        return;
-      }
-      
-      console.log(`Found ${documentLinks.length} document links on ${url}`);
-      
-      // Download documents with rate limiting
-      for (const doc of documentLinks) {
-        if (this.totalDownloaded >= this.maxDocuments) break;
-        
-        // Determine document category
-        const category = this.determineDocumentCategory(doc.title, doc.url, section);
-        
-        // Download document
-        const result = await this.downloadDocument(doc, category);
-        
-        if (result.success) {
-          this.totalDownloaded++;
-          this.documentsByCategory[category].push({
-            title: doc.title,
-            url: doc.url,
-            filePath: result.filePath,
-            category: category,
-            fileType: result.fileType,
-            size: result.size,
-            downloadDate: new Date().toISOString()
-          });
-          
-          // Add small delay between downloads
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-      }
-      
-    } catch (error) {
-      console.error(`Error processing page ${url}:`, error);
-    }
-  }
-  
-  /**
-   * Extract document links from current page
-   */
-  async extractDocumentLinks() {
-    try {
-      // Get document links using Playwright
-      const documentLinks = await this.page.evaluate((extensions) => {
-        const links = [];
-        
-        // Function to check if URL has document extension
-        const hasDocumentExtension = (url) => {
-          return extensions.some(ext => url.toLowerCase().endsWith(ext));
-        };
-        
-        // First, look for obvious download links
-        document.querySelectorAll('a[href]').forEach(a => {
-          const href = a.getAttribute('href');
-          if (!href) return;
-          
-          // Skip empty, javascript, or mailto links
-          if (href === '#' || href.startsWith('javascript:') || href.startsWith('mailto:')) return;
-          
-          // Check if it's a document link by extension
-          const isDocumentByExt = hasDocumentExtension(href);
-          
-          // Check if it has download indicators in text or classes
-          const hasDownloadIndicator = 
-            a.textContent?.toLowerCase().match(/download|form|document|guide|pdf|template/i) ||
-            a.className.toLowerCase().match(/download|pdf|doc|file/i) ||
-            a.querySelector('img[src*="pdf" i], img[src*="doc" i], img[src*="download" i]') !== null;
-          
-          // Get title from text content or image alt
-          let title = a.textContent?.trim();
-          if (!title || title.length < 2) {
-            const img = a.querySelector('img[alt]');
-            if (img && img.getAttribute('alt')) {
-              title = img.getAttribute('alt').trim();
-            }
-          }
-          
-          // If it's clearly a document or has download indicators
-          if (isDocumentByExt || hasDownloadIndicator) {
-            if (!title || title.length < 2) {
-              // Try to extract filename from href as fallback title
-              const urlParts = href.split('/');
-              const fileName = urlParts[urlParts.length - 1].split('?')[0];
-              title = decodeURIComponent(fileName).replace(/\\+/g, ' ');
-            }
-            
-            links.push({
-              title: title || 'Untitled Document',
-              url: href,
-              type: isDocumentByExt ? 'document' : 'download',
-              element: a.outerHTML
-            });
-          }
-        });
-        
-        return links;
-      }, this.documentExtensions);
-      
-      // Process and normalize links
-      return documentLinks.map(link => {
-        // Normalize URL (handle relative paths)
-        let fullUrl = link.url;
-        if (link.url.startsWith('/') || !link.url.startsWith('http')) {
-          fullUrl = new URL(link.url, this.websiteUrl).href;
-        }
-        
-        // Clean up title
-        const title = link.title
-          .replace(/\s+/g, ' ')
-          .replace(/[\\/:*?"<>|]/g, '_')
-          .trim();
-        
-        return {
-          ...link,
-          url: fullUrl,
-          title: title || 'Untitled Document'
-        };
-      });
-      
-    } catch (error) {
-      console.error('Error extracting document links:', error);
-      return [];
-    }
-  }
-  
-  /**
-   * Determine the best category for a document
-   */
-  determineDocumentCategory(title, url, section) {
-    const textToAnalyze = `${title} ${url} ${section}`.toLowerCase();
-    
-    // Check each category's keywords against the text
-    for (const [category, keywords] of Object.entries(this.categoryKeywords)) {
-      for (const keyword of keywords) {
-        if (textToAnalyze.includes(keyword)) {
-          return category;
-        }
-      }
-    }
-    
-    // Default to knowledge_bank if no category matches
-    return 'knowledge_bank';
-  }
-  
-  /**
-   * Download a document
-   */
-  async downloadDocument(document, category) {
-    const { title, url } = document;
-    
-    // Skip if already downloaded
-    if (this.downloadedUrls.has(url)) {
-      return { success: false, message: 'Already downloaded' };
-    }
-    
-    try {
-      // Determine file extension
-      let fileExt = '.pdf'; // Default
-      const urlLower = url.toLowerCase();
-      
-      // Extract extension from URL
-      for (const ext of this.documentExtensions) {
-        if (urlLower.endsWith(ext)) {
-          fileExt = ext;
-          break;
-        }
-      }
-      
-      // Generate safe filename
-      const safeTitle = title
-        .replace(/[\\/:*?"<>|]/g, '_')
-        .replace(/\s+/g, '_')
-        .substring(0, 100); // Limit length
-      
-      const fileName = `${safeTitle}_${Date.now()}${fileExt}`;
-      const outputPath = path.join(this.baseOutputDir, category, fileName);
-      
-      console.log(`Downloading document: ${title} (${url})`);
-      
-      // Download file
-      const response = await axios({
-        method: 'GET',
-        url: url,
-        responseType: 'arraybuffer',
-        timeout: 30000,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36'
-        }
-      });
-      
-      // Check if response is valid
-      if (response.status !== 200) {
-        throw new Error(`HTTP error: ${response.status}`);
-      }
-      
-      // Save file
-      fs.writeFileSync(outputPath, response.data);
-      
-      // Mark as downloaded
-      this.downloadedUrls.add(url);
-      
-      // Get file size
-      const stats = fs.statSync(outputPath);
-      const fileSizeKB = Math.round(stats.size / 1024);
-      
-      console.log(`Successfully downloaded: ${outputPath} (${fileSizeKB} KB)`);
-      
-      return {
-        success: true,
-        title,
-        url,
-        filePath: outputPath,
-        fileType: fileExt.replace('.', ''),
-        size: fileSizeKB,
-        category
-      };
-      
-    } catch (error) {
-      console.error(`Error downloading document ${url}:`, error);
-      return { success: false, error: error.message };
-    }
-  }
-}
+// Common document section keywords
+const DOCUMENT_PAGE_KEYWORDS = [
+  'download', 'documents', 'forms', 'publications', 'resources', 'guides', 'applications',
+  'guidelines', 'requirements', 'procedures', 'fees', 'regulations', 'policies',
+  'documentation', 'brochures', 'leaflets', 'manuals', 'handbooks', 'factsheets'
+];
+
+// Max number of pages to visit per free zone
+const MAX_PAGES_PER_FREEZONE = 30;
+
+// Base directory for storing downloaded documents
+const BASE_DIR = path.resolve('./freezone_docs');
 
 /**
- * Run the document downloader for a specific free zone
+ * Download a file using axios
  */
-async function downloadFreeZoneDocuments(freeZoneId) {
+async function downloadFile(url, outputPath) {
   try {
-    // Get free zone details from database
-    const freeZoneQuery = await db.execute(`
-      SELECT id, name, website FROM free_zones WHERE id = ${freeZoneId}
-    `);
-    
-    if (!freeZoneQuery.rows || freeZoneQuery.rows.length === 0) {
-      console.error(`Free zone with ID ${freeZoneId} not found`);
-      return { success: false, message: 'Free zone not found' };
-    }
-    
-    const freeZone = freeZoneQuery.rows[0];
-    
-    if (!freeZone.website) {
-      console.error(`Free zone ${freeZone.name} has no website URL`);
-      return { success: false, message: 'Free zone has no website URL' };
-    }
-    
-    // Initialize and run downloader
-    const downloader = new GenericFreeZoneDocumentDownloader({
-      freeZoneId: freeZone.id,
-      freeZoneName: freeZone.name,
-      websiteUrl: freeZone.website
+    const response = await axios({
+      url,
+      method: 'GET',
+      responseType: 'arraybuffer',
+      timeout: 30000,  // 30 seconds timeout
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      }
     });
-    
-    const result = await downloader.scrape();
+
+    fs.writeFileSync(outputPath, response.data);
     
     return {
-      ...result,
-      freeZoneId: freeZone.id,
-      freeZoneName: freeZone.name
+      success: true,
+      size: response.data.length,
+      status: response.status
     };
-    
   } catch (error) {
-    console.error(`Error in downloadFreeZoneDocuments:`, error);
-    return { success: false, error: error.message };
+    console.error(`Error downloading file from ${url}:`, error.message);
+    return {
+      success: false,
+      error: error.message
+    };
   }
 }
 
 /**
- * Download documents from all free zones
+ * Check if a URL is a file
  */
-async function downloadAllFreeZoneDocuments() {
+function isFileUrl(url) {
+  const parsedUrl = new URL(url);
+  const pathName = parsedUrl.pathname.toLowerCase();
+  return TARGET_FILE_EXTENSIONS.some(ext => pathName.endsWith(ext));
+}
+
+/**
+ * Extract document links from HTML content
+ */
+function extractDocumentLinks($, baseUrl) {
+  const links = [];
+  const seenUrls = new Set();
+
+  // Look for all links
+  $('a').each((i, element) => {
+    const href = $(element).attr('href');
+    if (!href) return;
+
+    try {
+      // Normalize URL
+      const resolvedUrl = new URL(href, baseUrl).href;
+      
+      // Skip if already seen
+      if (seenUrls.has(resolvedUrl)) return;
+      seenUrls.add(resolvedUrl);
+      
+      // Check if it's a file
+      const isFile = isFileUrl(resolvedUrl);
+      
+      // Add link with metadata
+      links.push({
+        url: resolvedUrl,
+        text: $(element).text().trim(),
+        isFile,
+        fileType: isFile ? path.extname(resolvedUrl).substring(1) : null
+      });
+    } catch (error) {
+      // Skip invalid URLs
+      console.log(`Skipping invalid URL: ${href}`);
+    }
+  });
+  
+  return links;
+}
+
+/**
+ * Determine document categories based on URL and link text
+ */
+function determineDocumentCategory(url, linkText) {
+  const urlLower = url.toLowerCase();
+  const textLower = linkText.toLowerCase();
+  
+  // Map of category keywords to category names
+  const categoryMappings = {
+    'business': 'business_setup',
+    'setup': 'business_setup',
+    'establish': 'business_setup',
+    'formation': 'business_setup',
+    'register': 'business_setup',
+    'incorporation': 'business_setup',
+    'license': 'business_setup',
+    'compliance': 'compliance',
+    'regulation': 'compliance',
+    'law': 'legal',
+    'legal': 'legal',
+    'visa': 'visa',
+    'immigration': 'visa',
+    'employ': 'visa',
+    'permit': 'visa',
+    'finance': 'financial',
+    'fee': 'financial',
+    'tax': 'financial',
+    'banking': 'financial',
+    'form': 'forms',
+    'application': 'forms',
+    'template': 'forms',
+    'guide': 'guides',
+    'handbook': 'guides',
+    'manual': 'guides',
+    'faq': 'knowledge_bank',
+    'service': 'services',
+    'facility': 'facilities',
+    'benefit': 'benefits',
+    'advantage': 'benefits',
+    'trade': 'trade'
+  };
+  
+  // Check for category keywords in URL and link text
+  for (const [keyword, category] of Object.entries(categoryMappings)) {
+    if (urlLower.includes(keyword) || textLower.includes(keyword)) {
+      return category;
+    }
+  }
+  
+  // Default to 'general' if no category matched
+  return 'general';
+}
+
+/**
+ * Crawl a website to find document links
+ */
+async function crawlWebsiteForDocuments(baseUrl, maxPages = MAX_PAGES_PER_FREEZONE) {
+  const browser = await chromium.launch();
+  const context = await browser.newContext({
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+  });
+  
   try {
-    // Get all free zones with websites
-    const freeZonesQuery = await db.execute(`
-      SELECT id, name, website FROM free_zones 
-      WHERE website IS NOT NULL AND website != ''
-    `);
+    const page = await context.newPage();
     
-    if (!freeZonesQuery.rows || freeZonesQuery.rows.length === 0) {
-      console.error('No free zones with websites found');
-      return { success: false, message: 'No free zones with websites found' };
+    // Set up request interception to avoid unnecessary requests
+    await page.route('**/*.{png,jpg,jpeg,gif,webp,svg,ico,woff,woff2,ttf,otf,eot}', route => route.abort());
+    
+    console.log(`Crawling ${baseUrl} for document links`);
+    
+    // Start with the base URL
+    await page.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    
+    // Get all links from the home page
+    const content = await page.content();
+    const $ = cheerio.load(content);
+    const homeLinks = extractDocumentLinks($, baseUrl);
+    
+    // Filter links that might contain documents
+    const potentialDocumentPages = homeLinks.filter(link => {
+      // Skip file links for now (we'll collect them separately)
+      if (link.isFile) return false;
+      
+      // Check if the URL or link text contains document-related keywords
+      const urlLower = link.url.toLowerCase();
+      const textLower = link.text.toLowerCase();
+      
+      return DOCUMENT_PAGE_KEYWORDS.some(keyword => 
+        urlLower.includes(keyword) || textLower.includes(keyword));
+    });
+    
+    console.log(`Found ${potentialDocumentPages.length} potential document pages`);
+    
+    // Collect documents from the home page
+    const documentLinks = homeLinks.filter(link => link.isFile);
+    const visitedUrls = new Set([baseUrl]);
+    
+    // Visit document pages up to the maximum limit
+    const pagesToVisit = potentialDocumentPages.slice(0, maxPages);
+    
+    for (const linkObj of pagesToVisit) {
+      if (visitedUrls.size >= maxPages) break;
+      if (visitedUrls.has(linkObj.url)) continue;
+      
+      try {
+        console.log(`Visiting ${linkObj.url}`);
+        await page.goto(linkObj.url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        visitedUrls.add(linkObj.url);
+        
+        // Extract links from this page
+        const pageContent = await page.content();
+        const $page = cheerio.load(pageContent);
+        const pageLinks = extractDocumentLinks($page, linkObj.url);
+        
+        // Keep only file links
+        const pageDocumentLinks = pageLinks.filter(link => link.isFile);
+        console.log(`Found ${pageDocumentLinks.length} document links on ${linkObj.url}`);
+        
+        // Add to our collection
+        documentLinks.push(...pageDocumentLinks);
+      } catch (error) {
+        console.error(`Error visiting ${linkObj.url}:`, error.message);
+      }
     }
     
-    console.log(`Found ${freeZonesQuery.rows.length} free zones with websites`);
+    // Add metadata to document links
+    const documentsWithMetadata = documentLinks.map(doc => ({
+      ...doc,
+      category: determineDocumentCategory(doc.url, doc.text),
+      title: doc.text || path.basename(doc.url),
+      source: baseUrl
+    }));
+    
+    console.log(`Total document links found: ${documentsWithMetadata.length}`);
+    
+    return {
+      success: true,
+      baseUrl,
+      documentsFound: documentsWithMetadata.length,
+      documents: documentsWithMetadata,
+      visitedPages: Array.from(visitedUrls)
+    };
+  } catch (error) {
+    console.error(`Error crawling ${baseUrl}:`, error.message);
+    return {
+      success: false,
+      baseUrl,
+      error: error.message,
+      stack: error.stack
+    };
+  } finally {
+    await browser.close();
+  }
+}
+
+/**
+ * Download documents for a specific free zone
+ */
+export async function downloadFreeZoneDocuments(freeZoneId, freeZoneName, freeZoneUrl) {
+  try {
+    console.log(`Starting document download for ${freeZoneName} (${freeZoneUrl})`);
+    
+    // Create directory for this free zone
+    const freeZoneDir = path.join(BASE_DIR, freeZoneName.toLowerCase().replace(/\s+/g, '_'));
+    
+    if (!fs.existsSync(BASE_DIR)) {
+      fs.mkdirSync(BASE_DIR, { recursive: true });
+    }
+    
+    if (!fs.existsSync(freeZoneDir)) {
+      fs.mkdirSync(freeZoneDir, { recursive: true });
+    }
+    
+    // Crawl the website for document links
+    const crawlResult = await crawlWebsiteForDocuments(freeZoneUrl);
+    
+    if (!crawlResult.success) {
+      return {
+        success: false,
+        freeZoneId,
+        freeZoneName,
+        error: crawlResult.error
+      };
+    }
+    
+    // Create summary file
+    const summaryPath = path.join(freeZoneDir, 'download_summary.json');
+    fs.writeFileSync(summaryPath, JSON.stringify(crawlResult, null, 2));
+    
+    // Download each document
+    console.log(`Found ${crawlResult.documents.length} documents to download`);
+    
+    const downloadResults = [];
+    
+    for (let i = 0; i < crawlResult.documents.length; i++) {
+      const doc = crawlResult.documents[i];
+      
+      try {
+        // Generate safe filename
+        const fileExt = path.extname(new URL(doc.url).pathname);
+        const safeName = doc.title
+          .replace(/[^a-z0-9]/gi, '_')
+          .replace(/_+/g, '_')
+          .toLowerCase();
+        const filename = `${safeName}${fileExt}`;
+        const outputPath = path.join(freeZoneDir, filename);
+        
+        console.log(`Downloading ${i+1}/${crawlResult.documents.length}: ${doc.url}`);
+        
+        // Create category subdirectory if it doesn't exist
+        const categoryDir = path.join(freeZoneDir, doc.category);
+        if (!fs.existsSync(categoryDir)) {
+          fs.mkdirSync(categoryDir, { recursive: true });
+        }
+        
+        const categoryFilePath = path.join(categoryDir, filename);
+        
+        // Download the file
+        const downloadResult = await downloadFile(doc.url, categoryFilePath);
+        
+        downloadResults.push({
+          ...doc,
+          downloadSuccess: downloadResult.success,
+          filePath: categoryFilePath,
+          filename,
+          size: downloadResult.size,
+          error: downloadResult.error
+        });
+      } catch (error) {
+        console.error(`Error downloading ${doc.url}:`, error.message);
+        
+        downloadResults.push({
+          ...doc,
+          downloadSuccess: false,
+          error: error.message
+        });
+      }
+    }
+    
+    // Update the summary with download results
+    crawlResult.downloadResults = downloadResults;
+    fs.writeFileSync(summaryPath, JSON.stringify(crawlResult, null, 2));
+    
+    // Return the result
+    return {
+      success: true,
+      freeZoneId,
+      freeZoneName,
+      documentsFound: crawlResult.documents.length,
+      documentsDownloaded: downloadResults.filter(r => r.downloadSuccess).length,
+      documents: downloadResults,
+      summaryPath
+    };
+  } catch (error) {
+    console.error(`Error downloading documents for ${freeZoneName}:`, error.message);
+    
+    return {
+      success: false,
+      freeZoneId,
+      freeZoneName,
+      error: error.message,
+      stack: error.stack
+    };
+  }
+}
+
+/**
+ * Download documents for all free zones
+ */
+export async function downloadAllFreeZoneDocuments(freeZones) {
+  try {
+    console.log(`Starting document download for ${freeZones.length} free zones`);
     
     const results = [];
     
-    // Process each free zone with rate limiting
-    for (const freeZone of freeZonesQuery.rows) {
-      console.log(`\n========== Processing ${freeZone.name} ==========\n`);
+    for (const freeZone of freeZones) {
+      if (!freeZone.website) {
+        console.log(`Skipping ${freeZone.name} - no website URL`);
+        results.push({
+          success: false,
+          freeZoneId: freeZone.id,
+          freeZoneName: freeZone.name,
+          error: 'No website URL'
+        });
+        continue;
+      }
       
-      const result = await downloadFreeZoneDocuments(freeZone.id);
-      results.push({
-        freeZoneId: freeZone.id,
-        freeZoneName: freeZone.name,
-        success: result.success,
-        totalDocuments: result.totalDocuments || 0,
-        error: result.error
-      });
+      console.log(`Processing ${freeZone.name} (${freeZone.website})`);
       
-      // Add delay between free zones to avoid overloading
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      const result = await downloadFreeZoneDocuments(
+        freeZone.id,
+        freeZone.name,
+        freeZone.website
+      );
+      
+      results.push(result);
     }
     
-    // Generate summary
-    const summary = {
-      totalFreeZones: results.length,
+    return {
+      success: true,
+      freeZones: results,
+      totalFreeZones: freeZones.length,
       successfulDownloads: results.filter(r => r.success).length,
-      failedDownloads: results.filter(r => !r.success).length,
-      totalDocumentsDownloaded: results.reduce((sum, r) => sum + (r.totalDocuments || 0), 0),
-      results
+      failedDownloads: results.filter(r => !r.success).length
     };
-    
-    // Save summary to file
-    fs.writeFileSync(
-      path.resolve('./freezone_docs/all_downloads_summary.json'),
-      JSON.stringify(summary, null, 2)
-    );
-    
-    console.log(`\n===== Document Download Summary =====`);
-    console.log(`Total Free Zones: ${summary.totalFreeZones}`);
-    console.log(`Successful Downloads: ${summary.successfulDownloads}`);
-    console.log(`Failed Downloads: ${summary.failedDownloads}`);
-    console.log(`Total Documents: ${summary.totalDocumentsDownloaded}`);
-    
-    return summary;
-    
   } catch (error) {
-    console.error('Error in downloadAllFreeZoneDocuments:', error);
-    return { success: false, error: error.message };
+    console.error('Error downloading documents for all free zones:', error.message);
+    
+    return {
+      success: false,
+      error: error.message,
+      stack: error.stack
+    };
   }
 }
-
-module.exports = {
-  GenericFreeZoneDocumentDownloader,
-  downloadFreeZoneDocuments,
-  downloadAllFreeZoneDocuments
-};

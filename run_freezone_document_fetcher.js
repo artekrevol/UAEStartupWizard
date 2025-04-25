@@ -11,191 +11,204 @@
  *   - For a specific free zone: node run_freezone_document_fetcher.js <freeZoneId>
  */
 
-const { downloadFreeZoneDocuments, downloadAllFreeZoneDocuments } = require('./scraper/generic_freezone_document_downloader');
-const { processFreeZoneDocuments, processAllFreeZoneDocuments } = require('./process-generic-freezone-docs');
-const fs = require('fs');
-const path = require('path');
+import * as fs from 'fs';
+import * as path from 'path';
+import * as url from 'url';
+import { processAllFreeZoneDocuments, processFreeZoneDocuments } from './process-generic-freezone-docs.js';
+
+// Import functions using dynamic import since this file is run as ESM
+const loadDependencies = async () => {
+  try {
+    // Use dynamic import for generic_freezone_document_downloader.js
+    const downloaderModule = await import('./scraper/generic_freezone_document_downloader.js');
+    const { downloadFreeZoneDocuments, downloadAllFreeZoneDocuments } = downloaderModule;
+    
+    // Use dynamic import for db.js
+    const dbModule = await import('./server/db.js');
+    const { db } = dbModule;
+    
+    // Get free zone ID from command line argument
+    const freeZoneId = process.argv[2] ? parseInt(process.argv[2]) : null;
+    
+    if (freeZoneId) {
+      await runForFreeZone(freeZoneId, db, downloadFreeZoneDocuments);
+    } else {
+      await runForAllFreeZones(db, downloadAllFreeZoneDocuments);
+    }
+  } catch (error) {
+    console.error('Error loading dependencies:', error);
+    process.exit(1);
+  }
+};
 
 /**
  * Run the complete document fetch and process flow for a specific free zone
  */
-async function runForFreeZone(freeZoneId) {
-  console.log(`\n======= Starting document fetch and process for free zone ID: ${freeZoneId} =======\n`);
-  
+async function runForFreeZone(freeZoneId, db, downloadFreeZoneDocuments) {
   try {
-    // Step 1: Download documents
-    console.log('Step 1: Downloading documents...');
-    const downloadResult = await downloadFreeZoneDocuments(freeZoneId);
+    console.log(`Starting document fetching for free zone ID ${freeZoneId}`);
     
-    if (!downloadResult.success) {
-      console.error(`Download failed: ${downloadResult.message || downloadResult.error}`);
-      return { success: false, stage: 'download', error: downloadResult.message || downloadResult.error };
+    // Get free zone details
+    const freeZoneResult = await db.execute(`
+      SELECT id, name, website FROM free_zones WHERE id = ${freeZoneId}
+    `);
+    
+    if (!freeZoneResult.rows || freeZoneResult.rows.length === 0) {
+      console.error(`Free zone with ID ${freeZoneId} not found`);
+      process.exit(1);
     }
     
-    console.log(`Download completed successfully. Downloaded ${downloadResult.totalDocuments} documents.`);
+    const freeZone = freeZoneResult.rows[0];
     
-    // Step 2: Process documents
-    console.log('\nStep 2: Processing and importing documents...');
-    const processResult = await processFreeZoneDocuments(freeZoneId);
-    
-    if (!processResult.success) {
-      console.error(`Processing failed: ${processResult.message || processResult.error}`);
-      return { 
-        success: false, 
-        stage: 'process', 
-        error: processResult.message || processResult.error,
-        downloadResult
-      };
+    if (!freeZone.website) {
+      console.error(`Free zone ${freeZone.name} has no website URL`);
+      process.exit(1);
     }
     
-    console.log(`Processing completed successfully. Imported ${processResult.results.imported} documents.`);
+    console.log(`Found free zone: ${freeZone.name}, website: ${freeZone.website}`);
     
-    // Final results
-    const finalResult = {
-      success: true,
+    // Create directories if they don't exist
+    const baseDir = path.resolve('./freezone_docs');
+    const freeZoneDir = path.join(baseDir, freeZone.name.toLowerCase().replace(/\s+/g, '_'));
+    const resultsDir = path.join(baseDir, 'results');
+    
+    if (!fs.existsSync(baseDir)) {
+      fs.mkdirSync(baseDir, { recursive: true });
+    }
+    
+    if (!fs.existsSync(freeZoneDir)) {
+      fs.mkdirSync(freeZoneDir, { recursive: true });
+    }
+    
+    if (!fs.existsSync(resultsDir)) {
+      fs.mkdirSync(resultsDir, { recursive: true });
+    }
+    
+    // Download documents
+    console.log(`Starting document download for ${freeZone.name}...`);
+    const downloadResult = await downloadFreeZoneDocuments(freeZoneId, freeZone.name, freeZone.website);
+    
+    // Write download result to file
+    const resultPath = path.join(resultsDir, `freezone_${freeZoneId}_result.json`);
+    fs.writeFileSync(resultPath, JSON.stringify(downloadResult, null, 2));
+    
+    console.log(`Download completed. Found ${downloadResult.documents.length} documents.`);
+    console.log(`Download summary saved to ${resultPath}`);
+    
+    // Process and import documents
+    console.log(`Starting document processing for ${freeZone.name}...`);
+    const processingResult = await processFreeZoneDocuments(freeZoneId, freeZoneDir);
+    
+    // Update the result file with processing information
+    downloadResult.processing = processingResult;
+    fs.writeFileSync(resultPath, JSON.stringify(downloadResult, null, 2));
+    
+    console.log(`Document processing completed for ${freeZone.name}`);
+    console.log(`Total documents found: ${downloadResult.documents.length}`);
+    console.log(`Documents imported: ${processingResult.successCount}`);
+    console.log(`Documents skipped: ${processingResult.skippedCount}`);
+    console.log(`Errors: ${processingResult.errorCount}`);
+    
+    return {
       freeZoneId,
-      freeZoneName: downloadResult.freeZoneName,
-      downloaded: downloadResult.totalDocuments,
-      imported: processResult.results.imported,
-      skipped: processResult.results.skipped,
-      errors: processResult.results.errors,
-      documentsByCategory: processResult.results.documentsByCategory
+      freeZoneName: freeZone.name,
+      documentsFound: downloadResult.documents.length,
+      documentsImported: processingResult.successCount,
+      documentsSkipped: processingResult.skippedCount,
+      errors: processingResult.errorCount,
+      success: true
     };
-    
-    // Save result to file
-    const resultDir = path.resolve('./freezone_docs/results');
-    if (!fs.existsSync(resultDir)) {
-      fs.mkdirSync(resultDir, { recursive: true });
-    }
-    
-    fs.writeFileSync(
-      path.join(resultDir, `freezone_${freeZoneId}_result.json`),
-      JSON.stringify(finalResult, null, 2)
-    );
-    
-    console.log(`\n======= Completed document fetch and process for ${finalResult.freeZoneName} =======\n`);
-    return finalResult;
-    
   } catch (error) {
-    console.error('Error running document fetch and process:', error);
-    return { success: false, error: error.message };
+    console.error(`Error running document fetcher for free zone ID ${freeZoneId}:`, error);
+    return {
+      freeZoneId,
+      success: false,
+      error: error.message,
+      stack: error.stack
+    };
   }
 }
 
 /**
  * Run the complete document fetch and process flow for all free zones
  */
-async function runForAllFreeZones() {
-  console.log('\n======= Starting document fetch and process for ALL free zones =======\n');
-  
+async function runForAllFreeZones(db, downloadAllFreeZoneDocuments) {
   try {
-    // Step 1: Download documents from all free zones
-    console.log('Step 1: Downloading documents from all free zones...');
-    const downloadResult = await downloadAllFreeZoneDocuments();
+    console.log('Starting document fetching for all free zones with websites');
     
-    if (!downloadResult.success) {
-      console.error(`Download failed: ${downloadResult.message || downloadResult.error}`);
-      return { success: false, stage: 'download', error: downloadResult.message || downloadResult.error };
+    // Get all free zones with websites
+    const freeZonesResult = await db.execute(`
+      SELECT id, name, website FROM free_zones 
+      WHERE website IS NOT NULL AND website != '' 
+      ORDER BY name
+    `);
+    
+    if (!freeZonesResult.rows || freeZonesResult.rows.length === 0) {
+      console.error('No free zones with websites found');
+      process.exit(1);
     }
     
-    console.log(`Download completed. Downloaded ${downloadResult.totalDocumentsDownloaded} documents from ${downloadResult.totalFreeZones} free zones.`);
+    console.log(`Found ${freeZonesResult.rows.length} free zones with websites`);
     
-    // Step 2: Process documents for all free zones
-    console.log('\nStep 2: Processing and importing documents for all free zones...');
-    const processResult = await processAllFreeZoneDocuments();
+    // Create directories if they don't exist
+    const baseDir = path.resolve('./freezone_docs');
+    const resultsDir = path.join(baseDir, 'results');
     
-    if (!processResult.success) {
-      console.error(`Processing failed: ${processResult.message || processResult.error}`);
-      return { 
-        success: false, 
-        stage: 'process', 
-        error: processResult.message || processResult.error,
-        downloadResult
-      };
+    if (!fs.existsSync(baseDir)) {
+      fs.mkdirSync(baseDir, { recursive: true });
     }
     
-    console.log(`Processing completed. Imported ${processResult.totalDocumentsImported} documents from ${processResult.totalFreeZones} free zones.`);
+    if (!fs.existsSync(resultsDir)) {
+      fs.mkdirSync(resultsDir, { recursive: true });
+    }
     
-    // Final results
-    const finalResult = {
-      success: true,
-      totalFreeZones: downloadResult.totalFreeZones,
-      totalDownloaded: downloadResult.totalDocumentsDownloaded,
-      totalImported: processResult.totalDocumentsImported,
-      successfulDownloads: downloadResult.successfulDownloads,
-      successfulImports: processResult.successfulImports,
-      failedDownloads: downloadResult.failedDownloads,
-      failedImports: processResult.failedImports,
-      timestamp: new Date().toISOString(),
-      freeZoneResults: downloadResult.results.map(downloadItem => {
-        const processItem = processResult.results.find(
-          p => p.freeZoneId === downloadItem.freeZoneId
-        );
-        
-        return {
-          freeZoneId: downloadItem.freeZoneId,
-          freeZoneName: downloadItem.freeZoneName,
-          downloadSuccess: downloadItem.success,
-          downloadCount: downloadItem.totalDocuments || 0,
-          importSuccess: processItem?.success || false,
-          importCount: processItem?.imported || 0,
-          skipped: processItem?.skipped || 0,
-          errors: processItem?.errors || 0
-        };
-      })
+    // Download documents for all free zones
+    console.log('Starting document download for all free zones...');
+    const downloadResult = await downloadAllFreeZoneDocuments(freeZonesResult.rows);
+    
+    // Write download result to file
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const resultPath = path.join(resultsDir, `all_freezones_result_${timestamp}.json`);
+    fs.writeFileSync(resultPath, JSON.stringify(downloadResult, null, 2));
+    
+    console.log('Download completed for all free zones');
+    console.log(`Downloaded documents for ${downloadResult.freeZones.length} free zones`);
+    console.log(`Download summary saved to ${resultPath}`);
+    
+    // Process and import documents for all free zones
+    console.log('Starting document processing for all free zones...');
+    const processingResult = await processAllFreeZoneDocuments();
+    
+    // Update the result file with processing information
+    downloadResult.processing = processingResult;
+    fs.writeFileSync(resultPath, JSON.stringify(downloadResult, null, 2));
+    
+    console.log('Document processing completed for all free zones');
+    console.log(`Free zones processed: ${processingResult.freeZones.length}`);
+    console.log(`Total documents imported: ${processingResult.totalSuccessCount}`);
+    console.log(`Total documents skipped: ${processingResult.totalSkippedCount}`);
+    console.log(`Total errors: ${processingResult.totalErrorCount}`);
+    
+    return {
+      freeZones: processingResult.freeZones,
+      totalFreeZones: processingResult.freeZones.length,
+      totalDocumentsImported: processingResult.totalSuccessCount,
+      totalDocumentsSkipped: processingResult.totalSkippedCount,
+      totalErrors: processingResult.totalErrorCount,
+      success: true
     };
-    
-    // Save result to file
-    const resultDir = path.resolve('./freezone_docs/results');
-    if (!fs.existsSync(resultDir)) {
-      fs.mkdirSync(resultDir, { recursive: true });
-    }
-    
-    fs.writeFileSync(
-      path.join(resultDir, `all_freezones_result_${Date.now()}.json`),
-      JSON.stringify(finalResult, null, 2)
-    );
-    
-    console.log(`\n======= Completed document fetch and process for ALL free zones =======\n`);
-    return finalResult;
-    
   } catch (error) {
-    console.error('Error running document fetch and process for all free zones:', error);
-    return { success: false, error: error.message };
+    console.error('Error running document fetcher for all free zones:', error);
+    return {
+      success: false,
+      error: error.message,
+      stack: error.stack
+    };
   }
 }
 
-// If running as main script
-if (require.main === module) {
-  const args = process.argv.slice(2);
-  
-  if (args.length > 0 && !isNaN(parseInt(args[0]))) {
-    // Run for specific free zone
-    const freeZoneId = parseInt(args[0]);
-    runForFreeZone(freeZoneId)
-      .then(result => {
-        console.log('Operation complete');
-        process.exit(0);
-      })
-      .catch(error => {
-        console.error('Operation failed:', error);
-        process.exit(1);
-      });
-  } else {
-    // Run for all free zones
-    runForAllFreeZones()
-      .then(result => {
-        console.log('Operation complete');
-        process.exit(0);
-      })
-      .catch(error => {
-        console.error('Operation failed:', error);
-        process.exit(1);
-      });
-  }
-}
-
-module.exports = {
-  runForFreeZone,
-  runForAllFreeZones
-};
+// Run the script
+loadDependencies().catch(error => {
+  console.error('Error running document fetcher:', error);
+  process.exit(1);
+});
