@@ -58,24 +58,35 @@ async function importAjmanDocuments() {
       // Read content
       const content = fs.readFileSync(filePath, 'utf8');
       
-      // Determine category based on filename
+      // Get filename from path
+      const filename = path.basename(filePath);
+      
+      // Determine category based on filename and path
       let category = 'general';
       let subcategory = null;
       let documentType = 'Text';
       
-      if (file.includes('business') || file.includes('setup')) {
+      // Extract directory structure for category detection
+      const dirStructure = path.dirname(filePath).split(path.sep);
+      const parentDir = dirStructure[dirStructure.length - 1];
+      
+      // Set category based on parent directory or filename
+      if (parentDir === 'business_setup' || filename.includes('business') || filename.includes('setup')) {
         category = 'business_setup';
         subcategory = 'Guide';
-      } else if (file.includes('license')) {
+      } else if (filename.includes('license')) {
         category = 'business_setup';
         subcategory = 'Licensing';
-      } else if (file.includes('visa')) {
+      } else if (filename.includes('visa')) {
         category = 'compliance';
         subcategory = 'Visa';
+      } else if (filename.includes('benefit')) {
+        category = 'benefits';
+        subcategory = null;
       }
       
       // Generate title from filename
-      const title = file
+      const title = filename
         .replace(/[_-]/g, ' ')
         .replace('.txt', '')
         .split(' ')
@@ -85,7 +96,7 @@ async function importAjmanDocuments() {
       // Prepare document data
       const documentData = {
         title,
-        filename: file,
+        filename,
         file_path: filePath,
         document_type: documentType,
         category,
@@ -105,11 +116,11 @@ async function importAjmanDocuments() {
       
       // Check if document already exists
       const checkResult = await db.execute(
-        sql`SELECT id FROM documents WHERE filename = ${file} AND free_zone_id = ${freeZoneId}`
+        sql`SELECT id FROM documents WHERE filename = ${filename} AND free_zone_id = ${freeZoneId}`
       );
       
       if (checkResult.rows && checkResult.rows.length > 0) {
-        console.log(`Document already exists: ${file}`);
+        console.log(`Document already exists: ${filename}`);
         continue;
       }
       
