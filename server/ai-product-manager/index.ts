@@ -474,20 +474,25 @@ export async function enrichFreeZoneData(
       
       console.log(`[AI-PM] Mapped field "${field}" to database column "${columnName}"`);
       
-      // Format the content appropriately based on field type
+      // Format the content appropriately based on field type with enhanced formatting
       let formattedContent: any;
+      
+      // Define common patterns for list detection
+      const bulletPatterns = /\n-|\n\d+\.|\n\*|\n•|\n✓|\n✔|\n→/;
+      const headingPattern = /\*\*(?=[A-Z])|\n##\s|\n###\s|\n####\s/;
+      
       if (field === 'faqs' || columnName === 'faqs') {
-        // Try to parse the content as FAQs
+        // Try to parse the content as FAQs with enhanced detection
         try {
-          // Extract Q&A format from content
+          // First try to extract Q&A format with explicit Q: A: pattern
           const extractedFaqs = content.match(/Q:(.+?)A:(.+?)(?=Q:|$)/gs)?.map(qa => {
             const question = qa.match(/Q:(.*?)(?=A:)/s)?.[1]?.trim() || '';
             const answer = qa.match(/A:(.*?)(?=$)/s)?.[1]?.trim() || '';
             return { question, answer };
           }) || [];
           
-          // If extraction didn't work well, try an alternative approach with question detection
-          const faqs = extractedFaqs.length > 0 ? extractedFaqs : 
+          // Second approach: look for question mark patterns
+          const questionPatternFaqs = extractedFaqs.length > 0 ? extractedFaqs : 
             content.split(/\n\n|\*\*Q:|(?=\*\*[^*]+\?)/g).map(paragraph => {
               // Clean up the paragraph
               const cleanParagraph = paragraph.trim().replace(/^\*\*|\*\*$/g, '');
@@ -505,47 +510,334 @@ export async function enrichFreeZoneData(
               }
               return null;
             }).filter(Boolean);
+            
+          // Third approach: numbered or bulleted lists that might be FAQ-like
+          const bulletedFaqs = questionPatternFaqs.length > 0 ? questionPatternFaqs :
+            content.split(bulletPatterns).map(item => {
+              const trimmedItem = item.trim();
+              if (trimmedItem.includes('?')) {
+                const parts = trimmedItem.split('?');
+                return {
+                  question: (parts[0] + '?').replace(/^\d+\.\s*/, ''),
+                  answer: parts.slice(1).join('?').trim()
+                };
+              }
+              return null;
+            }).filter(Boolean);
+          
+          // Use the best result
+          const faqs = bulletedFaqs.length > 0 ? bulletedFaqs : 
+            [{ question: 'What information is available about this free zone?', answer: content }];
           
           formattedContent = JSON.stringify(faqs);
         } catch (err) {
-          console.error('Error parsing FAQs', err);
+          console.error('[AI-PM] Error parsing FAQs', err);
           formattedContent = JSON.stringify([{ 
             question: 'What information is available about this free zone?', 
-            answer: content.substring(0, 500) + '...'
+            answer: content.substring(0, 500) + (content.length > 500 ? '...' : '')
           }]);
         }
-      } else if (['benefits', 'facilities', 'requirements', 'licenseTypes', 'industries', 'license_types'].includes(columnName)) {
-        // Parse as array of items
-        // First check if the content already contains structured bullet points or numbered lists
-        if (content.match(/\n-|\n\d+\.|\n\*|\*\*/)) {
-          // Content has bullet points, split by them
-          const items = content
-            .split(/\n-|\n\d+\.|\n\*|\*\*(?=[A-Z])/)
-            .map(item => item.trim())
-            .filter(item => item.length > 0);
-          
-          formattedContent = JSON.stringify(items);
-        } else {
-          // No clear bullet structure, try to split by sentences or paragraphs
-          const items = content
-            .split(/\.\s|\n\n/)
-            .map(item => item.trim() + (item.trim().endsWith('.') ? '' : '.'))
-            .filter(item => item.length > 5); // Ensure we have meaningful items
-          
-          formattedContent = JSON.stringify(items);
-        }
-      } else if (columnName === 'setupCost') {
-        // Try to parse as a structured object if it appears to have categories
+      } else if (columnName === 'benefits') {
+        // Special handling for benefits with enhanced formatting
         try {
-          // Check if content has structure
-          if (content.match(/\n-|\n\d+\.|\n\*|\*\*/)) {
-            // Use the same array format for consistency
+          // First check if the content has bullet points
+          if (content.match(bulletPatterns) || content.match(/\n\s*•|\n\s*-|\n\s*\*/)) {
+            // Content has bullet points, split by them
             const items = content
-              .split(/\n-|\n\d+\.|\n\*|\*\*(?=[A-Z])/)
-              .map(item => item.trim())
-              .filter(item => item.length > 0);
+              .split(bulletPatterns)
+              .map(item => item.trim().replace(/^•|-|\*|\d+\.\s*/, ''))
+              .filter(item => item.length > 3);
             
-            formattedContent = JSON.stringify(items);
+            // Clean up items
+            const cleanedItems = items.map(item => {
+              // Remove any trailing punctuation
+              return item.replace(/[,;.]$/, '').trim();
+            });
+            
+            formattedContent = JSON.stringify(cleanedItems);
+          } else if (content.match(/:\s*/)) {
+            // Try splitting by colons for potential key-value pairs
+            const benefitPairs = content
+              .split(/\n+/)
+              .filter(line => line.includes(':'))
+              .map(line => {
+                const parts = line.split(/:\s*/);
+                return parts[1]?.trim() || parts[0].trim();
+              })
+              .filter(item => item.length > 3);
+              
+            if (benefitPairs.length > 0) {
+              formattedContent = JSON.stringify(benefitPairs);
+            } else {
+              // Fall back to paragraph splitting
+              const paragraphs = content
+                .split(/\n\n+/)
+                .map(p => p.trim())
+                .filter(p => p.length > 5);
+                
+              formattedContent = JSON.stringify(paragraphs);
+            }
+          } else {
+            // No clear structure, try sentence-based splitting
+            const sentences = content
+              .split(/\.\s+/)
+              .map(s => s.trim() + (s.trim().endsWith('.') ? '' : '.'))
+              .filter(s => s.length > 10);
+              
+            formattedContent = JSON.stringify(sentences);
+          }
+        } catch (err) {
+          console.error('[AI-PM] Error parsing benefits', err);
+          formattedContent = content; // Fallback to raw content
+        }
+      } else if (columnName === 'industries') {
+        // Enhanced handling for industries
+        try {
+          // First check if content has structured industry listings
+          if (content.match(bulletPatterns) || content.match(headingPattern)) {
+            // Split by bullet points or headings
+            const rawItems = content
+              .split(new RegExp(bulletPatterns.source + '|' + headingPattern.source, 'g'))
+              .map(item => item.trim())
+              .filter(item => item.length > 2 && !item.match(/^(industries|sectors|business activities)$/i));
+            
+            // Clean up industry names
+            const industries = rawItems.map(item => {
+              // Remove any category prefix like "Industry:" or numbering
+              return item
+                .replace(/^industry:?\s*/i, '')
+                .replace(/^sector:?\s*/i, '')
+                .replace(/^activities?:?\s*/i, '')
+                .replace(/^\d+\.\s*/, '')
+                .replace(/[,;.]$/, '') // Remove trailing punctuation
+                .trim();
+            });
+            
+            formattedContent = JSON.stringify(industries);
+          } else if (content.includes(',')) {
+            // Try comma-separated list approach
+            const industries = content
+              .split(',')
+              .map(item => item.trim())
+              .filter(item => item.length > 2);
+              
+            formattedContent = JSON.stringify(industries);
+          } else {
+            // Fall back to paragraph splitting
+            const paragraphs = content
+              .split(/\n\n+/)
+              .map(p => p.trim())
+              .filter(p => p.length > 3);
+              
+            formattedContent = JSON.stringify(paragraphs);
+          }
+        } catch (err) {
+          console.error('[AI-PM] Error parsing industries', err);
+          formattedContent = content; // Fallback to raw content
+        }
+      } else if (columnName === 'facilities') {
+        // Enhanced handling for facilities
+        try {
+          if (content.match(bulletPatterns) || content.match(headingPattern)) {
+            // Split by bullet points or headings
+            const items = content
+              .split(new RegExp(bulletPatterns.source + '|' + headingPattern.source, 'g'))
+              .map(item => item.trim())
+              .filter(item => item.length > 3 && !item.match(/^(facilities|amenities|infrastructure)$/i));
+            
+            // Clean up facility descriptions
+            const facilities = items.map(item => {
+              return item
+                .replace(/^facility:?\s*/i, '')
+                .replace(/^amenity:?\s*/i, '')
+                .replace(/^\d+\.\s*/, '')
+                .replace(/[,;.]$/, '') // Remove trailing punctuation
+                .trim();
+            });
+            
+            formattedContent = JSON.stringify(facilities);
+          } else if (content.includes(':')) {
+            // Try to parse as key-value pairs
+            const facilityPairs = content
+              .split(/\n+/)
+              .filter(line => line.includes(':'))
+              .map(line => {
+                const parts = line.split(/:\s*/);
+                if (parts.length >= 2) {
+                  // If it looks like a feature description
+                  return `${parts[0].trim()}: ${parts.slice(1).join(': ').trim()}`;
+                }
+                return line.trim();
+              })
+              .filter(item => item.length > 5);
+              
+            if (facilityPairs.length > 0) {
+              formattedContent = JSON.stringify(facilityPairs);
+            } else {
+              // Fall back to paragraph splitting
+              const paragraphs = content
+                .split(/\n\n+/)
+                .map(p => p.trim())
+                .filter(p => p.length > 5);
+                
+              formattedContent = JSON.stringify(paragraphs);
+            }
+          } else {
+            // No clear structure, use sentence-based splitting
+            const sentences = content
+              .split(/\.\s+/)
+              .map(s => s.trim() + (s.trim().endsWith('.') ? '' : '.'))
+              .filter(s => s.length > 10);
+              
+            formattedContent = JSON.stringify(sentences);
+          }
+        } catch (err) {
+          console.error('[AI-PM] Error parsing facilities', err);
+          formattedContent = content; // Fallback to raw content
+        }
+      } else if (columnName === 'licenseTypes' || columnName === 'license_types') {
+        // Enhanced handling for license types
+        try {
+          // Try to identify if content has structured license listings
+          if (content.match(bulletPatterns) || content.match(headingPattern)) {
+            // First, try to extract license types with descriptions
+            const licensePairs = [];
+            const items = content
+              .split(new RegExp(bulletPatterns.source + '|' + headingPattern.source, 'g'))
+              .map(item => item.trim())
+              .filter(item => item.length > 3);
+              
+            for (const item of items) {
+              // Look for patterns like "Commercial License: This license..." or "Commercial License - This license..."
+              if (item.match(/:\s*|-\s*|–\s*/)) {
+                const parts = item.split(/:\s*|-\s*|–\s*/);
+                if (parts.length >= 2) {
+                  licensePairs.push({
+                    name: parts[0].trim().replace(/^license:?\s*/i, ''),
+                    description: parts.slice(1).join(': ').trim()
+                  });
+                } else {
+                  licensePairs.push({ name: item, description: '' });
+                }
+              } else {
+                licensePairs.push({ name: item, description: '' });
+              }
+            }
+            
+            if (licensePairs.length > 0) {
+              formattedContent = JSON.stringify(licensePairs);
+            } else {
+              // Fall back to simpler array format
+              const licenseNames = items.map(item => {
+                return item
+                  .replace(/^license:?\s*/i, '')
+                  .replace(/^\d+\.\s*/, '')
+                  .replace(/[,;.]$/, '') // Remove trailing punctuation
+                  .trim();
+              });
+              
+              formattedContent = JSON.stringify(licenseNames);
+            }
+          } else if (content.includes(':')) {
+            // Try to parse as key-value pairs for license types and descriptions
+            const licensePairs = [];
+            const lines = content.split(/\n+/);
+            
+            for (const line of lines) {
+              if (line.includes(':')) {
+                const parts = line.split(/:\s*/);
+                if (parts.length >= 2) {
+                  licensePairs.push({
+                    name: parts[0].trim(),
+                    description: parts.slice(1).join(': ').trim()
+                  });
+                }
+              }
+            }
+            
+            if (licensePairs.length > 0) {
+              formattedContent = JSON.stringify(licensePairs);
+            } else {
+              // Fall back to paragraph splitting
+              const paragraphs = content
+                .split(/\n\n+/)
+                .map(p => p.trim())
+                .filter(p => p.length > 5);
+                
+              formattedContent = JSON.stringify(paragraphs);
+            }
+          } else {
+            // No clear structure, use sentence-based splitting
+            const sentences = content
+              .split(/\.\s+/)
+              .map(s => s.trim() + (s.trim().endsWith('.') ? '' : '.'))
+              .filter(s => s.length > 10);
+              
+            formattedContent = JSON.stringify(sentences);
+          }
+        } catch (err) {
+          console.error('[AI-PM] Error parsing license types', err);
+          formattedContent = content; // Fallback to raw content
+        }
+      } else if (columnName === 'setupCost' || columnName === 'feeStructure') {
+        // Enhanced handling for costs and fees
+        try {
+          // Try to identify if content has structured cost listings
+          if (content.match(bulletPatterns) || content.match(headingPattern)) {
+            // First, try to extract cost items with amounts
+            const costPairs = [];
+            const items = content
+              .split(new RegExp(bulletPatterns.source + '|' + headingPattern.source, 'g'))
+              .map(item => item.trim())
+              .filter(item => item.length > 3);
+              
+            for (const item of items) {
+              // Look for patterns with currency or amounts
+              if (item.match(/AED|USD|Dhs?|Dirham|fee|cost|charge/i)) {
+                const amountMatch = item.match(/(AED|USD|Dhs?\.?|Dirham)\s*[\d,]+(\.\d+)?/i);
+                if (amountMatch) {
+                  // Found a likely cost item with amount
+                  costPairs.push(item);
+                } else {
+                  // General cost item without specific amount
+                  costPairs.push(item);
+                }
+              } else if (item.match(/[\d,]+(\.\d+)?\s*(AED|USD|Dhs?\.?|Dirham)/i)) {
+                // Amount followed by currency
+                costPairs.push(item);
+              } else {
+                costPairs.push(item);
+              }
+            }
+            
+            if (costPairs.length > 0) {
+              formattedContent = JSON.stringify(costPairs);
+            } else {
+              // Fall back to simpler array format
+              formattedContent = JSON.stringify(items);
+            }
+          } else if (content.includes(':')) {
+            // Try to parse as key-value pairs for cost categories and amounts
+            const costPairs = [];
+            const lines = content.split(/\n+/);
+            
+            for (const line of lines) {
+              if (line.includes(':')) {
+                costPairs.push(line.trim());
+              }
+            }
+            
+            if (costPairs.length > 0) {
+              formattedContent = JSON.stringify(costPairs);
+            } else {
+              // Fall back to paragraph splitting
+              const paragraphs = content
+                .split(/\n\n+/)
+                .map(p => p.trim())
+                .filter(p => p.length > 5);
+                
+              formattedContent = JSON.stringify(paragraphs);
+            }
           } else {
             // Try to create a simple object
             formattedContent = JSON.stringify({ details: content });
