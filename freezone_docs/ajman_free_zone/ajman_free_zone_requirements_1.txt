@@ -1,0 +1,49 @@
+# Ajman Free Zone Business Requirements
+
+## General Requirements
+
+### Documentation Requirements
+All businesses must provide:
+- Passport copies of shareholders
+- No objection letter from current sponsor (if applicable)
+- Bank reference letter
+- Business plan (for certain license types)
+- Completed application forms
+
+### Compliance Requirements
+Businesses must adhere to:
+- Annual license renewal procedures
+- Proper accounting and record-keeping
+- UAE labor laws
+- Immigration regulations
+- Health and safety standards
+
+## Specific License Requirements
+
+### Trading License Requirements
+- Product list with HS codes
+- Supplier agreements (if available)
+- Distribution agreements (if applicable)
+- Trademark registrations (if applicable)
+
+### Service License Requirements
+- Professional qualifications/certificates
+- Experience certificates
+- Portfolio of previous work (if applicable)
+- Professional memberships (if applicable)
+
+### Industrial License Requirements
+- Manufacturing process details
+- Equipment specifications
+- Environmental compliance plan
+- Production capacity estimates
+- Raw material requirements
+
+## Facility Requirements
+
+### Office Space Requirements
+- Minimum office size based on visa quota
+- Proper business signage
+- Adherence to building regulations
+- Fire safety compliance
+- Accessible location

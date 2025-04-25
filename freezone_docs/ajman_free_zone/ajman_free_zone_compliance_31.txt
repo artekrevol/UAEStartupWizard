@@ -1,0 +1,32 @@
+# Ajman Free Zone Compliance Guide
+
+## Regulatory Compliance Framework
+All companies in Ajman Free Zone must comply with:
+- UAE Federal Laws
+- Ajman Emirate Regulations
+- Free Zone Authority Rules
+- International standards applicable to their industry
+
+## Annual Compliance Requirements
+1. **License Renewal**: Annual renewal required with updated documentation
+2. **Financial Reporting**: Annual financial statements preparation
+3. **Immigration Compliance**: Employee visa renewal and status verification
+4. **Facility Inspections**: Regular inspections for health and safety compliance
+
+## Anti-Money Laundering Compliance
+- Customer due diligence requirements
+- Suspicious transaction reporting
+- Record keeping obligations
+- Regular staff training on AML measures
+
+## Data Protection and Privacy
+- Customer data protection requirements
+- Secure data storage obligations
+- Privacy policy implementation
+- Data breach response protocols
+
+## Health and Safety Standards
+- Workplace safety requirements
+- Emergency procedures documentation
+- Regular safety training
+- Incident reporting protocols

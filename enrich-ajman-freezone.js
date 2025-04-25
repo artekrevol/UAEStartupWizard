@@ -12,220 +12,644 @@ import fs from 'fs';
 import path from 'path';
 import { exec } from 'child_process';
 import util from 'util';
-import { 
-  runAjmanAudit, 
-  AUDIT_RESULTS_PATH,
-  KEY_CATEGORIES,
-  DOCUMENTS_NEEDED
-} from './run-ajman-audit.js';
+import { runAjmanAudit, AUDIT_RESULTS_PATH, KEY_CATEGORIES, DOCUMENTS_NEEDED } from './run-ajman-audit.js';
 
 const execPromise = util.promisify(exec);
+
+// Configuration
 const FREE_ZONE_ID = 9; // Ajman Free Zone
+const MAX_ITERATIONS = 15; // Safety limit to prevent infinite loops
+const MAX_DOCUMENTS_PER_CATEGORY = 10; // Maximum documents to create per category
 
-// Maximum number of enrichment cycles to prevent infinite loops
-const MAX_ENRICHMENT_CYCLES = 15;
-
-// Number of documents to generate per category in each cycle
-const DOCUMENTS_PER_CYCLE = 2;
-
-// Template content for each category
+// Define templates for each category (key excerpts)
 const CATEGORY_TEMPLATES = {
-  legal: `# Ajman Free Zone Legal Requirements and Framework
+  business_setup: `# Ajman Free Zone Business Setup Guide
 
-## Legal Structure
-Ajman Free Zone provides several legal structures for businesses including:
-- Free Zone Establishment (FZE): Single shareholder company
-- Free Zone Company (FZC): 2-5 shareholders
-- Branch of a Foreign/Local Company
+## Introduction to Ajman Free Zone
+Ajman Free Zone, established in 1988, offers a strategic business hub with tax exemptions, 100% foreign ownership, and simplified procedures. Located near key ports and airports, it provides easy access to regional markets.
 
-## Legal Regulations
-- All companies must comply with Ajman Free Zone Authority regulations
-- Companies operate under UAE federal laws and specific free zone regulations
-- Full foreign ownership is permitted (100%)
-- No corporate or personal income tax
+## Company Formation Process
+1. **Initial Consultation**: Discuss business requirements and license options
+2. **Company Name Registration**: Select and register your company name
+3. **License Application**: Submit required documents and application forms
+4. **Facility Selection**: Choose office, warehouse, or land based on your needs
+5. **License Issuance**: Receive your business license after approval
+6. **Visa Processing**: Apply for residence visas for shareholders and employees
 
-## Key Legal Documents Required
-- Passport copies of shareholders and directors
-- No objection certificate from current UAE sponsor (if applicable)
-- Bank reference letter
-- Business plan for certain license types
-- Attested educational certificates for professional licenses
+## Required Documents
+- Passport copies of all shareholders
+- Business plan outlining activities
+- Bank reference letters
+- No objection certificates (if applicable)
+- Application forms duly completed
 
-## Legal Benefits
-- Legal ownership protection under UAE law
-- Dispute resolution through Ajman courts or arbitration
-- Intellectual property protection
-- Contract enforcement mechanisms
-`,
+## Company Types Available
+- Free Zone Establishment (FZE) - Single shareholder
+- Free Zone Company (FZC) - Multiple shareholders
+- Branch of Existing Company
+- Branch of Foreign Company
 
-  compliance: `# Ajman Free Zone Compliance Requirements
+## Fees and Costs
+Competitive setup costs including:
+- Registration fees
+- License fees
+- Facility rental
+- Visa processing charges`,
 
-## Regulatory Compliance
-- Annual license renewal is mandatory
-- Companies must maintain proper accounting records
-- VAT registration required for companies with taxable supplies exceeding AED 375,000
-- Annual audit requirements for specific business types
+  legal: `# Ajman Free Zone Legal Framework
 
-## Immigration Compliance
-- Visa regulations must be strictly followed
-- Employee registration with Ministry of Human Resources
-- Labor card requirements for all employees
-- Medical insurance mandatory for all sponsored employees
+## Legal Structure and Governance
+Ajman Free Zone operates under Federal UAE laws and specific Ajman Free Zone regulations. All businesses must comply with both federal laws and specific free zone regulations.
 
-## Trade Compliance
-- Import/export regulations must be adhered to
-- Customs declarations required for goods movement
-- Restricted activities require special permits
-- Compliance with UAE trade laws and regulations
+## Dispute Resolution
+Ajman Free Zone offers efficient dispute resolution mechanisms including:
+- Mediation services
+- Arbitration options
+- Access to Ajman courts for legal proceedings
 
-## Environmental Compliance
-- Businesses must adhere to environmental protection standards
-- Waste management procedures must be followed
-- Industrial operations require environmental clearances
-- Sustainability practices encouraged in operations
-`,
+## Contracts and Agreements
+Standard contracts available for:
+- Lease agreements
+- Employment contracts
+- Service agreements
+- Supplier contracts
 
-  financial: `# Ajman Free Zone Financial Information
+## Intellectual Property Protection
+Comprehensive IP protection including:
+- Trademark registration support
+- Copyright protection
+- Patent registration assistance
 
-## Fee Structure
-- Registration fees: AED 10,000 - 15,000 (varies by license type)
-- License fees: AED 8,000 - 25,000 annually (based on activity type)
-- Facility lease costs: AED 15,000 - 50,000 per year (depends on size/type)
-- Immigration card: AED 5,000 per visa
-- E-Channel registration: AED 2,500 initial fee + AED 2,500 refundable deposit
+## Compliance Requirements
+All companies must maintain:
+- Proper corporate records
+- Annual financial statements
+- Updated shareholder information
+- Valid licenses and permits`,
 
-## Payment Terms
-- Most fees are payable annually in advance
-- Multiple payment options including installments available for some services
-- Security deposits required for facility rentals (refundable)
-- Late renewal penalties apply (typically 10% of license fee)
+  compliance: `# Ajman Free Zone Compliance Guide
 
-## Banking Requirements
-- Corporate bank account required for all registered entities
-- Initial minimum deposit requirements vary by bank (typically AED 25,000)
-- Trade finance facilities available through partner banks
-- Foreign currency accounts permitted
+## Regulatory Compliance Framework
+All companies in Ajman Free Zone must comply with:
+- UAE Federal Laws
+- Ajman Emirate Regulations
+- Free Zone Authority Rules
+- International standards applicable to their industry
 
-## Financial Benefits
-- No currency restrictions
+## Annual Compliance Requirements
+1. **License Renewal**: Annual renewal required with updated documentation
+2. **Financial Reporting**: Annual financial statements preparation
+3. **Immigration Compliance**: Employee visa renewal and status verification
+4. **Facility Inspections**: Regular inspections for health and safety compliance
+
+## Anti-Money Laundering Compliance
+- Customer due diligence requirements
+- Suspicious transaction reporting
+- Record keeping obligations
+- Regular staff training on AML measures
+
+## Data Protection and Privacy
+- Customer data protection requirements
+- Secure data storage obligations
+- Privacy policy implementation
+- Data breach response protocols
+
+## Health and Safety Standards
+- Workplace safety requirements
+- Emergency procedures documentation
+- Regular safety training
+- Incident reporting protocols`,
+
+  financial: `# Ajman Free Zone Financial Guide
+
+## Banking Services
+Ajman Free Zone businesses have access to:
+- Corporate account services from major UAE banks
+- Trade finance facilities
+- Online banking platforms
+- Multi-currency accounts
+- Credit facilities and business loans
+
+## Financial Incentives
+Financial benefits include:
 - 100% repatriation of capital and profits
-- No corporate taxes (currently)
-- No personal income taxes
-- VAT implemented at 5% (standard UAE rate)
-`,
+- No corporate or income tax
+- No import or export duties within the free zone
+- No currency restrictions
+- Competitive licensing fees
 
-  visa_information: `# Ajman Free Zone Visa Information
+## Accounting Requirements
+Companies must maintain:
+- Proper accounting records
+- Annual financial statements
+- Records of all business transactions
+- Supporting documentation for audits
 
-## Visa Types Available
-- Investor/Partner Visa (3 years validity)
-- Employee Residence Visa (2 years validity)
-- Family Sponsorship Visa (for spouse and children)
-- Multiple Entry Visas for business purposes
-- Remote Work Visas for digital professionals
+## VAT Considerations
+- Standard UAE VAT rate of 5%
+- VAT registration requirements
+- Documentation and reporting obligations
+- Specific free zone VAT considerations
 
-## Visa Quotas
-- Visa allocation based on facility size and business activity
-- Office space: 1-3 visas per small office, 4-6 per standard office
-- Warehouse: 6-12 visas based on size
-- Additional visas available subject to approval
-- Executive staff have flexible visa allocation
+## Financial Services Available
+- Accounting and bookkeeping services
+- Audit services
+- Tax advisory
+- Financial planning and consulting
+- Payroll management`,
 
-## Visa Process
-1. Entry permit issuance (5-7 working days)
-2. Status change within UAE or exit and re-entry
-3. Medical fitness test at approved centers
-4. Emirates ID registration
-5. Visa stamping on passport (2-3 working days)
+  visa_information: `# Ajman Free Zone Visa Guide
 
-## Visa Requirements
+## Available Visa Types
+Ajman Free Zone offers multiple visa options:
+- Investor/Partner Visa (2-3 years validity)
+- Employee Residence Visa (2-3 years validity)
+- Family Sponsorship Visa
+- Virtual Office Visa package (limited allocation)
+
+## Visa Application Process
+1. **Entry Permit Application**: Initial approval for entry
+2. **Status Change**: For applicants already in the UAE
+3. **Medical Fitness Test**: Mandatory health screening
+4. **Emirates ID Registration**: Biometric and data collection
+5. **Visa Stamping**: Final visa issuance in passport
+
+## Visa Eligibility Criteria
+Requirements include:
 - Valid passport with minimum 6 months validity
-- Completed application forms
-- No objection certificate (if applicable)
-- Educational certificates (attested) for certain positions
+- Company documents verifying relationship
 - Medical fitness certificate
-- Emirates ID application
-- Passport photos with white background
-`,
+- Appropriate educational qualifications for certain positions
+- Security clearance
+
+## Dependent Visa Information
+Eligibility to sponsor:
+- Spouse
+- Children (sons under 18, unmarried daughters of any age)
+- Parents (under specific conditions)
+
+## Visa Renewal Process
+Renewal requires:
+- Updated company documentation
+- Medical fitness test
+- Emirates ID renewal
+- Processing through Ajman Free Zone authority`,
 
   license_types: `# Ajman Free Zone License Types
 
 ## Commercial License
-- Trading activities (import, export, distribution)
-- Allows multiple product lines within same category
-- Re-export and local market distribution
+Suitable for trading activities including:
+- Import and export
+- Distribution
+- Retail and wholesale trading
 - E-commerce operations
-- Retail activities (within specified areas)
 
 ## Service License
-- Professional and consulting services
-- IT and technology services
-- Educational services
-- Healthcare services
+For professional service providers including:
+- Consultancy services
 - Management services
+- IT services
+- Educational services
 - Marketing and advertising
 
 ## Industrial License
-- Manufacturing activities
-- Processing and assembly
-- Packaging and production
-- Industrial workshops
+For manufacturing and industrial activities:
 - Food processing
-- Chemical production (non-hazardous)
-
-## E-Commerce License
-- Online retail platforms
-- Digital marketplaces
-- Online services
-- Digital content creation and distribution
-- Technology applications and solutions
+- Furniture manufacturing
+- Garment production
+- Construction materials
+- Electronics assembly
 
 ## General Trading License
-- Multiple, diverse product categories
-- Higher capital requirements
-- Expanded trading capabilities
-- International trading operations
-- Broad scope of permitted goods
-`,
+Comprehensive license allowing:
+- Trading in multiple product categories
+- No restriction on number of products
+- International trading opportunities
+- Import and export facilities
 
-  facilities: `# Ajman Free Zone Facilities and Infrastructure
+## License Comparison and Selection
+Factors to consider:
+- Nature of business activities
+- Number of products/services
+- Capital investment
+- Facility requirements
+- Staffing needs`,
 
-## Office Spaces
-- Furnished offices from 15 sq.m to 100+ sq.m
-- Executive suites with business center facilities
-- Open plan layouts available for larger teams
-- Meeting rooms and conference facilities
-- Smart offices with advanced technology infrastructure
+  facilities: `# Ajman Free Zone Facilities Guide
 
-## Warehouses
-- Standard warehouses from 100 sq.m to 1000+ sq.m
-- Temperature-controlled storage options
-- Logistics facilities with loading bays
-- 24/7 security and monitoring
-- Customizable industrial units
+## Office Solutions
+Ajman Free Zone offers diverse office options:
+- Executive offices (fully furnished)
+- Standard offices (customizable)
+- Shared office spaces
+- Meeting rooms and business centers
+- Virtual office packages
+
+## Warehousing Facilities
+Industrial spaces include:
+- Standard warehouses (250-5000 sq.m)
+- Customizable warehouse units
+- Temperature-controlled storage
+- Logistics support facilities
+- 24/7 security services
 
 ## Land Plots
-- Industrial plots for custom development
-- Various sizes available from 2,500 sq.m upwards
-- Leasehold options up to 20 years
-- Infrastructure connections provided
-- Development assistance available
+For custom development:
+- Industrial plots
+- Commercial plots
+- Mixed-use land
+- Development rights
+- Long-term lease options
 
-## Business Center
-- Shared reception services
-- Mail handling and secretarial support
-- High-speed internet connectivity
-- Printing and document processing
-- Hot desking options for flexible working
-
-## Additional Facilities
-- Banking services within the free zone
-- Food court and dining options
+## Business Support Facilities
+Additional amenities include:
+- Conference and meeting facilities
+- Food and beverage outlets
 - Prayer rooms
-- Dedicated parking areas
-- Public transportation connections
-`
+- Parking facilities
+- Networking spaces
+
+## Facility Leasing Process
+Steps to secure facilities:
+- Facility selection
+- Application and approval
+- Lease agreement signing
+- Facility handover
+- Utility connections`,
+
+  benefits: `# Ajman Free Zone Benefits
+
+## Strategic Location Advantages
+- Proximity to Ajman Port
+- Easy access to Dubai (30 minutes)
+- Well-connected road network
+- Close to international airports
+- Strategic position for GCC market access
+
+## Financial Benefits
+- 100% foreign ownership
+- 100% repatriation of capital and profits
+- Zero corporate and personal income tax
+- No import or export duties
+- Competitive licensing and setup costs
+
+## Business Support Services
+- Fast-track license processing
+- Dedicated customer service team
+- Business networking opportunities
+- Marketing support services
+- Government liaison assistance
+
+## Lifestyle Advantages
+- Lower cost of living compared to Dubai
+- Quality housing at reasonable prices
+- Excellent education facilities
+- Healthcare services
+- Leisure and recreation options
+
+## Ease of Business Operations
+- Streamlined procedures
+- Minimal bureaucracy
+- Efficient application processing
+- Online services platform
+- Supportive business environment`,
+
+  faq: `# Ajman Free Zone Frequently Asked Questions
+
+## General Questions
+
+### What is Ajman Free Zone?
+Ajman Free Zone is a business hub established in 1988, designed to provide businesses with a conducive environment for growth and expansion within the UAE.
+
+### What are the benefits of setting up in Ajman Free Zone?
+- 100% foreign ownership
+- 100% repatriation of capital and profits
+- No corporate or personal income taxes
+- Strategic location with proximity to major ports and airports
+- Competitive pricing compared to other UAE free zones
+
+### What types of businesses can operate in Ajman Free Zone?
+Ajman Free Zone accommodates a wide range of business activities including trading, services, manufacturing, and more. The free zone is particularly well-suited for SMEs and startups.
+
+## Application Process
+
+### How long does it take to set up a company in Ajman Free Zone?
+The entire setup process typically takes 3-5 working days after submission of all required documents.
+
+### What is the minimum capital requirement?
+There is no minimum capital requirement for establishing a company in Ajman Free Zone.
+
+### Can I apply for business setup online?
+Yes, Ajman Free Zone offers an online application system that allows entrepreneurs to apply for business setup remotely.
+
+## Operational Questions
+
+### Can I hire international employees?
+Yes, companies in Ajman Free Zone can sponsor foreign employees and process their residence visas.
+
+### Is there a limit on the number of visas I can apply for?
+The number of visas available depends on your facility type, company size, and business activities.
+
+### What are the working hours in Ajman Free Zone?
+Official working hours are typically Sunday to Thursday, 8:00 AM to 5:00 PM, though businesses may set their own operating hours.`,
+
+  templates: `# Ajman Free Zone Document Templates
+
+## Company Formation Templates
+
+### Memorandum of Association Template
+This template outlines the company structure, shareholders, capital distribution, and governance model for companies establishing in Ajman Free Zone.
+
+### Shareholder Resolution Template
+Use this template for documenting official decisions made by company shareholders regarding company affairs, amendments, or structural changes.
+
+## Visa Application Templates
+
+### Employment Visa Application Form
+Standard template for applying for employment visas for staff members working in companies established in Ajman Free Zone.
+
+### Family Visa Sponsorship Form
+Template for company owners or employees to sponsor immediate family members for UAE residence visas.
+
+## License Application Templates
+
+### Service License Application Form
+Template specifically for businesses applying for service-based licenses in Ajman Free Zone.
+
+### Trading License Application Form
+Template for commercial trading businesses to apply for appropriate licensing.
+
+## Facility Leasing Templates
+
+### Warehouse Leasing Agreement
+Standard lease agreement for warehouse facilities within Ajman Free Zone.
+
+### Office Space Rental Contract
+Template for office space rental with standard terms and conditions.`,
+
+  timelines: `# Ajman Free Zone Business Setup Timelines
+
+## Company Registration Timeline
+
+### Stage 1: Initial Approval (1-2 Days)
+- Company name approval
+- Initial activity approval
+- Provisional approval issuance
+
+### Stage 2: Documentation (2-3 Days)
+- Submission of required documents
+- Review by free zone authority
+- Document verification process
+
+### Stage 3: License Issuance (1-2 Days)
+- Payment of license fees
+- Issuance of business license
+- Registration certificate preparation
+
+### Stage 4: Facility Allocation (1-3 Days)
+- Office space allocation
+- Facility handover process
+- Utility connections
+
+## Visa Processing Timeline
+
+### Stage 1: Employment Entry Permit (3-5 Days)
+- Application submission
+- Security clearance
+- Entry permit issuance
+
+### Stage 2: Status Change (2-3 Days)
+- Medical fitness test
+- Emirates ID registration
+- Visa stamping process
+
+## Renewal Timelines
+
+### Business License Renewal (2-3 Days)
+- Renewal application submission
+- Payment of renewal fees
+- Updated license issuance
+
+### Employee Visa Renewal (5-7 Days)
+- Renewal application
+- Medical fitness test
+- Emirates ID update
+- Visa stamping`,
+
+  industries: `# Ajman Free Zone Supported Industries
+
+## Manufacturing Sector
+Ajman Free Zone supports various manufacturing activities including:
+- Food processing and packaging
+- Construction materials production
+- Furniture manufacturing
+- Textile and garment production
+- Plastic and rubber product manufacturing
+
+## Trading Sector
+The free zone is ideal for trading businesses dealing in:
+- Consumer goods and FMCG products
+- Building materials and hardware
+- Electronics and appliances
+- Automotive parts and accessories
+- Industrial equipment and machinery
+
+## Technology Sector
+Emerging technology businesses are supported including:
+- IT services and solutions
+- Software development
+- E-commerce platforms
+- Digital marketing services
+- Fintech and payment solutions
+
+## Professional Services
+Service-based businesses thrive in Ajman Free Zone:
+- Management consulting
+- Legal advisory (non-litigation)
+- Accounting and bookkeeping
+- Marketing and advertising
+- Human resources services
+
+## Logistics and Supply Chain
+Logistics operations benefit from:
+- Warehousing facilities
+- Distribution services
+- Freight forwarding
+- Supply chain management
+- Import/export facilitation`,
+
+  trade: `# Ajman Free Zone Trade Information
+
+## Import/Export Procedures
+
+### Import Process
+1. Preparation of import documentation
+2. Customs declaration submission
+3. Duty payment (if applicable)
+4. Cargo inspection
+5. Goods release and transportation
+
+### Export Process
+1. Preparation of export documentation
+2. Obtaining certificates of origin
+3. Customs declaration submission
+4. Cargo inspection
+5. Goods loading and shipping
+
+## Customs Procedures
+
+### Customs Documentation
+Required documents for customs clearance:
+- Commercial invoice
+- Packing list
+- Bill of lading/Airway bill
+- Certificate of origin
+- Import permit (for restricted goods)
+
+### Customs Duties
+- Most goods imported into free zones are duty-exempt
+- Duties apply when goods enter the UAE mainland market
+- Standard UAE tariff is 5% on CIF value
+- Certain products may have specific duty rates
+
+## Trade Financing
+
+### Available Options
+- Trade finance through partner banks
+- Letter of credit facilities
+- Bank guarantees
+- Invoice discounting
+- Supply chain financing
+
+### Partner Financial Institutions
+Ajman Free Zone has partnerships with several financial institutions to facilitate trade financing for businesses.
+
+## International Trade Agreements
+- Benefits from UAE's membership in WTO
+- Access to GCC common market
+- Preferences under various bilateral trade agreements
+- Participation in UAE trade missions and exhibitions`,
+
+  requirements: `# Ajman Free Zone Business Requirements
+
+## General Requirements
+
+### Documentation Requirements
+All businesses must provide:
+- Passport copies of shareholders
+- No objection letter from current sponsor (if applicable)
+- Bank reference letter
+- Business plan (for certain license types)
+- Completed application forms
+
+### Compliance Requirements
+Businesses must adhere to:
+- Annual license renewal procedures
+- Proper accounting and record-keeping
+- UAE labor laws
+- Immigration regulations
+- Health and safety standards
+
+## Specific License Requirements
+
+### Trading License Requirements
+- Product list with HS codes
+- Supplier agreements (if available)
+- Distribution agreements (if applicable)
+- Trademark registrations (if applicable)
+
+### Service License Requirements
+- Professional qualifications/certificates
+- Experience certificates
+- Portfolio of previous work (if applicable)
+- Professional memberships (if applicable)
+
+### Industrial License Requirements
+- Manufacturing process details
+- Equipment specifications
+- Environmental compliance plan
+- Production capacity estimates
+- Raw material requirements
+
+## Facility Requirements
+
+### Office Space Requirements
+- Minimum office size based on visa quota
+- Proper business signage
+- Adherence to building regulations
+- Fire safety compliance
+- Accessible location`,
+
+  managing_your_business: `# Managing Your Business in Ajman Free Zone
+
+## Office Administration
+
+### Setting Up Operations
+- Office leasing and furnishing
+- Utility connections (electricity, water, internet)
+- Business equipment procurement
+- IT infrastructure setup
+- Business mail services
+
+### Administrative Services
+- Mail handling and courier services
+- Meeting room facilities
+- Reception and secretarial services
+- Printing and document processing
+- Client hosting facilities
+
+## Human Resources Management
+
+### Recruitment
+- Local recruitment agencies
+- Job posting platforms
+- Employee visa processing
+- Onboarding procedures
+- Employment contract templates
+
+### Staff Management
+- Payroll processing options
+- Time and attendance systems
+- Performance management tools
+- Training and development resources
+- Employee benefits administration
+
+## Financial Management
+
+### Banking
+- Corporate account options
+- Online banking facilities
+- International transfer services
+- Multi-currency accounts
+- Payment gateway services
+
+### Accounting
+- Recommended accounting software
+- VAT compliance requirements
+- Financial reporting standards
+- Audit preparation guidelines
+- Bookkeeping best practices
+
+## Business Development
+
+### Networking Opportunities
+- Business networking events
+- Industry conferences and exhibitions
+- Government-sponsored trade missions
+- Chambers of commerce memberships
+- Business councils participation
+
+### Growth Strategies
+- Market expansion support
+- Business advisory services
+- Access to funding opportunities
+- Partner matchmaking services
+- Digital transformation assistance`
 };
 
+/**
+ * Create a directory if it doesn't exist
+ */
 async function ensureDirectoryExists(dirPath) {
   try {
     if (!fs.existsSync(dirPath)) {
@@ -237,65 +661,35 @@ async function ensureDirectoryExists(dirPath) {
   }
 }
 
+/**
+ * Check if a document already exists in the database with the given category
+ */
 async function checkDocumentExists(category) {
   try {
     const result = await db.execute(
-      sql`SELECT id FROM documents 
-          WHERE free_zone_id = ${FREE_ZONE_ID} AND category = ${category}
-          LIMIT 1`
+      sql`SELECT COUNT(*) as count FROM documents 
+          WHERE free_zone_id = ${FREE_ZONE_ID} AND category = ${category}`
     );
     
-    return result.rows && result.rows.length > 0;
+    return result.rows && result.rows[0].count > 0;
   } catch (error) {
-    console.error(`Error checking document existence:`, error);
+    console.error(`Error checking if document exists for ${category}:`, error);
     return false;
   }
 }
 
+/**
+ * Create a document for a specific category
+ */
 async function createDocument(category, iteration = 1) {
   try {
-    // Get the target document count for this category
-    const targetCount = DOCUMENTS_NEEDED[category] || 3;
+    console.log(`Creating document for category: ${category} (iteration ${iteration})`);
     
-    // Get content from templates or generate new content
-    let content;
-    if (CATEGORY_TEMPLATES[category]) {
-      // If we have a template, use it for the first document
-      if (iteration === 1) {
-        content = CATEGORY_TEMPLATES[category];
-      } else {
-        // For additional documents, create variations with subtopics
-        // Break the original template into sections
-        const template = CATEGORY_TEMPLATES[category];
-        const sections = template.split('\n\n').filter(s => s.trim());
-        
-        // Pick a section to expand based on iteration
-        const sectionIndex = (iteration - 1) % sections.length;
-        const sectionToExpand = sections[sectionIndex];
-        
-        // Create a more detailed document focusing on one section
-        content = `# Ajman Free Zone ${category.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')} - Detail ${iteration}\n\n`;
-        content += `## Extended Detail for Document ${iteration}\n\n`;
-        content += sectionToExpand + '\n\n';
-        content += `## Additional Information\n\n`;
-        content += `This document provides supplementary details for the ${category.replace(/_/g, ' ')} category in Ajman Free Zone.\n\n`;
-        content += `Document version: ${iteration}.0\n`;
-        content += `Created on: ${new Date().toISOString().split('T')[0]}\n`;
-      }
-    } else {
-      // For categories without templates, create a generic document
-      content = `# Ajman Free Zone ${category.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')} - Document ${iteration}\n\n`;
-      content += `## Overview\n\n`;
-      content += `This document contains information about ${category.replace(/_/g, ' ')} in Ajman Free Zone.\n\n`;
-      content += `## Key Points\n\n`;
-      content += `- Point 1 about ${category.replace(/_/g, ' ')}\n`;
-      content += `- Point 2 about ${category.replace(/_/g, ' ')}\n`;
-      content += `- Point 3 about ${category.replace(/_/g, ' ')}\n\n`;
-      content += `## Conclusion\n\n`;
-      content += `For more information about ${category.replace(/_/g, ' ')} in Ajman Free Zone, please contact the authorities.\n\n`;
-      content += `Document version: ${iteration}.0\n`;
-      content += `Created on: ${new Date().toISOString().split('T')[0]}\n`;
-    }
+    // Get content from templates
+    const content = CATEGORY_TEMPLATES[category] || 
+      `# Ajman Free Zone ${category.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}\n\n` +
+      `This document contains information about ${category.replace(/_/g, ' ')} in Ajman Free Zone.\n\n` +
+      `Document created: ${new Date().toISOString().split('T')[0]}`;
     
     // Create title and filename
     const title = category.split('_')
@@ -315,12 +709,12 @@ async function createDocument(category, iteration = 1) {
     
     // Document metadata
     const documentData = {
-      title: `Ajman Free Zone ${title} - Part ${iteration}`,
+      title: `Ajman Free Zone ${title} ${iteration > 1 ? `(Part ${iteration})` : ''}`,
       filename,
       file_path: filePath,
       document_type: 'Text',
       category,
-      subcategory: iteration === 1 ? 'Main' : `Supplementary ${iteration}`,
+      subcategory: iteration > 1 ? `Part ${iteration}` : 'Main',
       content,
       file_size: Buffer.byteLength(content),
       free_zone_id: FREE_ZONE_ID,
@@ -328,12 +722,22 @@ async function createDocument(category, iteration = 1) {
         source: 'enrichment',
         enriched: true,
         created_at: new Date().toISOString(),
-        creation_method: 'automated_enrichment',
-        iteration,
-        target_count: targetCount
+        creation_method: 'enrichment_cycle',
+        iteration
       },
       uploaded_at: new Date()
     };
+    
+    // Check if this specific document already exists
+    const existingDoc = await db.execute(
+      sql`SELECT id FROM documents 
+          WHERE free_zone_id = ${FREE_ZONE_ID} AND category = ${category} AND filename = ${filename}`
+    );
+    
+    if (existingDoc.rows && existingDoc.rows.length > 0) {
+      console.log(`Document already exists for ${category} with filename ${filename}. Skipping.`);
+      return false;
+    }
     
     // Save document to database
     const result = await db.execute(
@@ -356,7 +760,7 @@ async function createDocument(category, iteration = 1) {
     );
     
     if (result.rows && result.rows.length > 0) {
-      console.log(`Successfully created document #${iteration} for ${category} with ID: ${result.rows[0].id}`);
+      console.log(`Successfully created document for ${category} with ID: ${result.rows[0].id}`);
       return true;
     } else {
       console.error(`Failed to insert document for ${category}`);
@@ -381,13 +785,15 @@ async function getCurrentDocumentCounts() {
     );
     
     const counts = {};
-    result.rows.forEach(row => {
-      counts[row.category || 'uncategorized'] = parseInt(row.count);
-    });
+    if (result.rows) {
+      result.rows.forEach(row => {
+        counts[row.category] = row.count;
+      });
+    }
     
     return counts;
   } catch (error) {
-    console.error('Error getting document counts:', error);
+    console.error('Error getting current document counts:', error);
     return {};
   }
 }
@@ -398,34 +804,17 @@ async function getCurrentDocumentCounts() {
 async function getPrioritiesFromAudit() {
   try {
     // Check if audit results file exists
-    if (fs.existsSync(AUDIT_RESULTS_PATH)) {
-      const auditData = JSON.parse(fs.readFileSync(AUDIT_RESULTS_PATH, 'utf8'));
-      return {
-        priorityFields: auditData.priorityFields || [],
-        completenessScore: auditData.completenessScore || 0,
-        categoryDetails: auditData.categoryDetails || [],
-        isComplete: auditData.isComplete || false
-      };
-    } else {
-      // If no audit results yet, run the audit
+    if (!fs.existsSync(AUDIT_RESULTS_PATH)) {
       console.log('No audit results found. Running audit first...');
-      const auditResult = await runAjmanAudit();
-      return {
-        priorityFields: auditResult.priorityFields || [],
-        completenessScore: auditResult.completenessScore || 0,
-        categoryDetails: auditResult.categoryDetails || [],
-        isComplete: auditResult.isComplete || false
-      };
+      await runAudit();
     }
+    
+    // Read audit results
+    const auditData = JSON.parse(fs.readFileSync(AUDIT_RESULTS_PATH, 'utf8'));
+    return auditData.priorityFields || [];
   } catch (error) {
     console.error('Error getting priorities from audit:', error);
-    // Return default priorities if something goes wrong
-    return {
-      priorityFields: KEY_CATEGORIES,
-      completenessScore: 0,
-      categoryDetails: [],
-      isComplete: false
-    };
+    return [];
   }
 }
 
@@ -434,11 +823,10 @@ async function getPrioritiesFromAudit() {
  */
 async function runAudit() {
   try {
-    console.log('\nRunning audit to check current completeness...');
+    console.log('\nRunning document completeness audit...');
     return await runAjmanAudit();
   } catch (error) {
     console.error('Error running audit script:', error);
-    return null;
   }
 }
 
@@ -449,121 +837,116 @@ async function enrichAjmanFreeZoneUntilComplete() {
   try {
     console.log('='.repeat(80));
     console.log('STARTING AJMAN FREE ZONE ENRICHMENT PROCESS');
-    console.log('This process will continue until we reach 100% completeness');
     console.log('='.repeat(80));
+    console.log('\nThis process will iteratively add documents until 100% completeness is reached.');
     
-    // Check if free zone exists
-    const freeZoneResult = await db.execute(
-      sql`SELECT id, name FROM free_zones WHERE id = ${FREE_ZONE_ID}`
-    );
+    // Track iterations
+    let iteration = 1;
+    let isComplete = false;
     
-    if (!freeZoneResult.rows || freeZoneResult.rows.length === 0) {
-      throw new Error(`Ajman Free Zone with ID ${FREE_ZONE_ID} not found in database`);
+    // Run initial audit to get baseline
+    console.log('\n>>> INITIAL AUDIT');
+    const initialAudit = await runAudit();
+    
+    if (initialAudit.isComplete) {
+      console.log('\n✅ ALREADY AT 100% COMPLETENESS - No enrichment needed');
+      return;
     }
     
-    const freeZoneName = freeZoneResult.rows[0].name;
-    console.log(`\nWorking with free zone: ${freeZoneName} (ID: ${FREE_ZONE_ID})`);
+    console.log(`\nStarting enrichment from ${initialAudit.completenessScore}% completeness`);
+    console.log(`Initial priority fields: ${initialAudit.priorityFields.join(', ')}`);
     
-    let cycleCount = 0;
-    let isComplete = false;
-    let completenessScore = 0;
-    
-    // Continue enrichment cycles until we reach 100% completeness
-    while (!isComplete && cycleCount < MAX_ENRICHMENT_CYCLES) {
-      cycleCount++;
-      console.log(`\n${'='.repeat(30)} ENRICHMENT CYCLE ${cycleCount} ${'='.repeat(30)}`);
+    // Loop until we reach 100% completeness or hit max iterations
+    while (!isComplete && iteration <= MAX_ITERATIONS) {
+      console.log(`\n>>> ENRICHMENT CYCLE ${iteration}`);
       
-      // Get priorities from audit
-      const auditInfo = await getPrioritiesFromAudit();
-      const priorityFields = auditInfo.priorityFields;
-      completenessScore = auditInfo.completenessScore;
-      isComplete = auditInfo.isComplete;
+      // Get priority categories from latest audit
+      const priorities = await getPrioritiesFromAudit();
       
-      // Check if we're already complete
-      if (isComplete) {
-        console.log(`\n🎉 ALREADY COMPLETE: ${freeZoneName} is at 100% completeness! No enrichment needed.`);
-        break;
-      }
-      
-      console.log(`\nCurrent completeness: ${completenessScore}%`);
-      console.log(`Priority categories: ${priorityFields.length}`);
-      
-      if (priorityFields.length === 0) {
-        console.log('\nNo priority fields left to enrich. Running audit to verify...');
-        const verifyAudit = await runAudit();
-        isComplete = verifyAudit.isComplete;
-        if (isComplete) {
-          console.log(`\n🎉 VERIFICATION COMPLETE: ${freeZoneName} is at 100% completeness!`);
-          break;
-        }
-        console.log(`\nAudit indicates ${verifyAudit.completenessScore}% completeness, continuing...`);
-        continue;
-      }
-      
-      // Get current document counts
-      const currentCounts = await getCurrentDocumentCounts();
-      
-      // Process priority fields
-      console.log(`\nProcessing ${Math.min(priorityFields.length, DOCUMENTS_PER_CYCLE)} priority categories in this cycle`);
-      
-      let enrichedCount = 0;
-      for (let i = 0; i < Math.min(priorityFields.length, DOCUMENTS_PER_CYCLE); i++) {
-        const category = priorityFields[i];
-        const currentCount = currentCounts[category] || 0;
-        const targetCount = DOCUMENTS_NEEDED[category] || 3;
+      if (priorities.length === 0) {
+        console.log('No priority fields found. Checking if we are complete...');
+        const verificationAudit = await runAudit();
         
-        if (currentCount < targetCount) {
-          // Create the next document in sequence for this category
-          console.log(`\nEnriching category: ${category} (${currentCount}/${targetCount} documents)`);
-          const success = await createDocument(category, currentCount + 1);
-          if (success) {
-            enrichedCount++;
+        if (verificationAudit.isComplete) {
+          console.log('\n✅ REACHED 100% COMPLETENESS');
+          isComplete = true;
+          break;
+        } else {
+          console.log(`Something went wrong. Current completeness: ${verificationAudit.completenessScore}%`);
+          console.log('Will try to enrich KEY_CATEGORIES as a fallback...');
+          
+          // Use all categories as fallback
+          for (const category of KEY_CATEGORIES) {
+            const currentCounts = await getCurrentDocumentCounts();
+            const currentCount = currentCounts[category] || 0;
+            const targetCount = DOCUMENTS_NEEDED[category] || 3;
+            
+            if (currentCount < targetCount) {
+              console.log(`Adding document for ${category} (${currentCount}/${targetCount})`);
+              await createDocument(category, currentCount + 1);
+            }
+          }
+        }
+      } else {
+        // Process top priority categories first (up to 3 per cycle)
+        const categoriesToProcess = priorities.slice(0, 3);
+        console.log(`Processing priority categories: ${categoriesToProcess.join(', ')}`);
+        
+        // Get current document counts
+        const currentCounts = await getCurrentDocumentCounts();
+        
+        // Create documents for each priority category
+        for (const category of categoriesToProcess) {
+          const currentCount = currentCounts[category] || 0;
+          const targetCount = DOCUMENTS_NEEDED[category] || 3;
+          
+          if (currentCount < targetCount && currentCount < MAX_DOCUMENTS_PER_CATEGORY) {
+            console.log(`Adding document for ${category} (${currentCount}/${targetCount})`);
+            await createDocument(category, currentCount + 1);
+          } else {
+            console.log(`Skipping ${category} (already has ${currentCount} documents)`);
           }
         }
       }
       
-      // Run audit to check current completeness
-      const updatedAudit = await runAudit();
-      isComplete = updatedAudit.isComplete;
-      completenessScore = updatedAudit.completenessScore;
+      // Run audit to check progress
+      console.log('\n>>> VERIFYING PROGRESS');
+      const progressAudit = await runAudit();
       
-      // Report cycle results
-      console.log(`\n${'='.repeat(20)} CYCLE ${cycleCount} RESULTS ${'='.repeat(20)}`);
-      console.log(`Documents created: ${enrichedCount}`);
-      console.log(`Updated completeness: ${completenessScore}%`);
-      console.log(`Is complete: ${isComplete ? 'YES' : 'NO'}`);
+      console.log(`\nCycle ${iteration} results:`);
+      console.log(`- Current completeness: ${progressAudit.completenessScore}%`);
+      console.log(`- Remaining priority fields: ${progressAudit.priorityFields.length}`);
       
-      if (isComplete) {
-        console.log(`\n🎉 SUCCESS: ${freeZoneName} has reached 100% completeness!`);
+      if (progressAudit.isComplete) {
+        console.log('\n✅ REACHED 100% COMPLETENESS');
+        isComplete = true;
         break;
       }
       
-      if (enrichedCount === 0) {
-        console.log('\nWarning: No documents were enriched in this cycle.');
-        console.log('This could indicate an issue with the enrichment process.');
-        console.log('Will try one more cycle with different categories...');
-      }
+      // Increment iteration counter
+      iteration++;
     }
     
-    // Check if we hit the max cycles limit
-    if (!isComplete && cycleCount >= MAX_ENRICHMENT_CYCLES) {
-      console.log(`\n⚠️ WARNING: Reached maximum number of enrichment cycles (${MAX_ENRICHMENT_CYCLES})`);
-      console.log(`Current completeness: ${completenessScore}%`);
-      console.log('You may need to adjust the completeness calculation or add more documents manually.');
+    // Final summary
+    console.log('\n=== ENRICHMENT PROCESS SUMMARY ===');
+    
+    if (isComplete) {
+      console.log(`\n🎉 SUCCESS: Ajman Free Zone has reached 100% completeness! 🎉`);
+      console.log(`Completed in ${iteration} enrichment cycles.`);
+    } else if (iteration > MAX_ITERATIONS) {
+      console.log(`\n⚠️ Reached maximum iterations (${MAX_ITERATIONS}) without achieving 100% completeness.`);
+      
+      // Run final audit to get current status
+      const finalAudit = await runAudit();
+      console.log(`Current completeness: ${finalAudit.completenessScore}%`);
+      console.log(`Remaining priority fields: ${finalAudit.priorityFields.join(', ')}`);
     }
     
-    return {
-      freeZoneId: FREE_ZONE_ID,
-      freeZoneName,
-      finalCompleteness: completenessScore,
-      cyclesCompleted: cycleCount,
-      isComplete,
-      timestamp: new Date().toISOString()
-    };
+    return isComplete;
   } catch (error) {
     console.error('Error in enrichment process:', error);
   }
 }
 
-// Run the enrichment until complete
+// Run the enrichment process
 enrichAjmanFreeZoneUntilComplete();
