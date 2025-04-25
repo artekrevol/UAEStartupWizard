@@ -285,18 +285,13 @@ async function analyzeLiveWebsite(freeZoneId: number, freeZoneName: string, webs
     };
   }
   
-  // Mock data for fallback if Playwright fails
-  const mockData = {
+  // Properly formatted data structure for analysis results
+  const analysisResult = {
     url: websiteUrl,
-    fieldsFound: ['setup_process', 'legal_requirements', 'fee_structure', 'facilities', 'benefits'],
-    contentSummary: {
-      'setup_process': 'Setup process information would be extracted from the website.',
-      'legal_requirements': 'Legal requirements information would be extracted from the website.',
-      'fee_structure': 'Fee structure information would be extracted from the website.',
-      'facilities': 'Facilities information would be extracted from the website.',
-      'benefits': 'Benefits information would be extracted from the website.'
-    },
-    fallbackUsed: true
+    fieldsFound: [] as string[],
+    contentSummary: {} as Record<string, string>,
+    screenshotPath: '',
+    webDataSource: 'live' // Indicate data is from live scraping
   };
   
   let browser = null;
@@ -310,134 +305,270 @@ async function analyzeLiveWebsite(freeZoneId: number, freeZoneName: string, webs
       // Skip browser executable path validation
       executablePath: process.env.PLAYWRIGHT_BROWSERS_PATH || undefined
     });
-    context = await browser.newContext();
+    context = await browser.newContext({
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36',
+      viewport: { width: 1366, height: 768 }
+    });
     page = await context.newPage();
-    page.setDefaultTimeout(60000); // 60 second timeout
+    page.setDefaultTimeout(90000); // 90 second timeout for better reliability
     
-    // Visit the main website
-    await page.goto(websiteUrl, { waitUntil: 'domcontentloaded' });
-    console.log(`[Deep-Audit] Loaded website: ${websiteUrl}`);
+    // Visit the main website with improved error handling
+    try {
+      await page.goto(websiteUrl, { 
+        waitUntil: 'networkidle',
+        timeout: 60000 
+      });
+      console.log(`[Deep-Audit] Loaded website: ${websiteUrl}`);
+    } catch (navError) {
+      console.log(`[Deep-Audit] Initial navigation error: ${navError.message}`);
+      // Try with a less strict wait condition
+      await page.goto(websiteUrl, { 
+        waitUntil: 'domcontentloaded',
+        timeout: 60000 
+      });
+      console.log(`[Deep-Audit] Loaded website with fallback strategy: ${websiteUrl}`);
+    }
     
-    // Take a screenshot
+    // Take a screenshot - using a more reliable approach
     const screenshotDir = path.resolve('screenshots');
     if (!fs.existsSync(screenshotDir)) {
       fs.mkdirSync(screenshotDir, { recursive: true });
     }
     
     const screenshotPath = path.join(screenshotDir, `freezone_${freeZoneId}_${Date.now()}.png`);
+    // Wait for the page to stabilize before taking screenshot
+    await page.waitForTimeout(2000);
     await page.screenshot({ path: screenshotPath, fullPage: false });
+    analysisResult.screenshotPath = screenshotPath;
     
-    // Extract content from the website
+    // Extract content from the website with improved techniques
     const pageContent = await page.content();
     const pageText = await page.evaluate(() => document.body.innerText);
+    
+    // Get all available navigation links to build a better site map
+    const siteNavigation = await page.evaluate(() => {
+      const links = Array.from(document.querySelectorAll('nav a, header a, .menu a, .navigation a, [role="navigation"] a'))
+        .map(a => {
+          const href = a.getAttribute('href');
+          const text = a.textContent?.trim();
+          return { href, text };
+        })
+        .filter(link => link.href && link.text);
+      return links;
+    });
+    
+    console.log(`[Deep-Audit] Found ${siteNavigation.length} navigation links on the main page`);
     
     // Use GPT-4o to analyze the page content for relevant fields
     const fieldsFound: string[] = [];
     const contentSummary: { [key: string]: string } = {};
     
-    // Check for key information sections on the main page
-    for (const field of dataCategories) {
-      const fieldPresence = await page.evaluate((field) => {
-        const fieldTerms = {
-          'setup_process': ['setup', 'process', 'how to', 'start', 'establish', 'registration'],
-          'legal_requirements': ['legal', 'requirements', 'regulations', 'compliance', 'rules'],
-          'fee_structure': ['fee', 'fees', 'cost', 'costs', 'pricing', 'price'],
-          'visa_information': ['visa', 'residence', 'permit', 'immigration', 'work permit'],
-          'license_types': ['license', 'licenses', 'licensing', 'permit', 'business type'],
-          'facilities': ['facilities', 'office', 'spaces', 'building', 'amenities'],
-          'benefits': ['benefits', 'advantages', 'incentives', 'features', 'perks'],
-          'faq': ['faq', 'frequently', 'asked', 'questions', 'common questions'],
-          'templates': ['templates', 'forms', 'documents', 'application'],
-          'costs': ['costs', 'pricing', 'packages', 'fees', 'financial'],
-          'timelines': ['timeline', 'duration', 'time', 'period', 'estimate'],
+    // Enhanced field detection with additional context
+    const fieldDetectionResults = await page.evaluate((categories) => {
+      // More comprehensive field terms dictionary
+      const fieldTerms = {
+        'setup_process': ['setup', 'process', 'how to', 'start', 'establish', 'registration', 'procedure', 'application', 'incorporate', 'formation'],
+        'legal_requirements': ['legal', 'requirements', 'regulations', 'compliance', 'rules', 'law', 'regulatory', 'obligation'],
+        'fee_structure': ['fee', 'fees', 'cost', 'costs', 'pricing', 'price', 'payment', 'charges', 'financial'],
+        'visa_information': ['visa', 'residence', 'permit', 'immigration', 'work permit', 'employment visa', 'family visa', 'dependent'],
+        'license_types': ['license', 'licenses', 'licensing', 'permit', 'business type', 'commercial', 'trading', 'industrial', 'service'],
+        'facilities': ['facilities', 'office', 'spaces', 'building', 'amenities', 'infrastructure', 'premises', 'warehouse', 'property'],
+        'benefits': ['benefits', 'advantages', 'incentives', 'features', 'perks', 'privileges', 'exemption', 'profit', 'ownership'],
+        'faq': ['faq', 'frequently', 'asked', 'questions', 'common questions', 'inquiries', 'help'],
+        'templates': ['templates', 'forms', 'documents', 'application', 'sample', 'download', 'pdf'],
+        'costs': ['costs', 'pricing', 'packages', 'fees', 'financial', 'payment', 'price list', 'budget'],
+        'timelines': ['timeline', 'duration', 'time', 'period', 'estimate', 'schedule', 'process time', 'days', 'weeks'],
+        'industries': ['industries', 'sectors', 'business activities', 'trades', 'commercial activities'],
+        'location': ['location', 'address', 'map', 'directions', 'where', 'place', 'situated'],
+      };
+      
+      const results = {};
+      
+      // For each category, perform comprehensive detection
+      categories.forEach(category => {
+        const terms = fieldTerms[category] || [];
+        
+        const fieldData = {
+          found: false,
+          content: '',
+          confidence: 0,
+          sources: [] // Track where we found information
         };
         
-        // Get relevant terms for this field
-        const terms = fieldTerms[field] || [];
+        // More sophisticated detection methods
         
-        // Look for these terms in headings and emphasized content
-        let found = false;
-        let content = '';
-        
-        // Check headings
-        document.querySelectorAll('h1, h2, h3, h4, h5, h6, strong, b').forEach(el => {
+        // Method 1: Check structured section headers
+        document.querySelectorAll('h1, h2, h3, h4, h5, h6, .heading, .title, .section-title').forEach(el => {
           const text = el.textContent?.toLowerCase() || '';
           if (terms.some(term => text.includes(term))) {
-            found = true;
+            fieldData.found = true;
+            fieldData.confidence += 0.4;
+            fieldData.sources.push('header');
             
             // Get the container or section this heading belongs to
             let container = el.parentElement;
-            while (container && !['section', 'div', 'article'].includes(container.tagName.toLowerCase())) {
+            while (container && !['section', 'div', 'article', 'main'].includes(container.tagName.toLowerCase()) && container !== document.body) {
               container = container.parentElement;
             }
             
-            // Extract text from this section (up to 500 chars)
             if (container) {
-              content = container.textContent?.trim().substring(0, 500) || '';
+              // Get text excluding nested headers
+              let containerContent = '';
+              container.childNodes.forEach(node => {
+                if (node.nodeType === 3) { // Text node
+                  containerContent += node.textContent || '';
+                } else if (node.nodeType === 1) { // Element node
+                  // Skip if it's another heading
+                  if (!['H1', 'H2', 'H3', 'H4', 'H5', 'H6'].includes(node.nodeName)) {
+                    containerContent += node.textContent || '';
+                  }
+                }
+              });
+              fieldData.content = (containerContent || container.textContent || '').trim().substring(0, 800);
             }
           }
         });
         
-        return { found, content };
-      }, field);
+        // Method 2: Check for relevant terms in page content with proximity analysis
+        if (!fieldData.found) {
+          document.querySelectorAll('p, li, td, .content, article').forEach(el => {
+            const text = el.textContent?.toLowerCase() || '';
+            // Need multiple term matches for content blocks (higher confidence)
+            const matchCount = terms.filter(term => text.includes(term)).length;
+            if (matchCount >= 2) {
+              fieldData.found = true;
+              fieldData.confidence += 0.2 + (matchCount * 0.05);
+              fieldData.sources.push('content');
+              fieldData.content = el.textContent?.trim().substring(0, 800) || '';
+            }
+          });
+        }
+        
+        // Method 3: Check navigation and buttons that might point to relevant pages
+        document.querySelectorAll('a, button, .nav-item').forEach(el => {
+          const text = el.textContent?.toLowerCase() || '';
+          if (terms.some(term => text.includes(term))) {
+            fieldData.found = true;
+            fieldData.confidence += 0.1;
+            fieldData.sources.push('navigation');
+            // Don't set content from navigation, but mark it for further investigation
+          }
+        });
+        
+        results[category] = fieldData;
+      });
       
-      if (fieldPresence.found) {
-        fieldsFound.push(field);
-        contentSummary[field] = fieldPresence.content;
-      }
-    }
+      return results;
+    }, dataCategories);
     
-    // Navigate to likely important subpages
-    const subpages = [
+    // Process field detection results
+    Object.entries(fieldDetectionResults).forEach(([field, data]) => {
+      if (data.found && data.confidence > 0.1) {
+        fieldsFound.push(field);
+        contentSummary[field] = data.content || `Information about ${field.replace('_', ' ')} is available on this website.`;
+      }
+    });
+    
+    // Build a smarter list of subpages to visit based on detected fields and site navigation
+    const standardSubpages = [
       { path: '/setup', name: 'Setup' },
       { path: '/business', name: 'Business' },
       { path: '/services', name: 'Services' },
       { path: '/costs', name: 'Costs' },
       { path: '/licenses', name: 'Licenses' },
       { path: '/about', name: 'About' },
+      { path: '/business-setup', name: 'Business Setup' },
+      { path: '/how-to-start', name: 'Start Business' },
+      { path: '/regulations', name: 'Regulations' },
+      { path: '/visa', name: 'Visa' },
+      { path: '/facilities', name: 'Facilities' },
+      { path: '/company-formation', name: 'Company Formation' },
+      { path: '/benefits', name: 'Benefits' },
+      { path: '/industries', name: 'Industries' },
+      { path: '/faq', name: 'FAQ' },
     ];
     
-    for (const subpage of subpages) {
+    // Combine standard paths with detected navigation
+    const allSubpages = [...standardSubpages];
+    
+    // Visit prioritized subpages
+    const visitedPaths = new Set<string>();
+    for (const subpage of allSubpages) {
       try {
         // Create full URL for subpage
         const subpageUrl = new URL(subpage.path, websiteUrl).href;
         
-        // Only visit if it seems to be part of the same domain
-        if (subpageUrl.includes(new URL(websiteUrl).hostname)) {
-          await page.goto(subpageUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-          console.log(`[Deep-Audit] Visited subpage: ${subpageUrl}`);
+        // Skip if already visited or if it's external
+        if (visitedPaths.has(subpageUrl) || !subpageUrl.includes(new URL(websiteUrl).hostname)) {
+          continue;
+        }
+        
+        visitedPaths.add(subpageUrl);
+        
+        console.log(`[Deep-Audit] Attempting to visit subpage: ${subpageUrl}`);
+        try {
+          await page.goto(subpageUrl, { waitUntil: 'domcontentloaded', timeout: 45000 });
+          console.log(`[Deep-Audit] Successfully visited subpage: ${subpageUrl}`);
           
-          // Extract additional field information
+          // Take quick screenshot of important pages for reference
+          const subpageScreenshotPath = path.join(screenshotDir, `freezone_${freeZoneId}_${subpage.name.toLowerCase()}_${Date.now()}.png`);
+          await page.screenshot({ path: subpageScreenshotPath, fullPage: false });
+          
+          // Extract detailed field information with improved extraction
           const subpageContent = await page.content();
+          const subpageText = await page.evaluate(() => document.body.innerText);
+          
+          // Use GPT-4o for more accurate analysis of this specific page
           const subpageFieldAnalysis = await analyzePageForFields(subpageContent, dataCategories);
           
-          // Add newly found fields
+          // Add newly found fields with improved content extraction
           subpageFieldAnalysis.fieldsFound.forEach(field => {
             if (!fieldsFound.includes(field)) {
               fieldsFound.push(field);
               contentSummary[field] = subpageFieldAnalysis.contentSummary[field];
+            } else if (contentSummary[field].length < subpageFieldAnalysis.contentSummary[field].length) {
+              // Use the more detailed content if available
+              contentSummary[field] = subpageFieldAnalysis.contentSummary[field];
             }
           });
+        } catch (navError) {
+          console.log(`[Deep-Audit] Could not load subpage ${subpage.path}: ${navError.message}`);
+          continue;
         }
       } catch (err) {
-        console.log(`[Deep-Audit] Could not load subpage ${subpage.path}: ${err.message}`);
+        console.log(`[Deep-Audit] Error processing subpage ${subpage.path}: ${err.message}`);
       }
     }
     
-    // Return the successful result
-    return {
-      url: websiteUrl,
-      fieldsFound,
-      contentSummary,
-      screenshotPath: screenshotPath
-    };
+    // Run a final comprehensive analysis using GPT-4o over all collected content
+    // This helps identify fields that might have been missed by element-level analysis
+    const pageTitle = await page.title();
+    const gptAnalysis = await runComprehensiveGPTAnalysis(freeZoneName, pageTitle, pageText, dataCategories);
+    
+    // Merge GPT analysis results for more complete coverage
+    gptAnalysis.fieldsFound.forEach(field => {
+      if (!fieldsFound.includes(field)) {
+        fieldsFound.push(field);
+        contentSummary[field] = gptAnalysis.contentSummary[field];
+      }
+    });
+    
+    // Return the enhanced result
+    analysisResult.fieldsFound = fieldsFound;
+    analysisResult.contentSummary = contentSummary;
+    
+    return analysisResult;
     
   } catch (error) {
     console.error(`[Deep-Audit] Error accessing website ${websiteUrl}:`, error);
     
-    // If we encounter an error, return the mock data
-    console.log(`[Deep-Audit] Using mock data for ${freeZoneName} website analysis`);
-    return mockData;
+    // Return an empty result structure with error indication, not mock data
+    return {
+      url: websiteUrl,
+      fieldsFound: [],
+      contentSummary: {},
+      error: error.message
+    };
   } finally {
     try {
       // Close browser resources if they were opened
@@ -447,6 +578,72 @@ async function analyzeLiveWebsite(freeZoneId: number, freeZoneName: string, webs
     } catch (err) {
       console.log("[Deep-Audit] Error while closing browser:", err);
     }
+  }
+}
+
+/**
+ * Run a comprehensive GPT analysis on the entire page content
+ * This gives us a high-level semantic understanding of the page
+ */
+async function runComprehensiveGPTAnalysis(
+  freeZoneName: string,
+  pageTitle: string,
+  pageText: string,
+  fields: string[]
+): Promise<{ fieldsFound: string[], contentSummary: Record<string, string> }> {
+  try {
+    // Prepare prompt
+    const prompt = `
+    You are analyzing text content from the ${freeZoneName} free zone website.
+    The page title is: "${pageTitle}"
+    
+    I need you to identify which of the following business setup topics are discussed in the content:
+    ${fields.join(', ')}
+    
+    For each topic that is present, provide a brief factual summary of what the page says about it. Only include topics that are actually discussed.
+    
+    Return your response as JSON in this format:
+    {
+      "fieldsFound": ["field1", "field2"],
+      "contentSummary": {
+        "field1": "Factual summary of content",
+        "field2": "Factual summary of content"
+      }
+    }
+    
+    Focus on extracting FACTUAL information only. Do not make assumptions or add information not present in the text.
+    `;
+    
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+      messages: [
+        { 
+          role: "system", 
+          content: "You are a specialized content analyzer focusing on business setup information for free zones in the UAE. Extract only factual information from provided text."
+        },
+        { 
+          role: "user", 
+          content: prompt + "\n\nText to analyze:\n" + pageText.substring(0, 15000) // Truncate to avoid token limits
+        }
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.2, // Lower temperature for more factual responses
+    });
+    
+    // Parse the response
+    try {
+      const result = JSON.parse(completion.choices[0].message.content);
+      return {
+        fieldsFound: result.fieldsFound || [],
+        contentSummary: result.contentSummary || {}
+      };
+    } catch (parseError) {
+      console.error("[Deep-Audit] Error parsing GPT analysis result:", parseError);
+      return { fieldsFound: [], contentSummary: {} };
+    }
+  } catch (error) {
+    console.error("[Deep-Audit] Error in comprehensive GPT analysis:", error);
+    return { fieldsFound: [], contentSummary: {} };
   }
 }
 
