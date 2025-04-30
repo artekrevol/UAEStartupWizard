@@ -440,25 +440,25 @@ export async function enrichFreeZoneData(
       // Map fields to their actual column names in the database
       const columnNameMap: Record<string, string> = {
         // Core fields
-        'license_types': 'licenseTypes',
+        'license_types': 'license_types',
         'setup_process': 'setup_process',
         'legal_requirements': 'requirements',
-        'fee_structure': 'setupCost',
+        'fee_structure': 'setup_cost',
         'visa_information': 'visa_information',
         'facilities': 'facilities',
         'benefits': 'benefits',
         'faqs': 'faqs',
         'templates': 'templates',
         'timelines': 'timelines',
-        'setup_cost': 'setupCost',
+        'setup_cost': 'setup_cost',
         'industries': 'industries',
         
         // Alternative field names (for flexibility)
         'requirements': 'requirements',
         'visas': 'visa_information',
         'visa': 'visa_information',
-        'costs': 'setupCost',
-        'fees': 'setupCost',
+        'costs': 'setup_cost',
+        'fees': 'setup_cost',
         'office_spaces': 'facilities',
         'warehouses': 'facilities',
         'business_activities': 'industries',
@@ -852,13 +852,59 @@ export async function enrichFreeZoneData(
       }
       
       // Update the free zone record with this data
-      await db.execute(sql`
-        UPDATE free_zones
-        SET ${sql.raw(`${columnName} = ${formattedContent ? `'${formattedContent.replace(/'/g, "''")}'` : 'NULL'}`)}
-        WHERE id = ${freeZoneId}
-      `);
-      
-      console.log(`[AI-PM] Updated free zone table directly with field "${field}" for ${freeZone.name}`);
+      try {
+        // Ensure proper JSON formatting for jsonb columns
+        if (columnName === 'benefits' || 
+            columnName === 'requirements' || 
+            columnName === 'industries' || 
+            columnName === 'license_types' || 
+            columnName === 'facilities' || 
+            columnName === 'setup_cost' || 
+            columnName === 'faqs') {
+          
+          // Make sure formattedContent is a valid JSON string
+          if (typeof formattedContent === 'string' && !formattedContent.startsWith('[') && !formattedContent.startsWith('{')) {
+            // Convert plain text to a JSON array of one item for jsonb columns
+            formattedContent = JSON.stringify([formattedContent]);
+          }
+          
+          await db.execute(sql`
+            UPDATE free_zones
+            SET ${sql.raw(`${columnName} = ${formattedContent ? `'${formattedContent.replace(/'/g, "''")}'::jsonb` : 'NULL'}`)}
+            WHERE id = ${freeZoneId}
+          `);
+        } else {
+          // Regular text columns
+          await db.execute(sql`
+            UPDATE free_zones
+            SET ${sql.raw(`${columnName} = ${formattedContent ? `'${formattedContent.replace(/'/g, "''")}'` : 'NULL'}`)}
+            WHERE id = ${freeZoneId}
+          `);
+        }
+        
+        console.log(`[AI-PM] Updated free zone table directly with field "${field}" for ${freeZone.name}`);
+      } catch (jsonError) {
+        console.error(`[AI-PM] Error updating ${columnName} with JSON data:`, jsonError);
+        // Fallback to a safe default JSON value
+        if (columnName === 'benefits' || 
+            columnName === 'requirements' || 
+            columnName === 'industries' || 
+            columnName === 'license_types' || 
+            columnName === 'facilities' || 
+            columnName === 'setup_cost' || 
+            columnName === 'faqs') {
+          
+          const fallbackJson = JSON.stringify([`Information about ${field} (could not format original data properly)`]);
+          
+          await db.execute(sql`
+            UPDATE free_zones
+            SET ${sql.raw(`${columnName} = '${fallbackJson}'::jsonb`)}
+            WHERE id = ${freeZoneId}
+          `);
+          
+          console.log(`[AI-PM] Used fallback JSON for ${field} after formatting error`);
+        }
+      }
     } catch (updateError) {
       console.error(`Error updating free zone record: ${updateError}`);
       // Don't fail the overall process if this update fails
