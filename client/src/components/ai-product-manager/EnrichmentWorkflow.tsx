@@ -459,6 +459,15 @@ export default function EnrichmentWorkflow() {
       }
     };
   }, [autoInterval]);
+  
+  // Auto mode status text
+  const getAutoModeStatus = () => {
+    if (autoMode) {
+      return "Auto mode enabled - Enriching every 10 minutes";
+    } else {
+      return "Auto mode disabled";
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -476,23 +485,30 @@ export default function EnrichmentWorkflow() {
             <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
           </Button>
-          <Button 
-            onClick={toggleAutoMode}
-            variant={autoMode ? "destructive" : "default"}
-            disabled={executeEnrichmentMutation.isPending || runWorkflowMutation.isPending}
-          >
-            {autoMode ? (
-              <>
-                <PauseIcon className="mr-2 h-4 w-4" />
-                Stop Auto Mode
-              </>
-            ) : (
-              <>
-                <PlayIcon className="mr-2 h-4 w-4" />
-                Start Auto Mode
-              </>
-            )}
-          </Button>
+          <div className="flex flex-col">
+            <div className="flex items-center mb-1">
+              <div className={`h-2 w-2 rounded-full mr-2 ${autoMode ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`} />
+              <span className="text-xs text-muted-foreground">{getAutoModeStatus()}</span>
+            </div>
+            <Button 
+              onClick={toggleAutoMode}
+              variant={autoMode ? "destructive" : "default"}
+              disabled={executeEnrichmentMutation.isPending || runWorkflowMutation.isPending}
+              className="w-full"
+            >
+              {autoMode ? (
+                <>
+                  <PauseIcon className="mr-2 h-4 w-4" />
+                  Stop Auto Mode
+                </>
+              ) : (
+                <>
+                  <PlayIcon className="mr-2 h-4 w-4" />
+                  Start Auto Mode
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -533,12 +549,11 @@ export default function EnrichmentWorkflow() {
                     {tasks.tasks.map((task: EnrichmentTask) => (
                       <div key={`${task.freeZoneId}-${task.field}`} className="grid grid-cols-12 p-3 items-center">
                         <div className="col-span-1">
-                          <input 
-                            type="checkbox"
+                          <Checkbox 
                             checked={selectedTasks.some(t => 
                               t.freeZoneId === task.freeZoneId && t.field === task.field
                             )}
-                            onChange={() => toggleTaskSelection(task)}
+                            onCheckedChange={() => toggleTaskSelection(task)}
                             className="w-4 h-4"
                           />
                         </div>
