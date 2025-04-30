@@ -783,15 +783,20 @@ export default function EnrichmentWorkflow() {
                             ) : missingFields.length > 0 ? (
                               <div className="flex flex-wrap gap-2">
                                 {missingFields.map((field) => (
-                                  <Badge
+                                  <div 
                                     key={field}
-                                    variant={isSelected(field) ? "default" : "outline"}
-                                    className="cursor-pointer"
+                                    className={`px-3 py-1 text-sm rounded-md cursor-pointer transition-colors ${
+                                      isSelected(field) 
+                                        ? 'bg-primary text-primary-foreground' 
+                                        : 'bg-muted/50 hover:bg-muted'
+                                    }`}
                                     onClick={() => toggleFieldSelection(auditResult.freeZoneId, field)}
                                   >
-                                    {isSelected(field) && <CheckIcon className="mr-1 h-3 w-3" />}
-                                    {formatFieldName(field)}
-                                  </Badge>
+                                    <div className="flex items-center">
+                                      {isSelected(field) && <CheckIcon className="mr-1 h-3 w-3" />}
+                                      <span>{formatFieldName(field)}</span>
+                                    </div>
+                                  </div>
                                 ))}
                               </div>
                             ) : (
