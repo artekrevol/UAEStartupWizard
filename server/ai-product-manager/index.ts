@@ -924,6 +924,54 @@ export async function enrichFreeZoneData(
       'enrich'
     );
     
+    // Update the analysis record to reflect this field is now complete
+    try {
+      // Get the latest analysis
+      const analysisResult = await db.execute(sql`
+        SELECT * FROM free_zone_analysis
+        WHERE free_zone_id = ${freeZoneId}
+        ORDER BY created_at DESC
+        LIMIT 1
+      `);
+      
+      if (analysisResult.rows.length > 0) {
+        const analysis = analysisResult.rows[0];
+        const fields = typeof analysis.fields === 'string' 
+          ? JSON.parse(analysis.fields) 
+          : analysis.fields;
+        
+        // Update the status of this field to "complete"
+        const updatedFields = fields.map((f: any) => {
+          if (f.field === field) {
+            return {
+              ...f,
+              status: 'complete',
+              confidence: 1.0 // Full confidence after enrichment
+            };
+          }
+          return f;
+        });
+        
+        // Calculate new overall completeness
+        const completeFields = updatedFields.filter((f: any) => f.status === 'complete').length;
+        const totalFields = updatedFields.length;
+        const newOverallCompleteness = (completeFields / totalFields) * 100;
+        
+        // Save the updated analysis
+        await db.execute(sql`
+          UPDATE free_zone_analysis
+          SET fields = ${JSON.stringify(updatedFields)}::jsonb,
+              overall_completeness = ${newOverallCompleteness}
+          WHERE id = ${analysis.id}
+        `);
+        
+        console.log(`[AI-PM] Updated analysis record to mark ${field} as complete for ${freeZone.name}`);
+      }
+    } catch (analysisError) {
+      console.error(`[AI-PM] Error updating analysis after enrichment: ${analysisError}`);
+      // Non-fatal, continue with return
+    }
+    
     return {
       freeZoneId,
       freeZoneName: freeZone.name,

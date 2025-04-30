@@ -242,12 +242,17 @@ router.post('/execute-enrichment', async (req, res) => {
     // Execute tasks - we reuse the existing executeEnrichmentTasks function
     const batchResult = await executeEnrichmentTasks(tasks);
     
+    // Get updated tasks after processing (important: this will reflect the changes we made to the analysis)
+    const updatedTasks = await generateEnrichmentTasks();
+    
     // Return results in the format expected by the client
     res.json({
       success: true,
       completedTasks: batchResult.results.length,
       successfulTasks: batchResult.results.filter(r => r.success).length,
-      results: batchResult.results
+      results: batchResult.results,
+      // Include updated tasks list so client can refresh without additional request
+      updatedTasks: updatedTasks.slice(0, 10) // Limit to first 10 for performance
     });
   } catch (error) {
     console.error('Error executing enrichment:', error);

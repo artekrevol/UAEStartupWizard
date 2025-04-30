@@ -121,13 +121,28 @@ export default function EnrichmentWorkflow() {
       const response = await apiRequest('POST', '/api/ai-pm/execute-enrichment', data);
       return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/ai-pm/enrichment-tasks'] });
+    onSuccess: (data) => {
+      // If server returned updated tasks, immediately update the cache to avoid needing a refetch
+      if (data && data.updatedTasks) {
+        // Update the cache with the new tasks list
+        queryClient.setQueryData(['/api/ai-pm/enrichment-tasks'], { 
+          tasks: data.updatedTasks 
+        });
+        
+        // Clear selected tasks as they've been processed
+        setSelectedTasks([]);
+      } else {
+        // Fall back to invalidating the cache for a refetch
+        queryClient.invalidateQueries({ queryKey: ['/api/ai-pm/enrichment-tasks'] });
+      }
+      
+      // Always update metrics and logs
       queryClient.invalidateQueries({ queryKey: ['/api/ai-pm/enrichment-performance'] });
       queryClient.invalidateQueries({ queryKey: ['/api/ai-pm/logs'] });
+      
       toast({
         title: "Enrichment complete",
-        description: "Selected tasks have been processed successfully",
+        description: `${data.successfulTasks} of ${data.completedTasks} tasks processed successfully`,
       });
     },
     onError: (error) => {
@@ -146,9 +161,13 @@ export default function EnrichmentWorkflow() {
       return response.json();
     },
     onSuccess: (data: { completedTasks: number, successfulTasks: number }) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/ai-pm/enrichment-tasks'] });
+      // Always refresh tasks list after a workflow run
+      refetchTasks();
+      
+      // Update other data
       queryClient.invalidateQueries({ queryKey: ['/api/ai-pm/enrichment-performance'] });
       queryClient.invalidateQueries({ queryKey: ['/api/ai-pm/logs'] });
+      
       toast({
         title: "Workflow complete",
         description: `Processed ${data.completedTasks} tasks with ${data.successfulTasks} successful completions`,
