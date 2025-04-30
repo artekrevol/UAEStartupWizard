@@ -550,64 +550,73 @@ router.post('/create-tasks-from-audit', async (req, res) => {
     for (const auditResult of auditResults) {
       const { freeZoneId, freeZoneName, result } = auditResult;
       
-      if (!result || !result.missingFields) {
+      if (!result || !result.existingData || !result.existingData.fieldsMissing) {
         console.log(`[AI-PM] Skipping ${freeZoneName} - no valid audit result or missing fields`);
         continue;
       }
       
+      // Missing fields from the audit result
+      const missingFields = result.existingData.fieldsMissing;
+      
       // Filter fields based on selection if provided
       const fieldsToProcess = selectedFields && selectedFields.length > 0
-        ? result.missingFields.filter(field => selectedFields.includes(field.name))
-        : result.missingFields;
+        ? missingFields.filter(field => 
+            selectedFields.some(sf => 
+              sf.freeZoneId === freeZoneId && sf.field === field
+            )
+          )
+        : missingFields;
       
       console.log(`[AI-PM] Processing ${fieldsToProcess.length} fields for ${freeZoneName}`);
       
+      // Table reference - we need to use a proper table reference for Drizzle
+      // We'll use plain SQL queries since this is a dynamic table
+      
       // Create analysis records for each field
-      for (const field of fieldsToProcess) {
+      for (const fieldName of fieldsToProcess) {
         try {
-          // Check if analysis already exists
-          const existingAnalysis = await db.select()
-            .from(sql.raw('analysis_records'))
-            .where(sql.raw('free_zone_id = ? AND field = ?', [freeZoneId, field.name]))
-            .limit(1);
+          // Check if analysis already exists using a raw SQL query
+          const existingAnalysis = await db.execute(
+            sql`SELECT * FROM analysis_records 
+                WHERE free_zone_id = ${freeZoneId} AND field = ${fieldName} 
+                LIMIT 1`
+          );
             
+          // The result will be an array, so we check if there are any results
           if (existingAnalysis && existingAnalysis.length > 0) {
-            // Update existing analysis
-            await db.update(sql.raw('analysis_records'))
-              .set({
-                status: 'missing',
-                confidence: field.confidence || 0.8,
-                last_analyzed: new Date().toISOString(),
-                recommendations: JSON.stringify(field.recommendations || [])
-              })
-              .where(sql.raw('free_zone_id = ? AND field = ?', [freeZoneId, field.name]));
+            // Update existing analysis with raw SQL
+            await db.execute(
+              sql`UPDATE analysis_records 
+                  SET status = 'missing', 
+                      confidence = ${0.8}, 
+                      last_analyzed = ${new Date().toISOString()}, 
+                      recommendations = ${JSON.stringify([])} 
+                  WHERE free_zone_id = ${freeZoneId} AND field = ${fieldName}`
+            );
               
-            console.log(`[AI-PM] Updated analysis for ${freeZoneName} - ${field.name}`);
+            console.log(`[AI-PM] Updated analysis for ${freeZoneName} - ${fieldName}`);
           } else {
-            // Create new analysis
-            await db.insert(sql.raw('analysis_records'))
-              .values({
-                free_zone_id: freeZoneId,
-                field: field.name,
-                status: 'missing',
-                confidence: field.confidence || 0.8,
-                last_analyzed: new Date().toISOString(),
-                recommendations: JSON.stringify(field.recommendations || [])
-              });
+            // Create new analysis with raw SQL
+            await db.execute(
+              sql`INSERT INTO analysis_records 
+                  (free_zone_id, field, status, confidence, last_analyzed, recommendations) 
+                  VALUES (${freeZoneId}, ${fieldName}, 'missing', ${0.8}, 
+                          ${new Date().toISOString()}, ${JSON.stringify([])})`
+            );
               
-            console.log(`[AI-PM] Created analysis for ${freeZoneName} - ${field.name}`);
+            console.log(`[AI-PM] Created analysis for ${freeZoneName} - ${fieldName}`);
           }
           
           // Add to created tasks list
           createdTasks.push({
             freeZoneId,
             freeZoneName,
-            field: field.name,
+            field: fieldName,
             status: 'missing',
-            confidence: field.confidence || 0.8
+            confidence: 0.8
           });
         } catch (error) {
-          console.error(`[AI-PM] Error creating task for ${freeZoneName} - ${field.name}:`, error);
+          console.error(`[AI-PM] Error creating task for ${freeZoneName} - ${fieldName}:`, error);
         }
       }
     }

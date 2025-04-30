@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -6,7 +6,23 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { CheckIcon, RefreshCw, DownloadIcon, BookOpenIcon, AlertTriangleIcon, PlayIcon, PauseIcon } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
+import { 
+  CheckIcon, 
+  RefreshCw, 
+  DownloadIcon, 
+  BookOpenIcon, 
+  AlertTriangleIcon, 
+  PlayIcon, 
+  PauseIcon,
+  DatabaseIcon,
+  ListIcon,
+  Globe,
+  ArrowDownToLine,
+  Sparkles
+} from "lucide-react";
+import axios from "axios";
 import { apiRequest } from "@/lib/queryClient";
 import { toast } from "@/hooks/use-toast";
 
@@ -46,6 +62,63 @@ interface EnrichmentMetrics {
   recommendations: string[];
 }
 
+interface DeepAuditResult {
+  freeZoneId: number;
+  freeZoneName: string;
+  existingData: {
+    documents: number;
+    documentsByCategory: { [key: string]: number };
+    fieldsPresent: string[];
+    fieldsIncomplete: string[];
+    fieldsMissing: string[];
+    fieldsWithDocs: { [key: string]: number };
+    completenessScore: number;
+  };
+  liveWebsiteData: {
+    url: string;
+    fieldsFound: string[];
+    contentSummary: { [key: string]: string };
+    screenshotPath?: string;
+  };
+  delta: {
+    fieldsPresentInBoth: string[];
+    fieldsOnlyInDatabase: string[];
+    fieldsOnlyOnWebsite: string[];
+    inconsistentFields: { 
+      field: string;
+      databaseContent: string;
+      websiteContent: string;
+      confidenceScore: number;
+    }[];
+  };
+  scraperUpdate: {
+    scraperRun: boolean;
+    scraperSuccess: boolean;
+    fieldsImproved: string[];
+    fieldsStillMissing: string[];
+    newCompleteness: number;
+    scrapedContentSummary?: { [key: string]: string };
+  };
+  recommendations: {
+    priority: 'high' | 'medium' | 'low';
+    action: string;
+    field?: string;
+    details: string;
+  }[];
+  timestamp: string;
+}
+
+interface DeepAuditAllResult {
+  success: boolean;
+  auditResults: {
+    freeZoneId: number;
+    freeZoneName: string;
+    result: DeepAuditResult;
+    error?: string;
+  }[];
+  timestamp: string;
+}
+
 // Helper functions
 const formatPriority = (priority: number) => {
   if (priority > 12) return "Critical";
@@ -67,6 +140,12 @@ export default function EnrichmentWorkflow() {
   const [selectedTasks, setSelectedTasks] = useState<EnrichmentTask[]>([]);
   const [autoMode, setAutoMode] = useState(false);
   const [autoInterval, setAutoInterval] = useState<NodeJS.Timeout | null>(null);
+  
+  // Deep Audit state
+  const [isRunningDeepAudit, setIsRunningDeepAudit] = useState(false);
+  const [deepAuditAllResults, setDeepAuditAllResults] = useState<DeepAuditAllResult | null>(null);
+  const [selectedAuditResults, setSelectedAuditResults] = useState<{freeZoneId: number, fields: string[]}[]>([]);
+  const [isCreatingTasks, setIsCreatingTasks] = useState(false);
 
   // Define response types for the API
   interface EnrichmentTasksResponse {
@@ -247,14 +326,139 @@ export default function EnrichmentWorkflow() {
     }
   };
 
+  // Deep Audit functions
+  const runDeepAuditAllFreeZones = async () => {
+    setIsRunningDeepAudit(true);
+    setDeepAuditAllResults(null);
+    
+    try {
+      const response = await axios.post('/api/ai-pm/deep-audit-all');
+      const results = response.data;
+      
+      setDeepAuditAllResults(results);
+      
+      toast({
+        title: "Deep Audit Complete",
+        description: `Successfully audited ${results.auditResults.length} free zones.`,
+      });
+    } catch (error) {
+      console.error('Error running deep audit for all free zones:', error);
+      toast({
+        title: "Deep Audit Failed",
+        description: "An error occurred while running the deep audit. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsRunningDeepAudit(false);
+    }
+  };
+  
+  // Toggle a field selection for a free zone
+  const toggleFieldSelection = (freeZoneId: number, field: string) => {
+    const existingFreeZone = selectedAuditResults.find(item => item.freeZoneId === freeZoneId);
+    
+    if (existingFreeZone) {
+      // Free zone already exists in selection
+      if (existingFreeZone.fields.includes(field)) {
+        // Remove field if already selected
+        setSelectedAuditResults(prevResults => 
+          prevResults.map(item => 
+            item.freeZoneId === freeZoneId
+              ? { ...item, fields: item.fields.filter(f => f !== field) }
+              : item
+          ).filter(item => item.fields.length > 0) // Remove free zone if no fields selected
+        );
+      } else {
+        // Add field to existing free zone
+        setSelectedAuditResults(prevResults => 
+          prevResults.map(item => 
+            item.freeZoneId === freeZoneId
+              ? { ...item, fields: [...item.fields, field] }
+              : item
+          )
+        );
+      }
+    } else {
+      // Add new free zone with field
+      setSelectedAuditResults(prevResults => 
+        [...prevResults, { freeZoneId, fields: [field] }]
+      );
+    }
+  };
+  
+  // Create tasks from selected audit results
+  const createTasksFromAudit = async () => {
+    if (selectedAuditResults.length === 0) {
+      toast({
+        title: "No Fields Selected",
+        description: "Please select at least one field to create tasks.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsCreatingTasks(true);
+    
+    try {
+      // Prepare the data based on our selection and deep audit results
+      const selectedFields = selectedAuditResults.flatMap(item => 
+        item.fields.map(field => ({ freeZoneId: item.freeZoneId, field }))
+      );
+      
+      // Use the audit results to create tasks
+      const response = await axios.post('/api/ai-pm/create-tasks-from-audit', {
+        auditResults: deepAuditAllResults?.auditResults || [],
+        selectedFields: selectedFields
+      });
+      
+      const result = response.data;
+      
+      if (result.success) {
+        // Refresh tasks list
+        refetchTasks();
+        
+        // Reset selections
+        setSelectedAuditResults([]);
+        
+        toast({
+          title: "Tasks Created",
+          description: `Successfully created ${result.createdTasks.length} tasks from audit results.`,
+        });
+      } else {
+        toast({
+          title: "Error Creating Tasks",
+          description: result.message || "Failed to create tasks from audit results.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Error creating tasks from audit:', error);
+      toast({
+        title: "Error Creating Tasks",
+        description: "An error occurred while creating tasks. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsCreatingTasks(false);
+    }
+  };
+  
+  // Format field name for display
+  const formatFieldName = (field: string) => {
+    return field
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
   // Clean up interval on component unmount
-  useState(() => {
+  useEffect(() => {
     return () => {
       if (autoInterval) {
         clearInterval(autoInterval);
       }
     };
-  });
+  }, [autoInterval]);
 
   return (
     <div className="space-y-6">
@@ -449,6 +653,176 @@ export default function EnrichmentWorkflow() {
           </Card>
         </TabsContent>
 
+        {/* Deep Audit Tab */}
+        <TabsContent value="deepAudit" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Deep Audit All Free Zones</CardTitle>
+              <CardDescription>
+                Run a comprehensive audit of all free zones to compare database information with official websites.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {!deepAuditAllResults ? (
+                <div className="text-center py-8">
+                  {isRunningDeepAudit ? (
+                    <div className="space-y-4">
+                      <div className="w-12 h-12 rounded-full border-4 border-primary border-t-transparent animate-spin mx-auto" />
+                      <p className="text-muted-foreground">Running deep audit on all free zones. This may take several minutes...</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <DatabaseIcon className="h-16 w-16 mx-auto text-muted-foreground" />
+                      <div className="max-w-md mx-auto">
+                        <p className="mb-4">Run a deep audit to compare database information with the official websites and identify gaps or inconsistencies across all free zones.</p>
+                        <Button 
+                          onClick={runDeepAuditAllFreeZones} 
+                          disabled={isRunningDeepAudit}
+                          className="mx-auto"
+                        >
+                          <DatabaseIcon className="mr-2 h-4 w-4" />
+                          Run Deep Audit on All Free Zones
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h3 className="text-lg font-medium">
+                        Audit Results
+                        <span className="ml-2 text-sm text-muted-foreground">
+                          {new Date(deepAuditAllResults.timestamp).toLocaleString()}
+                        </span>
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        Processed {deepAuditAllResults.auditResults.length} free zones
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        variant="outline" 
+                        onClick={runDeepAuditAllFreeZones}
+                        disabled={isRunningDeepAudit}
+                      >
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        Refresh Audit
+                      </Button>
+                      <Button
+                        onClick={createTasksFromAudit}
+                        disabled={selectedAuditResults.length === 0 || isCreatingTasks}
+                      >
+                        {isCreatingTasks ? (
+                          <>
+                            <div className="mr-2 h-4 w-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                            Creating Tasks...
+                          </>
+                        ) : (
+                          <>
+                            <ArrowDownToLine className="mr-2 h-4 w-4" />
+                            Create Tasks from Selected Fields
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <div className="border rounded-md divide-y">
+                    <div className="grid grid-cols-12 p-3 font-medium bg-muted/50">
+                      <div className="col-span-3">Free Zone</div>
+                      <div className="col-span-2">Completeness</div>
+                      <div className="col-span-7">Missing Fields</div>
+                    </div>
+                    
+                    {deepAuditAllResults.auditResults.map((auditResult) => {
+                      // Find missing fields
+                      const missingFields = auditResult.result?.existingData?.fieldsMissing || [];
+                      
+                      const isSelected = (field: string) => {
+                        const selectedFreeZone = selectedAuditResults.find(
+                          item => item.freeZoneId === auditResult.freeZoneId
+                        );
+                        return selectedFreeZone ? selectedFreeZone.fields.includes(field) : false;
+                      };
+                      
+                      return (
+                        <div key={auditResult.freeZoneId} className="grid grid-cols-12 p-3">
+                          <div className="col-span-3">
+                            <span className="font-medium">{auditResult.freeZoneName}</span>
+                          </div>
+                          <div className="col-span-2">
+                            {auditResult.error ? (
+                              <Badge variant="destructive">Error</Badge>
+                            ) : (
+                              <div className="flex items-center">
+                                <Progress value={auditResult.result.existingData.completenessScore * 100} className="w-16 h-2 mr-2" />
+                                <span>{Math.round(auditResult.result.existingData.completenessScore * 100)}%</span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="col-span-7">
+                            {auditResult.error ? (
+                              <span className="text-red-500 text-sm">{auditResult.error}</span>
+                            ) : missingFields.length > 0 ? (
+                              <div className="flex flex-wrap gap-2">
+                                {missingFields.map((field) => (
+                                  <Badge
+                                    key={field}
+                                    variant={isSelected(field) ? "default" : "outline"}
+                                    className="cursor-pointer"
+                                    onClick={() => toggleFieldSelection(auditResult.freeZoneId, field)}
+                                  >
+                                    {isSelected(field) && <CheckIcon className="mr-1 h-3 w-3" />}
+                                    {formatFieldName(field)}
+                                  </Badge>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-green-500">No missing fields</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  
+                  {selectedAuditResults.length > 0 && (
+                    <div className="bg-muted/30 p-4 rounded-md">
+                      <h4 className="font-medium mb-2">Selected Fields ({selectedAuditResults.reduce((sum, item) => sum + item.fields.length, 0)})</h4>
+                      <div className="space-y-2">
+                        {selectedAuditResults.map((item) => {
+                          const freeZone = deepAuditAllResults.auditResults.find(
+                            result => result.freeZoneId === item.freeZoneId
+                          );
+                          
+                          return (
+                            <div key={item.freeZoneId} className="flex flex-wrap items-center gap-2">
+                              <span className="font-medium mr-2">{freeZone?.freeZoneName}:</span>
+                              {item.fields.map((field) => (
+                                <Badge
+                                  key={field}
+                                  variant="default"
+                                  className="cursor-pointer flex items-center"
+                                  onClick={() => toggleFieldSelection(item.freeZoneId, field)}
+                                >
+                                  {formatFieldName(field)}
+                                  <span className="ml-1 text-xs">×</span>
+                                </Badge>
+                              ))}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
         {/* Metrics Tab */}
         <TabsContent value="metrics" className="space-y-4">
           <Card>
