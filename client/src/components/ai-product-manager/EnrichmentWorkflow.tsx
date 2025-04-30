@@ -68,22 +68,49 @@ export default function EnrichmentWorkflow() {
   const [autoMode, setAutoMode] = useState(false);
   const [autoInterval, setAutoInterval] = useState<NodeJS.Timeout | null>(null);
 
+  // Define response types for the API
+  interface EnrichmentTasksResponse {
+    tasks: EnrichmentTask[];
+  }
+
+  interface EnrichmentMetricsResponse {
+    totalEnrichments: number;
+    successRate: number;
+    avgContentLength: number;
+    timeStats: {
+      lastHour: number;
+      last24Hours: number;
+      lastWeek: number;
+    };
+    mostEnrichedFields: string[];
+    mostEnrichedFreeZones: string[];
+    recommendations: string[];
+  }
+
   // Fetch tasks
   const { 
-    data: tasks, 
+    data: tasks = { tasks: [] } as EnrichmentTasksResponse, 
     isLoading: isLoadingTasks,
     refetch: refetchTasks 
-  } = useQuery({ 
+  } = useQuery<EnrichmentTasksResponse>({ 
     queryKey: ['/api/ai-pm/enrichment-tasks'],
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
   // Fetch metrics
   const { 
-    data: metrics, 
+    data: metrics = {
+      totalEnrichments: 0,
+      successRate: 0,
+      avgContentLength: 0,
+      timeStats: { lastHour: 0, last24Hours: 0, lastWeek: 0 },
+      mostEnrichedFields: [],
+      mostEnrichedFreeZones: [],
+      recommendations: []
+    } as EnrichmentMetricsResponse, 
     isLoading: isLoadingMetrics,
     refetch: refetchMetrics 
-  } = useQuery({ 
+  } = useQuery<EnrichmentMetricsResponse>({ 
     queryKey: ['/api/ai-pm/enrichment-performance'],
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
