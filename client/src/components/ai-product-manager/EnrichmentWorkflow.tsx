@@ -91,10 +91,8 @@ export default function EnrichmentWorkflow() {
   // Execute enrichment mutation
   const executeEnrichmentMutation = useMutation({
     mutationFn: async (data: { tasks: EnrichmentTask[], batchSize: number }) => {
-      return apiRequest('/api/ai-pm/execute-enrichment', {
-        method: 'POST',
-        body: JSON.stringify(data)
-      });
+      const response = await apiRequest('POST', '/api/ai-pm/execute-enrichment', data);
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/ai-pm/enrichment-tasks'] });
@@ -117,12 +115,10 @@ export default function EnrichmentWorkflow() {
   // Run workflow mutation
   const runWorkflowMutation = useMutation({
     mutationFn: async (data: { batchSize: number }) => {
-      return apiRequest('/api/ai-pm/run-enrichment-workflow', {
-        method: 'POST',
-        body: JSON.stringify(data)
-      });
+      const response = await apiRequest('POST', '/api/ai-pm/run-enrichment-workflow', data);
+      return response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: (data: { completedTasks: number, successfulTasks: number }) => {
       queryClient.invalidateQueries({ queryKey: ['/api/ai-pm/enrichment-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['/api/ai-pm/enrichment-performance'] });
       queryClient.invalidateQueries({ queryKey: ['/api/ai-pm/logs'] });
