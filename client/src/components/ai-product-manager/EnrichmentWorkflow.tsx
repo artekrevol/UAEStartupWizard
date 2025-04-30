@@ -781,22 +781,20 @@ export default function EnrichmentWorkflow() {
                             {auditResult.error ? (
                               <span className="text-red-500 text-sm">{auditResult.error}</span>
                             ) : missingFields.length > 0 ? (
-                              <div className="flex flex-wrap gap-2">
+                              <div className="grid grid-cols-3 gap-2">
                                 {missingFields.map((field) => (
-                                  <div 
-                                    key={field}
-                                    className={`p-2 text-sm rounded-md cursor-pointer border ${
-                                      isSelected(field) 
-                                        ? 'bg-primary text-primary-foreground border-primary' 
-                                        : 'bg-background hover:bg-muted border-muted-foreground'
-                                    }`}
-                                    onClick={() => toggleFieldSelection(auditResult.freeZoneId, field)}
+                                  <label 
+                                    key={field} 
+                                    className="flex items-center gap-2 p-2 rounded border hover:bg-muted cursor-pointer"
                                   >
-                                    <div className="flex items-center">
-                                      {isSelected(field) && <CheckIcon className="mr-1 h-3 w-3" />}
-                                      <span>{formatFieldName(field)}</span>
-                                    </div>
-                                  </div>
+                                    <input 
+                                      type="checkbox" 
+                                      checked={isSelected(field)}
+                                      onChange={() => toggleFieldSelection(auditResult.freeZoneId, field)}
+                                      className="h-4 w-4"
+                                    />
+                                    <span>{formatFieldName(field)}</span>
+                                  </label>
                                 ))}
                               </div>
                             ) : (
