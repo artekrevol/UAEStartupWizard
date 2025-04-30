@@ -6,6 +6,9 @@
  */
 
 import express from 'express';
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
+import { freeZones } from '../../shared/schema';
 import { 
   analyzeFreeZoneData, 
   analyzeAllFreeZones, 
@@ -399,6 +402,64 @@ router.post('/deep-audit/:freeZoneId', async (req, res) => {
   }
 });
 
+// Run deep audit for all free zones
+router.post('/deep-audit-all', async (req, res) => {
+  try {
+    console.log('[Deep-Audit] Running deep audit for all free zones');
+    
+    // Get all free zones from database
+    const freeZonesResult = await db.select().from(freeZones);
+    
+    if (!freeZonesResult || freeZonesResult.length === 0) {
+      return res.status(404).json({ error: 'No free zones found' });
+    }
+    
+    // Map to store all audit results
+    const allResults = [];
+    
+    // Process each free zone sequentially to avoid rate limiting
+    for (const zone of freeZonesResult) {
+      try {
+        console.log(`[Deep-Audit] Auditing free zone: ${zone.name} (ID: ${zone.id})`);
+        const auditResult = await runDeepAudit(zone.id);
+        
+        // Add to results
+        allResults.push({
+          freeZoneId: zone.id,
+          freeZoneName: zone.name,
+          result: auditResult
+        });
+        
+        // Log result
+        console.log(`[Deep-Audit] Completed audit for ${zone.name}`);
+        
+        // Wait 2 seconds between requests to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      } catch (error) {
+        console.error(`[Deep-Audit] Error auditing ${zone.name}:`, error);
+        
+        // Continue with next free zone despite error
+        allResults.push({
+          freeZoneId: zone.id,
+          freeZoneName: zone.name,
+          error: String(error)
+        });
+      }
+    }
+    
+    console.log(`[Deep-Audit] All free zones audit complete. Processed ${allResults.length} zones`);
+    
+    res.json({
+      success: true,
+      auditResults: allResults,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error running deep audit for all free zones:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
 // Store the latest test result
 let latestTestResult = null;
 
@@ -468,6 +529,106 @@ router.get('/deep-audit/:freeZoneId/latest', async (req, res) => {
     res.json(auditResult);
   } catch (error) {
     console.error('Error getting latest deep audit:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
+// Create tasks from deep audit results
+router.post('/create-tasks-from-audit', async (req, res) => {
+  try {
+    const { auditResults, selectedFields } = req.body;
+    
+    if (!auditResults || !Array.isArray(auditResults) || auditResults.length === 0) {
+      return res.status(400).json({ error: 'Invalid or empty audit results' });
+    }
+    
+    console.log(`[AI-PM] Creating tasks from audit results for ${auditResults.length} free zones`);
+    
+    const createdTasks = [];
+    
+    // Process each free zone from the audit results
+    for (const auditResult of auditResults) {
+      const { freeZoneId, freeZoneName, result } = auditResult;
+      
+      if (!result || !result.missingFields) {
+        console.log(`[AI-PM] Skipping ${freeZoneName} - no valid audit result or missing fields`);
+        continue;
+      }
+      
+      // Filter fields based on selection if provided
+      const fieldsToProcess = selectedFields && selectedFields.length > 0
+        ? result.missingFields.filter(field => selectedFields.includes(field.name))
+        : result.missingFields;
+      
+      console.log(`[AI-PM] Processing ${fieldsToProcess.length} fields for ${freeZoneName}`);
+      
+      // Create analysis records for each field
+      for (const field of fieldsToProcess) {
+        try {
+          // Check if analysis already exists
+          const existingAnalysis = await db.select()
+            .from(sql.raw('analysis_records'))
+            .where(sql.raw('free_zone_id = ? AND field = ?', [freeZoneId, field.name]))
+            .limit(1);
+            
+          if (existingAnalysis && existingAnalysis.length > 0) {
+            // Update existing analysis
+            await db.update(sql.raw('analysis_records'))
+              .set({
+                status: 'missing',
+                confidence: field.confidence || 0.8,
+                last_analyzed: new Date().toISOString(),
+                recommendations: JSON.stringify(field.recommendations || [])
+              })
+              .where(sql.raw('free_zone_id = ? AND field = ?', [freeZoneId, field.name]));
+              
+            console.log(`[AI-PM] Updated analysis for ${freeZoneName} - ${field.name}`);
+          } else {
+            // Create new analysis
+            await db.insert(sql.raw('analysis_records'))
+              .values({
+                free_zone_id: freeZoneId,
+                field: field.name,
+                status: 'missing',
+                confidence: field.confidence || 0.8,
+                last_analyzed: new Date().toISOString(),
+                recommendations: JSON.stringify(field.recommendations || [])
+              });
+              
+            console.log(`[AI-PM] Created analysis for ${freeZoneName} - ${field.name}`);
+          }
+          
+          // Add to created tasks list
+          createdTasks.push({
+            freeZoneId,
+            freeZoneName,
+            field: field.name,
+            status: 'missing',
+            confidence: field.confidence || 0.8
+          });
+        } catch (error) {
+          console.error(`[AI-PM] Error creating task for ${freeZoneName} - ${field.name}:`, error);
+        }
+      }
+    }
+    
+    // Log the activity
+    await logActivity(
+      'tasks-created-from-audit',
+      `Created ${createdTasks.length} tasks from deep audit results`,
+      { taskCount: createdTasks.length },
+      'enrichment-workflow',
+      'info'
+    );
+    
+    // Return the created tasks
+    res.json({
+      success: true,
+      createdTasks,
+      message: `Created ${createdTasks.length} tasks from deep audit results`
+    });
+  } catch (error) {
+    console.error('Error creating tasks from audit:', error);
     res.status(500).json({ error: String(error) });
   }
 });

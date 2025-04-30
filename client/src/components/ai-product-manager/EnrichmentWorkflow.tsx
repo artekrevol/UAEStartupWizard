@@ -293,9 +293,10 @@ export default function EnrichmentWorkflow() {
       </div>
 
       <Tabs defaultValue="tasks">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="tasks">Enrichment Tasks</TabsTrigger>
           <TabsTrigger value="workflow">Workflow Controls</TabsTrigger>
+          <TabsTrigger value="deepAudit">Deep Audit</TabsTrigger>
           <TabsTrigger value="metrics">Performance Metrics</TabsTrigger>
         </TabsList>
 
