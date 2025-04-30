@@ -8,7 +8,9 @@ import {
   Settings, 
   Building2,
   Map,
-  ShieldAlert
+  ShieldAlert,
+  Bot,
+  Database
 } from "lucide-react";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -90,15 +92,44 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               Settings
             </Button>
             
+            <Button 
+              variant={location === "/premium-assistant" ? "default" : "ghost"} 
+              className="w-full justify-start"
+              onClick={() => setLocation("/premium-assistant")}
+            >
+              <Bot className="mr-2 h-5 w-5" />
+              AI Assistant
+            </Button>
+            
             {isAdmin && (
-              <Button 
-                variant={location === "/admin" ? "default" : "ghost"} 
-                className="w-full justify-start"
-                onClick={() => setLocation("/admin")}
-              >
-                <ShieldAlert className="mr-2 h-5 w-5" />
-                Admin Panel
-              </Button>
+              <>
+                <Button 
+                  variant={location === "/admin" ? "default" : "ghost"} 
+                  className="w-full justify-start"
+                  onClick={() => setLocation("/admin")}
+                >
+                  <ShieldAlert className="mr-2 h-5 w-5" />
+                  Admin Panel
+                </Button>
+                
+                <Button 
+                  variant={location === "/ai-product-manager" ? "default" : "ghost"} 
+                  className="w-full justify-start"
+                  onClick={() => setLocation("/ai-product-manager")}
+                >
+                  <Database className="mr-2 h-5 w-5" />
+                  AI Product Manager
+                </Button>
+                
+                <Button 
+                  variant={location === "/enrichment-workflow" ? "default" : "ghost"} 
+                  className="w-full justify-start"
+                  onClick={() => setLocation("/enrichment-workflow")}
+                >
+                  <Bot className="mr-2 h-5 w-5" />
+                  Enrichment Tasks
+                </Button>
+              </>
             )}
           </nav>
         </aside>
