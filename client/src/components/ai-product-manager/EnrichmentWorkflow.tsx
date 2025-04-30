@@ -785,10 +785,10 @@ export default function EnrichmentWorkflow() {
                                 {missingFields.map((field) => (
                                   <div 
                                     key={field}
-                                    className={`px-3 py-1 text-sm rounded-md cursor-pointer transition-colors ${
+                                    className={`p-2 text-sm rounded-md cursor-pointer border ${
                                       isSelected(field) 
-                                        ? 'bg-primary text-primary-foreground' 
-                                        : 'bg-muted/50 hover:bg-muted'
+                                        ? 'bg-primary text-primary-foreground border-primary' 
+                                        : 'bg-background hover:bg-muted border-muted-foreground'
                                     }`}
                                     onClick={() => toggleFieldSelection(auditResult.freeZoneId, field)}
                                   >
