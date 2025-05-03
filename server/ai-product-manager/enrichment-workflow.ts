@@ -29,13 +29,70 @@ const FIELD_IMPORTANCE = {
 
 // Enrichment task interface
 interface EnrichmentTask {
+  id?: number;
   freeZoneId: number;
   freeZoneName: string;
   field: string;
-  status: 'missing' | 'incomplete';
+  status: 'missing' | 'incomplete' | 'complete';
   confidence: number;
   importance: number;
   priority: number; // Calculated priority score
+  createdAt?: Date;
+  updatedAt?: Date;
+  completedAt?: Date | null;
+  result?: any;
+}
+
+/**
+ * Get tasks from the database based on the enrichment_tasks table
+ */
+export async function getEnrichmentTasksFromDB(): Promise<EnrichmentTask[]> {
+  try {
+    const tasksResult = await db.execute(sql`
+      SELECT id, free_zone_id, free_zone_name, field, priority, status, created_at, updated_at, completed_at, result
+      FROM enrichment_tasks
+      ORDER BY priority DESC, created_at ASC
+    `);
+    
+    // Convert DB results to EnrichmentTask format
+    return tasksResult.rows.map((task: any) => {
+      // Determine the status based on the database value
+      let status: 'missing' | 'incomplete' | 'complete';
+      if (task.status === 'completed') {
+        status = 'complete';
+      } else if (task.status === 'pending') {
+        status = 'missing';
+      } else {
+        status = 'incomplete';
+      }
+      
+      return {
+        id: task.id,
+        freeZoneId: task.free_zone_id,
+        freeZoneName: task.free_zone_name,
+        field: task.field,
+        status,
+        confidence: 0.5, // Default value since the DB might not have this
+        importance: task.priority, // Use priority as importance
+        priority: task.priority, // Use priority directly from the DB
+        createdAt: task.created_at,
+        updatedAt: task.updated_at,
+        completedAt: task.completed_at,
+        result: task.result
+      };
+    });
+  } catch (error) {
+    console.error(`Error fetching enrichment tasks from database: ${error}`);
+    await logActivity(
+      'task-fetch-error',
+      `Error fetching enrichment tasks: ${(error as Error).message}`,
+      { error: (error as Error).message },
+      'ai-product-manager',
+      'error'
+    );
+    
+    return [];
+  }
 }
 
 /**
@@ -43,6 +100,18 @@ interface EnrichmentTask {
  */
 export async function generateEnrichmentTasks(): Promise<EnrichmentTask[]> {
   try {
+    // First, check if there are existing tasks in the database
+    const existingTasks = await getEnrichmentTasksFromDB();
+    
+    // If we have tasks in the database, return them
+    if (existingTasks.length > 0) {
+      console.log(`[AI-PM] Found ${existingTasks.length} existing tasks in database`);
+      return existingTasks;
+    }
+    
+    // If no tasks in DB, generate new ones
+    console.log('[AI-PM] No existing tasks found, generating from analysis');
+    
     // Log the task generation start
     await logActivity(
       'enrichment-task-generation-start',
