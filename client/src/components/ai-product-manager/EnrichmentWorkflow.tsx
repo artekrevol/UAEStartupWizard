@@ -559,6 +559,56 @@ export default function EnrichmentWorkflow() {
     }
   };
   
+  // Select all fields for a specific free zone
+  const selectAllFieldsForFreeZone = (freeZoneId: number) => {
+    if (!deepAuditAllResults) return;
+    
+    const auditResult = deepAuditAllResults.auditResults.find(result => result.freeZoneId === freeZoneId);
+    if (!auditResult || auditResult.error) return;
+    
+    const missingFields = auditResult.result?.existingData?.fieldsMissing || [];
+    if (missingFields.length === 0) return;
+    
+    // Check if this free zone is already in the selection
+    const existingFreeZone = selectedAuditResults.find(item => item.freeZoneId === freeZoneId);
+    
+    if (existingFreeZone) {
+      // Update the existing entry to include all missing fields
+      setSelectedAuditResults(prevResults => 
+        prevResults.map(item => 
+          item.freeZoneId === freeZoneId
+            ? { ...item, fields: missingFields }
+            : item
+        )
+      );
+    } else {
+      // Add a new entry with all missing fields
+      setSelectedAuditResults(prevResults => 
+        [...prevResults, { freeZoneId, fields: missingFields }]
+      );
+    }
+    
+    toast({
+      title: "Free Zone Fields Selected",
+      description: `Selected ${missingFields.length} fields for ${auditResult.freeZoneName}.`
+    });
+  };
+  
+  // Deselect all fields for a specific free zone
+  const deselectAllFieldsForFreeZone = (freeZoneId: number) => {
+    // Remove the free zone from selection completely
+    setSelectedAuditResults(prevResults => 
+      prevResults.filter(item => item.freeZoneId !== freeZoneId)
+    );
+    
+    const freeZoneName = deepAuditAllResults?.auditResults.find(r => r.freeZoneId === freeZoneId)?.freeZoneName || "Free Zone";
+    
+    toast({
+      title: "Fields Deselected",
+      description: `Deselected all fields for ${freeZoneName}.`
+    });
+  };
+  
   // Create tasks from selected audit results
   const createTasksFromAudit = async () => {
     if (selectedAuditResults.length === 0) {
@@ -968,8 +1018,30 @@ export default function EnrichmentWorkflow() {
                       
                       return (
                         <div key={auditResult.freeZoneId} className="grid grid-cols-12 p-3">
-                          <div className="col-span-3">
+                          <div className="col-span-3 flex items-center gap-2">
                             <span className="font-medium">{auditResult.freeZoneName}</span>
+                            {!auditResult.error && missingFields.length > 0 && (
+                              <div className="flex gap-1">
+                                <button 
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    selectAllFieldsForFreeZone(auditResult.freeZoneId);
+                                  }}
+                                  className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                                >
+                                  Select All
+                                </button>
+                                <button 
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    deselectAllFieldsForFreeZone(auditResult.freeZoneId);
+                                  }}
+                                  className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                                >
+                                  Clear
+                                </button>
+                              </div>
+                            )}
                           </div>
                           <div className="col-span-2">
                             {auditResult.error ? (
