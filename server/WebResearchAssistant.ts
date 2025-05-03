@@ -531,20 +531,28 @@ function formatLicenseTypes(licenseTypes: unknown): any[] {
 /**
  * Format facilities list for better readability
  */
-function formatFacilitiesList(facilities: string | null): string[] {
+function formatFacilitiesList(facilities: unknown): string[] {
   if (!facilities) return [];
   
+  // Handle different input types
+  if (Array.isArray(facilities)) {
+    return facilities.map(item => String(item)).filter(Boolean);
+  }
+  
+  const facilitiesString = String(facilities);
+  
   // Handle JSON format
-  if (facilities.startsWith('[')) {
+  if (facilitiesString.startsWith('[')) {
     try {
-      return JSON.parse(facilities);
+      const parsed = JSON.parse(facilitiesString);
+      return Array.isArray(parsed) ? parsed.map(item => String(item)) : [];
     } catch (e) {
       // Fall through to text processing if JSON parsing fails
     }
   }
   
   // Process as text with bullet points or numbering
-  return facilities
+  return facilitiesString
     .split(/\n|•|\*|\d+\.|✓|✔|→|-/)
     .map(item => item.trim())
     .filter(item => item.length > 0);
@@ -591,7 +599,8 @@ function extractFreeZoneNames(query: string): string[] {
     }
   }
   
-  return [...new Set(foundZones)]; // Remove duplicates
+  // Remove duplicates using filter instead of Set for better compatibility
+  return foundZones.filter((value, index, self) => self.indexOf(value) === index);
 }
 
 /**
@@ -657,7 +666,7 @@ async function getFreeZoneDetailedInfo(freeZoneId: number): Promise<any> {
     // Process each row to build category counts
     const docCategories: Record<string, number> = {};
     for (const row of documentRows) {
-      if (row.category && row.count) {
+      if (row.category && typeof row.category === 'string' && row.count) {
         docCategories[row.category] = Number(row.count);
       }
     }
@@ -679,7 +688,7 @@ async function getFreeZoneDetailedInfo(freeZoneId: number): Promise<any> {
       licenseTypes: formatLicenseTypes(freeZone.licenseTypes),
       visaInformation: "", // Visa information not in schema, using empty string
       facilities: formatFacilitiesList(freeZone.facilities),
-      documentCategories: docCategories,
+      documentCategories: docCategories as Record<string, number>,
       totalDocuments: Object.values(docCategories).reduce((a, b) => a + b, 0),
       lastUpdated: freeZone.lastUpdated || new Date(),
       completenessScore: calculateCompletenessScore(freeZone)
