@@ -7,9 +7,9 @@ import fs from "fs";
 import { exec } from "child_process";
 
 const app = express();
-// Increase payload size limit to 50MB for handling large audit results
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: false, limit: '50mb' }));
+// Increase payload size limit to 100MB for handling large audit results
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ extended: false, limit: '100mb' }));
 
 // Add logging middleware
 app.use((req, res, next) => {
