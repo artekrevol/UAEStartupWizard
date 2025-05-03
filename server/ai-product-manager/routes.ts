@@ -671,10 +671,9 @@ router.post('/create-tasks-from-audit', async (req, res) => {
           await db.execute(
             `INSERT INTO enrichment_tasks 
             (free_zone_id, free_zone_name, field, priority, status, created_at) 
-            VALUES ($1, $2, $3, $4, $5, $6)
+            VALUES (${freeZoneId}, '${freeZoneName}', '${fieldName}', ${priority}, 'pending', '${new Date().toISOString()}')
             ON CONFLICT (free_zone_id, field) DO UPDATE
-            SET status = 'pending', priority = $4, updated_at = NOW()`,
-            [freeZoneId, freeZoneName, fieldName, priority, 'pending', new Date().toISOString()]
+            SET status = 'pending', priority = ${priority}, updated_at = NOW()`
           );
           
           // Add to created tasks list
