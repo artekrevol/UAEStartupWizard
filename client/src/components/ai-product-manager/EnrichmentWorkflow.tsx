@@ -21,7 +21,8 @@ import {
   ListIcon,
   Globe,
   ArrowDownToLine,
-  Sparkles
+  Sparkles,
+  XIcon
 } from "lucide-react";
 import axios from "axios";
 import { apiRequest } from "@/lib/queryClient";
@@ -300,7 +301,29 @@ export default function EnrichmentWorkflow() {
     
     toast({
       title: "Tasks Deselected",
-      description: `Deselected all tasks for ${freeZoneName}.`
+    });
+  };
+  
+  // Select ALL tasks across all free zones
+  const selectAllTasks = () => {
+    if (!tasks?.tasks) return;
+    
+    // Set selected tasks to all available tasks
+    setSelectedTasks([...tasks.tasks]);
+    
+    toast({
+      title: "All Tasks Selected",
+      description: `Selected ${tasks.tasks.length} tasks across all free zones.`
+    });
+  };
+  
+  // Clear all task selections
+  const clearAllTaskSelections = () => {
+    setSelectedTasks([]);
+    
+    toast({
+      title: "All Selections Cleared",
+      description: "Deselected all tasks."
     });
   };
 
@@ -799,6 +822,27 @@ export default function EnrichmentWorkflow() {
                 </div>
               ) : tasks?.tasks && tasks.tasks.length > 0 ? (
                 <div className="space-y-4">
+                  {/* Global Select All / Clear All controls */}
+                  <div className="flex justify-end gap-2 mb-2">
+                    <Button 
+                      onClick={selectAllTasks}
+                      variant="outline"
+                      size="sm"
+                      className="text-xs px-3 py-1"
+                    >
+                      <CheckIcon className="mr-1 h-3 w-3" />
+                      Select All Tasks
+                    </Button>
+                    <Button 
+                      onClick={clearAllTaskSelections}
+                      variant="outline"
+                      size="sm"
+                      className="text-xs px-3 py-1"
+                    >
+                      <XIcon className="mr-1 h-3 w-3" />
+                      Clear All
+                    </Button>
+                  </div>
                   <div className="border rounded-md divide-y">
                     <div className="grid grid-cols-12 p-3 font-medium bg-muted/50">
                       <div className="col-span-1">Select</div>
