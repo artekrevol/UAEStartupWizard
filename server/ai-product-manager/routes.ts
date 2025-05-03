@@ -330,6 +330,7 @@ router.get('/enrichment-performance', async (req, res) => {
     const successfulTasks = enrichmentLogs.filter(log => 
       log.metadata && 
       typeof log.metadata === 'object' && 
+      'success' in log.metadata && 
       log.metadata.success === true
     ).length;
     
@@ -337,9 +338,9 @@ router.get('/enrichment-performance', async (req, res) => {
     const totalEnrichments = enrichmentLogs.length;
     
     // Find the most enriched fields
-    const fieldCounts = {};
+    const fieldCounts: Record<string, number> = {};
     enrichmentLogs.forEach(log => {
-      if (log.metadata && typeof log.metadata === 'object' && log.metadata.field) {
+      if (log.metadata && typeof log.metadata === 'object' && 'field' in log.metadata && log.metadata.field) {
         const field = String(log.metadata.field);
         fieldCounts[field] = (fieldCounts[field] || 0) + 1;
       }
@@ -352,9 +353,9 @@ router.get('/enrichment-performance', async (req, res) => {
       .map(([field]) => field);
     
     // Find the most enriched free zones
-    const freeZoneCounts = {};
+    const freeZoneCounts: Record<string, number> = {};
     enrichmentLogs.forEach(log => {
-      if (log.metadata && typeof log.metadata === 'object' && log.metadata.freeZoneName) {
+      if (log.metadata && typeof log.metadata === 'object' && 'freeZoneName' in log.metadata && log.metadata.freeZoneName) {
         const freeZone = String(log.metadata.freeZoneName);
         freeZoneCounts[freeZone] = (freeZoneCounts[freeZone] || 0) + 1;
       }
@@ -473,7 +474,14 @@ router.post('/deep-audit-all', async (req, res) => {
 });
 
 // Store the latest test result
-let latestTestResult = null;
+interface TestResult {
+  freeZoneId: number;
+  timestamp: string;
+  result: any; // Using any here as the full type would be complex
+  fallbackUsed: boolean;
+}
+
+let latestTestResult: TestResult | null = null;
 
 // Test endpoint for the deep audit with fallback functionality
 router.get('/test-deep-audit/:freeZoneId', async (req, res) => {
@@ -513,8 +521,8 @@ router.get('/test-deep-audit/:freeZoneId', async (req, res) => {
   } catch (error) {
     console.error('[Test API] Error in deep audit test:', error);
     res.status(500).json({ 
-      error: error.message,
-      stack: error.stack 
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
     });
   }
 });
