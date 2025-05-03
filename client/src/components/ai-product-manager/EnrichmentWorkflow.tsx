@@ -1,4 +1,5 @@
-import { useState, useEffect, Fragment } from "react";
+import { useState, useEffect } from "react";
+import React, { Fragment } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -821,7 +822,7 @@ export default function EnrichmentWorkflow() {
                       groups[key].tasks.push(task);
                       return groups;
                     }, {})).map(([freeZoneKey, freeZoneGroup]) => (
-                      <Fragment key={freeZoneKey}>
+                      <React.Fragment key={freeZoneKey.toString()}>
                         {/* Free Zone header with select/deselect controls */}
                         <div className="grid grid-cols-12 p-2 bg-muted/30 items-center">
                           <div className="col-span-1"></div>
@@ -879,7 +880,7 @@ export default function EnrichmentWorkflow() {
                             </div>
                           </div>
                         ))}
-                      </Fragment>
+                      </React.Fragment>
                     ))}
                   </div>
                 </div>
