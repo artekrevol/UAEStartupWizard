@@ -433,14 +433,22 @@ export default function EnrichmentWorkflow() {
     setIsCreatingTasks(true);
     
     try {
-      // Prepare the data based on our selection and deep audit results
-      const selectedFields = selectedAuditResults.flatMap(item => 
-        item.fields.map(field => ({ freeZoneId: item.freeZoneId, field }))
-      );
+      // Prepare the data with only the necessary information to reduce payload size
+      const selectedFields = selectedAuditResults.flatMap(item => {
+        // Get the free zone name from the audit results
+        const freeZone = deepAuditAllResults?.auditResults.find(
+          result => result.freeZoneId === item.freeZoneId
+        );
+        
+        return item.fields.map(field => ({
+          freeZoneId: item.freeZoneId,
+          freeZoneName: freeZone?.freeZoneName || '',
+          field
+        }));
+      });
       
-      // Use the audit results to create tasks
+      // Send only the selected fields to create tasks, not the full audit results
       const response = await axios.post('/api/ai-pm/create-tasks-from-audit', {
-        auditResults: deepAuditAllResults?.auditResults || [],
         selectedFields: selectedFields
       });
       

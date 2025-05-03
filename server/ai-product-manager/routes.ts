@@ -536,44 +536,41 @@ router.get('/deep-audit/:freeZoneId/latest', async (req, res) => {
 // Create tasks from deep audit results
 router.post('/create-tasks-from-audit', async (req, res) => {
   try {
-    const { auditResults, selectedFields } = req.body;
+    // Get only the selectedFields from the request body to reduce payload size
+    const { selectedFields } = req.body;
     
-    if (!auditResults || !Array.isArray(auditResults) || auditResults.length === 0) {
-      return res.status(400).json({ error: 'Invalid or empty audit results' });
+    if (!selectedFields || !Array.isArray(selectedFields) || selectedFields.length === 0) {
+      return res.status(400).json({ error: 'No fields selected for task creation' });
     }
     
-    console.log(`[AI-PM] Creating tasks from audit results for ${auditResults.length} free zones`);
+    console.log(`[AI-PM] Creating tasks from ${selectedFields.length} selected fields`);
     
     const createdTasks = [];
     
-    // Process each free zone from the audit results
-    for (const auditResult of auditResults) {
-      const { freeZoneId, freeZoneName, result } = auditResult;
-      
-      if (!result || !result.existingData || !result.existingData.fieldsMissing) {
-        console.log(`[AI-PM] Skipping ${freeZoneName} - no valid audit result or missing fields`);
-        continue;
+    // Group selected fields by free zone for more efficient processing
+    const fieldsByFreeZone = selectedFields.reduce((acc, item) => {
+      if (!acc[item.freeZoneId]) {
+        acc[item.freeZoneId] = {
+          fields: [],
+          freeZoneName: item.freeZoneName || ''
+        };
       }
+      acc[item.freeZoneId].fields.push(item.field);
+      return acc;
+    }, {});
+    
+    // Process each free zone
+    for (const [freeZoneIdStr, data] of Object.entries(fieldsByFreeZone)) {
+      const freeZoneId = parseInt(freeZoneIdStr);
+      const { fields, freeZoneName } = data;
       
-      // Missing fields from the audit result
-      const missingFields = result.existingData.fieldsMissing;
-      
-      // Filter fields based on selection if provided
-      const fieldsToProcess = selectedFields && selectedFields.length > 0
-        ? missingFields.filter(field => 
-            selectedFields.some(sf => 
-              sf.freeZoneId === freeZoneId && sf.field === field
-            )
-          )
-        : missingFields;
-      
-      console.log(`[AI-PM] Processing ${fieldsToProcess.length} fields for ${freeZoneName}`);
+      console.log(`[AI-PM] Processing ${fields.length} fields for ${freeZoneName || freeZoneId}`);
       
       // Table reference - we need to use a proper table reference for Drizzle
       // We'll use plain SQL queries since this is a dynamic table
       
       // Create analysis records for each field
-      for (const fieldName of fieldsToProcess) {
+      for (const fieldName of fields) {
         try {
           // Check if analysis already exists using a raw SQL query
           const existingAnalysis = await db.execute(

@@ -1,0 +1,91 @@
+ 1. Product Architecture Understanding
+
+    What apps/repos exist right now?
+
+    What modules (files/directories) are considered:
+
+        Backend core (APIs, DB, scraping)
+
+        Frontend / User UI
+
+        Admin / Management tools
+
+    What is exposed publicly right now (API endpoints, frontend)?
+
+👥 2. User & Role Access Mapping
+
+    What roles are coded into the app right now?
+
+        Admin? User? Superuser? Public visitor?
+
+    Are there role-based access controls applied anywhere?
+
+    Can users and admins access the same UI components?
+
+    Which endpoints are open to the public vs. protected?
+
+🧠 3. AI + Data Intelligence Layer
+
+    How does the scraper currently work:
+
+        On demand or on schedule?
+
+        Is it callable via API?
+
+    Where is scraped data stored?
+
+        What tables or schemas exist?
+
+        How clean/normalized is the data?
+
+🧰 4. Admin Tools (Internal Use)
+
+    What admin tools are currently built?
+
+        Can you manually edit free zone data?
+
+        Can you trigger enrichment or scraping?
+
+        Is there any UI or is it all CLI/API driven?
+
+🎨 5. User-Facing Experience (External Use)
+
+    What can the user do today?
+
+        Can they search for a free zone?
+
+        Can they enter preferences (budget, ownership)?
+
+        Can they see recommendations?
+
+        Can they submit leads or contact forms?
+
+    Are these experiences well separated from admin functions?
+
+🔐 6. Security + API Exposure
+
+    Which endpoints are currently exposed?
+
+    Are API keys or secrets visible anywhere in frontend or responses?
+
+    Are admin APIs protected?
+
+    Is rate limiting and auth in place on critical routes?
+
+📊 7. Analytics + Logging
+
+    Do we log:
+
+        User searches
+
+        Scraper activity
+
+        Enrichment actions
+
+    Where are logs stored? (Replit log console, DB?)
+
+📈 8. Future Scaling Considerations
+
+    Is there any session/user management right now?
+
+    If user uploads or AI assistant was needed later, is that easy to add?
