@@ -36,26 +36,29 @@ export async function searchDocuments(
     // Create a safe search pattern based on the query
     const searchPattern = `%${query.replace(/\s+/g, '%')}%`;
     
-    // Start with a base query using Drizzle ORM
-    let dbQuery = db
-      .select()
-      .from(documents)
-      .where(
-        or(
-          sql`LOWER(${documents.title}) LIKE LOWER(${searchPattern})`,
-          sql`LOWER(${documents.content}) LIKE LOWER(${searchPattern})`
-        )
-      );
+    // Create conditions array
+    const conditions = [
+      or(
+        sql`LOWER(${documents.title}) LIKE LOWER(${searchPattern})`,
+        sql`LOWER(${documents.content}) LIKE LOWER(${searchPattern})`
+      )
+    ];
     
     // Add category filter if provided
     if (category) {
-      dbQuery = dbQuery.where(eq(documents.category, category));
+      conditions.push(eq(documents.category, category));
     }
     
     // Add free zone filter if provided
     if (freeZoneId !== undefined) {
-      dbQuery = dbQuery.where(eq(documents.freeZoneId, freeZoneId));
+      conditions.push(eq(documents.freeZoneId, freeZoneId));
     }
+    
+    // Start with a base query using Drizzle ORM with all conditions
+    const dbQuery = db
+      .select()
+      .from(documents)
+      .where(and(...conditions));
     
     // Execute query with limit
     const results = await dbQuery.limit(MAX_RESULTS);
