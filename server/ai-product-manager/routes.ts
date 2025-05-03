@@ -182,11 +182,11 @@ router.delete('/logs', async (req, res) => {
 // Get enrichment tasks
 router.get('/enrichment-tasks', async (req, res) => {
   try {
-    // Get tasks without count parameter since it's not supported by the implementation
+    // Get all tasks without limiting
     const tasks = await generateEnrichmentTasks();
     
-    // Apply limit after the fact if requested
-    const count = req.query.count ? parseInt(req.query.count as string) : 10;
+    // Return all tasks by default, but still allow for limiting if the client requests it
+    const count = req.query.count ? parseInt(req.query.count as string) : 0; // 0 means no limit
     const limitedTasks = count > 0 ? tasks.slice(0, count) : tasks;
     
     res.json({ tasks: limitedTasks });
@@ -265,8 +265,8 @@ router.post('/execute-enrichment', async (req, res) => {
       completedTasks: batchResult.results.length,
       successfulTasks: batchResult.results.filter(r => r.success).length,
       results: batchResult.results,
-      // Include updated tasks list so client can refresh without additional request
-      updatedTasks: updatedTasks.slice(0, 10) // Limit to first 10 for performance
+      // Include all updated tasks so client can refresh without additional request
+      updatedTasks: updatedTasks // No limit - return all tasks
     });
   } catch (error) {
     console.error('Error executing enrichment:', error);
