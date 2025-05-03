@@ -584,7 +584,7 @@ router.post('/create-tasks-from-audit', async (req, res) => {
       console.log(`[AI-PM] Processing ${fields.length} fields for ${freeZoneName || freeZoneId}`);
       
       // Get existing documents for this free zone to detect potential duplicates
-      const existingDocs = await db.query(
+      const existingDocs = await db.execute(
         `SELECT category, COUNT(*) as doc_count FROM documents WHERE free_zone_id = $1 GROUP BY category`,
         [freeZoneId]
       );
@@ -601,13 +601,13 @@ router.post('/create-tasks-from-audit', async (req, res) => {
         
         try {
           // Check if analysis record already exists
-          const existingAnalysisRecord = await db.query(
+          const existingAnalysisRecord = await db.execute(
             `SELECT * FROM analysis_records WHERE free_zone_id = $1 AND field = $2`,
             [freeZoneId, fieldName]
           );
           
           // Check if task already exists
-          const existingTask = await db.query(
+          const existingTask = await db.execute(
             `SELECT * FROM enrichment_tasks WHERE free_zone_id = $1 AND field = $2 AND status = 'pending'`,
             [freeZoneId, fieldName]
           );
