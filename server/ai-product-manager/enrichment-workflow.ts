@@ -51,8 +51,11 @@ export async function getEnrichmentTasksFromDB(): Promise<EnrichmentTask[]> {
     const tasksResult = await db.execute(sql`
       SELECT id, free_zone_id, free_zone_name, field, priority, status, created_at, updated_at, completed_at, result
       FROM enrichment_tasks
+      WHERE status != 'completed'
       ORDER BY priority DESC, created_at ASC
     `);
+    
+    console.log(`[AI-PM] Fetched ${tasksResult.rows.length} non-completed tasks from database`);
     
     // Convert DB results to EnrichmentTask format
     return tasksResult.rows.map((task: any) => {
