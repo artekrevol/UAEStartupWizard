@@ -128,37 +128,134 @@ Setting up a business in Dubai Internet City involves various costs. Here's a co
 **Note**: All fees are subject to 5% VAT. Costs are approximate and may change based on company size, activity, and specific requirements. Always consult with an official DIC representative for the most current fee structure.
 `;
 
-    // Update Dubai Internet City freezone data
+    // Update Dubai Internet City freezone data with proper JSON escaping
+    const licenseTypes = JSON.stringify(['Commercial License', 'Professional Services License', 'Industrial License', 'E-Commerce License', 'Freelancer Permit']);
+    const setupCost = JSON.stringify('Starting from AED 30,000 for initial setup plus annual license fees');
+    const faqs = JSON.stringify([{
+      question: 'What industries are permitted in DIC?',
+      answer: 'DIC primarily supports technology-related businesses including software development, IT services, telecommunications, and digital media.'
+    }]);
+    
     await pool.query(`
       UPDATE free_zones 
       SET 
-        license_types = '["Commercial License", "Professional Services License", "Industrial License", "E-Commerce License", "Freelancer Permit"]'::jsonb,
-        setup_cost = 'Starting from AED 30,000 for initial setup plus annual license fees',
-        faqs = '[{"question":"What industries are permitted in DIC?","answer":"DIC primarily supports technology-related businesses including software development, IT services, telecommunications, and digital media."}]'::jsonb
+        license_types = $1::jsonb,
+        setup_cost = $2::jsonb,
+        faqs = $3::jsonb
       WHERE id = 3
-    `);
+    `, [licenseTypes, setupCost, faqs]);
     
-    // Update or insert documents for DIC
+    // First check if documents exist for each category
+    const setupDocResult = await pool.query(
+      `SELECT id FROM documents WHERE category = 'setup_process' AND free_zone_id = 3`
+    );
+    
+    const licenseDocResult = await pool.query(
+      `SELECT id FROM documents WHERE category = 'license_types' AND free_zone_id = 3`
+    );
+    
+    const costsDocResult = await pool.query(
+      `SELECT id FROM documents WHERE category = 'costs' AND free_zone_id = 3`
+    );
+    
     // Setup Process Document
-    await pool.query(`
-      INSERT INTO documents (title, content, free_zone_id, category, subcategory, format, source_url, created_at, updated_at, confidence_score)
-      VALUES ('Dubai Internet City Setup Process Guide', $1, 3, 'setup_process', 'registration', 'markdown', 'https://dic.ae/setup', NOW(), NOW(), 0.95)
-      ON CONFLICT (title, free_zone_id) DO UPDATE SET content = $1, updated_at = NOW(), confidence_score = 0.95
-    `, [setupProcessContent]);
+    if (setupDocResult.rows.length > 0) {
+      // Update existing document
+      await pool.query(`
+        UPDATE documents 
+        SET content = $1, metadata = $2, uploaded_at = NOW()
+        WHERE id = $3
+      `, [
+        setupProcessContent, 
+        JSON.stringify({
+          source_url: 'https://dic.ae/setup',
+          confidence_score: 0.95,
+          format: 'markdown'
+        }),
+        setupDocResult.rows[0].id
+      ]);
+      console.log('Updated existing setup process document');
+    } else {
+      // Insert new document
+      await pool.query(`
+        INSERT INTO documents (title, content, free_zone_id, category, subcategory, document_type, metadata, uploaded_at, filename, file_path)
+        VALUES ('Dubai Internet City Setup Process Guide', $1, 3, 'setup_process', 'registration', 'text', $2, NOW(), 'dic_setup_process.md', '/freezone_docs/dic/setup_process.md')
+      `, [
+        setupProcessContent, 
+        JSON.stringify({
+          source_url: 'https://dic.ae/setup',
+          confidence_score: 0.95,
+          format: 'markdown'
+        })
+      ]);
+      console.log('Created new setup process document');
+    }
     
     // License Types Document
-    await pool.query(`
-      INSERT INTO documents (title, content, free_zone_id, category, subcategory, format, source_url, created_at, updated_at, confidence_score)
-      VALUES ('Dubai Internet City License Types Overview', $1, 3, 'license_types', 'options', 'markdown', 'https://dic.ae/licenses', NOW(), NOW(), 0.95)
-      ON CONFLICT (title, free_zone_id) DO UPDATE SET content = $1, updated_at = NOW(), confidence_score = 0.95
-    `, [licenseTypesContent]);
+    if (licenseDocResult.rows.length > 0) {
+      // Update existing document
+      await pool.query(`
+        UPDATE documents 
+        SET content = $1, metadata = $2, uploaded_at = NOW()
+        WHERE id = $3
+      `, [
+        licenseTypesContent, 
+        JSON.stringify({
+          source_url: 'https://dic.ae/licenses',
+          confidence_score: 0.95,
+          format: 'markdown'
+        }),
+        licenseDocResult.rows[0].id
+      ]);
+      console.log('Updated existing license types document');
+    } else {
+      // Insert new document
+      await pool.query(`
+        INSERT INTO documents (title, content, free_zone_id, category, subcategory, document_type, metadata, uploaded_at, filename, file_path)
+        VALUES ('Dubai Internet City License Types Overview', $1, 3, 'license_types', 'options', 'text', $2, NOW(), 'dic_license_types.md', '/freezone_docs/dic/license_types.md')
+      `, [
+        licenseTypesContent, 
+        JSON.stringify({
+          source_url: 'https://dic.ae/licenses',
+          confidence_score: 0.95,
+          format: 'markdown'
+        })
+      ]);
+      console.log('Created new license types document');
+    }
     
     // Costs Document
-    await pool.query(`
-      INSERT INTO documents (title, content, free_zone_id, category, subcategory, format, source_url, created_at, updated_at, confidence_score)
-      VALUES ('Dubai Internet City Cost Structure', $1, 3, 'costs', 'fees', 'markdown', 'https://dic.ae/fees', NOW(), NOW(), 0.95)
-      ON CONFLICT (title, free_zone_id) DO UPDATE SET content = $1, updated_at = NOW(), confidence_score = 0.95
-    `, [costsContent]);
+    if (costsDocResult.rows.length > 0) {
+      // Update existing document
+      await pool.query(`
+        UPDATE documents 
+        SET content = $1, metadata = $2, uploaded_at = NOW()
+        WHERE id = $3
+      `, [
+        costsContent, 
+        JSON.stringify({
+          source_url: 'https://dic.ae/fees',
+          confidence_score: 0.95,
+          format: 'markdown'
+        }),
+        costsDocResult.rows[0].id
+      ]);
+      console.log('Updated existing costs document');
+    } else {
+      // Insert new document
+      await pool.query(`
+        INSERT INTO documents (title, content, free_zone_id, category, subcategory, document_type, metadata, uploaded_at, filename, file_path)
+        VALUES ('Dubai Internet City Cost Structure', $1, 3, 'costs', 'fees', 'text', $2, NOW(), 'dic_costs.md', '/freezone_docs/dic/costs.md')
+      `, [
+        costsContent, 
+        JSON.stringify({
+          source_url: 'https://dic.ae/fees',
+          confidence_score: 0.95,
+          format: 'markdown'
+        })
+      ]);
+      console.log('Created new costs document');
+    }
     
     // Update analysis records to mark fields as complete
     await pool.query(`
