@@ -270,6 +270,22 @@ export async function executeEnrichmentTasks(
         // Execute the enrichment
         const result = await enrichFreeZoneData(task.freeZoneId, task.field);
         
+        // Update task status in database to completed
+        if (task.id) {
+          try {
+            await db.execute(sql`
+              UPDATE enrichment_tasks
+              SET status = 'completed',
+                  completed_at = NOW(),
+                  result = ${JSON.stringify(result)}
+              WHERE id = ${task.id}
+            `);
+            console.log(`[AI-PM] Updated task ID ${task.id} status to completed in database`);
+          } catch (updateError) {
+            console.error(`[AI-PM] Error updating task status: ${updateError}`);
+          }
+        }
+        
         // Record the successful result
         results.push({
           task,
@@ -280,6 +296,22 @@ export async function executeEnrichmentTasks(
         successfulTasks++;
       } catch (error) {
         console.error(`Error executing task for ${task.freeZoneName} - ${task.field}: ${error}`);
+        
+        // Update task status in database to failed
+        if (task.id) {
+          try {
+            await db.execute(sql`
+              UPDATE enrichment_tasks
+              SET status = 'failed',
+                  completed_at = NOW(),
+                  result = ${JSON.stringify({ error: (error as Error).message })}
+              WHERE id = ${task.id}
+            `);
+            console.log(`[AI-PM] Updated task ID ${task.id} status to failed in database`);
+          } catch (updateError) {
+            console.error(`[AI-PM] Error updating task status: ${updateError}`);
+          }
+        }
         
         // Record the failed result
         results.push({

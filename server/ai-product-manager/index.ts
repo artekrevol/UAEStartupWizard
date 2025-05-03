@@ -474,6 +474,121 @@ export async function enrichFreeZoneData(
       
       console.log(`[AI-PM] Mapped field "${field}" to database column "${columnName}"`);
       
+      // Define allowed columns that exist in the database
+      const validColumns = [
+        'description', 'location', 'benefits', 'requirements', 'industries',
+        'license_types', 'facilities', 'website', 'setup_cost', 'visa_information',
+        'fee_structure', 'faqs'
+      ];
+      
+      // Check if this is a valid column that exists in the database
+      if (!validColumns.includes(columnName)) {
+        console.log(`[AI-PM] Column "${columnName}" is not in the free_zones table schema. Creating document instead.`);
+        
+        // Create or update a document in the documents table instead
+        const documentTitle = `${freeZone.name} - ${field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`;
+        const documentFilename = `${freeZone.name.toLowerCase().replace(/\s+/g, '_')}_${field}.txt`;
+        
+        try {
+          // Check if document already exists
+          const existingDocResult = await db.execute(sql`
+            SELECT id FROM documents 
+            WHERE free_zone_id = ${freeZoneId} AND category = ${field}
+          `);
+          
+          if (existingDocResult.rows.length > 0) {
+            // Update existing document
+            await db.execute(sql`
+              UPDATE documents
+              SET content = ${content}, 
+                  metadata = jsonb_set(metadata::jsonb, '{enriched}', 'true'::jsonb)
+              WHERE id = ${existingDocResult.rows[0].id}
+            `);
+            console.log(`[AI-PM] Updated existing document for "${field}" instead of creating database column`);
+          } else {
+            // Insert new document
+            await db.execute(sql`
+              INSERT INTO documents (
+                title, filename, file_path, content, file_type, category, free_zone_id, metadata
+              ) VALUES (
+                ${documentTitle},
+                ${documentFilename},
+                ${`freezone_docs/${freeZone.name.toLowerCase().replace(/\s+/g, '_')}/${documentFilename}`},
+                ${content},
+                'text/plain',
+                ${field},
+                ${freeZoneId},
+                ${{enriched: true, aiGenerated: true}}
+              )
+            `);
+            console.log(`[AI-PM] Created new document for "${field}" instead of using non-existent database column`);
+          }
+          
+          // Skip database column update since we created a document instead
+          newStatus = 'complete';
+          
+          // Update the analysis record
+          try {
+            // Get latest analysis record
+            const analysisResult = await db.execute(sql`
+              SELECT * FROM free_zone_analysis
+              WHERE free_zone_id = ${freeZoneId}
+              ORDER BY created_at DESC
+              LIMIT 1
+            `);
+            
+            if (analysisResult.rows.length > 0) {
+              const analysis = analysisResult.rows[0];
+              
+              // Get the fields and update the status
+              const fields = typeof analysis.fields === 'string' 
+                ? JSON.parse(analysis.fields) 
+                : analysis.fields;
+              
+              // Update the field status
+              const updatedFields = fields.map((f: any) => {
+                if (f.field === field) {
+                  return { ...f, status: 'complete' };
+                }
+                return f;
+              });
+              
+              // Calculate new overall completeness
+              const completeFields = updatedFields.filter((f: any) => f.status === 'complete').length;
+              const totalFields = updatedFields.length;
+              const newOverallCompleteness = (completeFields / totalFields) * 100;
+              
+              // Save the updated analysis
+              await db.execute(sql`
+                UPDATE free_zone_analysis
+                SET fields = ${JSON.stringify(updatedFields)}::jsonb,
+                    overall_completeness = ${newOverallCompleteness}
+                WHERE id = ${analysis.id}
+              `);
+              
+              console.log(`[AI-PM] Updated analysis record to mark ${field} as complete for ${freeZone.name}`);
+            }
+          } catch (analysisError) {
+            console.error(`[AI-PM] Error updating analysis after document creation: ${analysisError}`);
+          }
+          
+          // Return early since we've handled this as a document
+          return {
+            freeZoneId,
+            freeZoneName: freeZone.name,
+            field,
+            originalStatus: fieldStatus,
+            newStatus,
+            content,
+            source: 'Web Research',
+            confidence: 0.8
+          };
+        } catch (documentError) {
+          console.error(`[AI-PM] Error creating document for field "${field}": ${documentError}`);
+          // Continue with normal flow (which will likely fail) if document creation fails
+        }
+      }
+      
       // Format the content appropriately based on field type with enhanced formatting
       let formattedContent: any;
       
