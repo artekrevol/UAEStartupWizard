@@ -353,6 +353,39 @@ export default function EnrichmentWorkflow() {
     }
   };
   
+  // Select all missing fields for all free zones
+  const selectAllMissingFields = () => {
+    if (!deepAuditAllResults) return;
+    
+    const allSelections = deepAuditAllResults.auditResults
+      .filter(auditResult => !auditResult.error) // Skip free zones with errors
+      .map(auditResult => {
+        const missingFields = auditResult.result?.existingData?.fieldsMissing || [];
+        return {
+          freeZoneId: auditResult.freeZoneId,
+          fields: missingFields
+        };
+      })
+      .filter(item => item.fields.length > 0); // Only include free zones with missing fields
+    
+    setSelectedAuditResults(allSelections);
+    
+    toast({
+      title: "All Missing Fields Selected",
+      description: `Selected ${allSelections.reduce((total, item) => total + item.fields.length, 0)} fields across ${allSelections.length} free zones.`
+    });
+  };
+  
+  // Clear all selected fields
+  const clearAllSelections = () => {
+    setSelectedAuditResults([]);
+    
+    toast({
+      title: "Selections Cleared",
+      description: "All field selections have been cleared."
+    });
+  };
+  
   // Toggle a field selection for a free zone
   const toggleFieldSelection = (freeZoneId: number, field: string) => {
     const existingFreeZone = selectedAuditResults.find(item => item.freeZoneId === freeZoneId);
@@ -726,6 +759,24 @@ export default function EnrichmentWorkflow() {
                         Refresh Audit
                       </Button>
                       <Button
+                        variant="outline"
+                        onClick={selectAllMissingFields}
+                        disabled={isRunningDeepAudit}
+                        className="bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100"
+                      >
+                        <CheckIcon className="mr-2 h-4 w-4" />
+                        Select All
+                      </Button>
+                      {selectedAuditResults.length > 0 && (
+                        <Button
+                          variant="outline"
+                          onClick={clearAllSelections}
+                          className="text-red-600"
+                        >
+                          Clear All
+                        </Button>
+                      )}
+                      <Button
                         onClick={createTasksFromAudit}
                         disabled={selectedAuditResults.length === 0 || isCreatingTasks}
                       >
@@ -748,7 +799,12 @@ export default function EnrichmentWorkflow() {
                     <div className="grid grid-cols-12 p-3 font-medium bg-muted/50">
                       <div className="col-span-3">Free Zone</div>
                       <div className="col-span-2">Completeness</div>
-                      <div className="col-span-7">Missing Fields</div>
+                      <div className="col-span-7 flex justify-between items-center">
+                        <span>Missing Fields</span>
+                        <span className="text-xs text-muted-foreground">
+                          {selectedAuditResults.reduce((total, item) => total + item.fields.length, 0)} fields selected
+                        </span>
+                      </div>
                     </div>
                     
                     {deepAuditAllResults.auditResults.map((auditResult) => {
