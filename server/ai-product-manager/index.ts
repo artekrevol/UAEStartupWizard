@@ -392,7 +392,7 @@ export async function enrichFreeZoneData(
     const content = contentAnalysis.choices[0].message.content || '';
     
     // Save this information to the database
-    const newStatus = content.length > 200 ? 'complete' : 'incomplete';
+    let newStatus = content.length > 200 ? 'complete' : 'incomplete';
     const confidence = newStatus === 'complete' ? 0.9 : 0.5;
     
     // Create or update the related document
