@@ -559,8 +559,14 @@ router.post('/create-tasks-from-audit', async (req, res) => {
       return acc;
     }, {});
     
+    // Process each free zone - limit to processing 50 tasks at once to prevent timeout
+    let processedCount = 0;
+    const maxTasksToProcess = 50;
+    
     // Process each free zone
     for (const [freeZoneIdStr, data] of Object.entries(fieldsByFreeZone)) {
+      if (processedCount >= maxTasksToProcess) break; // Stop if we've processed enough tasks
+      
       const freeZoneId = parseInt(freeZoneIdStr);
       const { fields, freeZoneName } = data;
       
@@ -571,47 +577,73 @@ router.post('/create-tasks-from-audit', async (req, res) => {
       
       // Create analysis records for each field
       for (const fieldName of fields) {
+        if (processedCount >= maxTasksToProcess) break; // Stop if we've processed enough tasks
+        
         try {
-          // Check if analysis already exists using a raw SQL query
-          const existingAnalysis = await db.execute(
-            sql`SELECT * FROM analysis_records 
-                WHERE free_zone_id = ${freeZoneId} AND field = ${fieldName} 
-                LIMIT 1`
+          // Check if analysis record already exists
+          const existingAnalysisRecord = await db.query(
+            `SELECT * FROM analysis_records WHERE free_zone_id = $1 AND field = $2`,
+            [freeZoneId, fieldName]
           );
-            
-          // The result will be an array, so we check if there are any results
-          if (existingAnalysis && existingAnalysis.length > 0) {
-            // Update existing analysis with raw SQL
-            await db.execute(
-              sql`UPDATE analysis_records 
-                  SET status = 'missing', 
-                      confidence = ${0.8}, 
-                      last_analyzed = ${new Date().toISOString()}, 
-                      recommendations = ${JSON.stringify([])} 
-                  WHERE free_zone_id = ${freeZoneId} AND field = ${fieldName}`
-            );
-              
-            console.log(`[AI-PM] Updated analysis for ${freeZoneName} - ${fieldName}`);
-          } else {
-            // Create new analysis with raw SQL
-            await db.execute(
-              sql`INSERT INTO analysis_records 
-                  (free_zone_id, field, status, confidence, last_analyzed, recommendations) 
-                  VALUES (${freeZoneId}, ${fieldName}, 'missing', ${0.8}, 
-                          ${new Date().toISOString()}, ${JSON.stringify([])})`
-            );
-              
-            console.log(`[AI-PM] Created analysis for ${freeZoneName} - ${fieldName}`);
+          
+          // Check if task already exists
+          const existingTask = await db.query(
+            `SELECT * FROM enrichment_tasks WHERE free_zone_id = $1 AND field = $2 AND status = 'pending'`,
+            [freeZoneId, fieldName]
+          );
+          
+          if (existingTask.rows.length > 0) {
+            console.log(`[AI-PM] Task for ${freeZoneName} - ${fieldName} already exists, skipping`);
+            continue;
           }
+          
+          // If analysis record exists, update it, otherwise create it
+          if (existingAnalysisRecord.rows.length > 0) {
+            await db.execute(
+              `UPDATE analysis_records SET status = 'pending', last_analyzed = NOW() WHERE free_zone_id = $1 AND field = $2`,
+              [freeZoneId, fieldName]
+            );
+          } else {
+            // Insert new analysis record with conflict handling
+            await db.execute(
+              `INSERT INTO analysis_records 
+              (free_zone_id, field, status, confidence) 
+              VALUES ($1, $2, $3, $4)
+              ON CONFLICT (free_zone_id, field) DO UPDATE
+              SET status = 'pending', last_analyzed = NOW()`,
+              [freeZoneId, fieldName, 'pending', 0.5]
+            );
+          }
+          
+          // Create a priority score based on field type
+          let priority = 5; // default
+          
+          // Boost priority for important business setup fields
+          if (['process', 'requirements', 'license_types', 'costs'].includes(fieldName)) {
+            priority = 10;
+          }
+          
+          // Create task record in DB
+          await db.execute(
+            `INSERT INTO enrichment_tasks 
+            (free_zone_id, free_zone_name, field, priority, status, created_at) 
+            VALUES ($1, $2, $3, $4, $5, $6)
+            ON CONFLICT (free_zone_id, field) DO UPDATE
+            SET status = 'pending', priority = $4, updated_at = NOW()`,
+            [freeZoneId, freeZoneName, fieldName, priority, 'pending', new Date().toISOString()]
+          );
           
           // Add to created tasks list
           createdTasks.push({
             freeZoneId,
             freeZoneName,
             field: fieldName,
-            status: 'missing',
+            status: 'pending',
+            priority,
             confidence: 0.8
           });
+          
+          processedCount++;
         } catch (error) {
           console.error(`[AI-PM] Error creating task for ${freeZoneName} - ${fieldName}:`, error);
         }
@@ -622,16 +654,19 @@ router.post('/create-tasks-from-audit', async (req, res) => {
     await logActivity(
       'tasks-created-from-audit',
       `Created ${createdTasks.length} tasks from deep audit results`,
-      { taskCount: createdTasks.length },
+      { taskCount: createdTasks.length, totalSelected: selectedFields.length },
       'enrichment-workflow',
       'info'
     );
     
-    // Return the created tasks
+    // Return the created tasks with information about progress
     res.json({
       success: true,
       createdTasks,
-      message: `Created ${createdTasks.length} tasks from deep audit results`
+      message: `Successfully created ${createdTasks.length} tasks out of ${selectedFields.length} selected fields`,
+      totalSelected: selectedFields.length,
+      processed: processedCount,
+      remaining: selectedFields.length - processedCount
     });
   } catch (error) {
     console.error('Error creating tasks from audit:', error);

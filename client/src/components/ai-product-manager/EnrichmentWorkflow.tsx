@@ -412,23 +412,83 @@ export default function EnrichmentWorkflow() {
     setDeepAuditAllResults(null);
     
     try {
-      const response = await axios.post('/api/ai-pm/deep-audit-all');
-      const results = response.data;
-      
-      setDeepAuditAllResults(results);
+      // Run the audit in smaller batches to avoid timeout
+      const batchSize = 5;
       
       toast({
-        title: "Deep Audit Complete",
-        description: `Successfully audited ${results.auditResults.length} free zones.`,
+        title: "Deep Audit Started",
+        description: "Auditing free zones in batches. This may take a few minutes.",
       });
+      
+      // First batch (first 5 free zones)
+      const response = await axios.post('/api/ai-pm/deep-audit-all', {
+        startIndex: 0,
+        maxCount: batchSize
+      });
+      
+      const firstBatchResults = response.data;
+      
+      // Set initial results
+      setDeepAuditAllResults(firstBatchResults);
+      
+      toast({
+        title: "First Batch Complete",
+        description: `Processed first ${firstBatchResults.auditResults.length} free zones, continuing with remaining zones.`,
+      });
+      
+      // Process remaining batches in the background
+      const processNextBatch = async (startIndex: number, currentResults: any) => {
+        try {
+          const nextResponse = await axios.post('/api/ai-pm/deep-audit-all', {
+            startIndex,
+            maxCount: batchSize
+          });
+          
+          const nextBatchResults = nextResponse.data;
+          
+          // Merge the results
+          const combinedResults = {
+            ...currentResults,
+            auditResults: [
+              ...currentResults.auditResults,
+              ...nextBatchResults.auditResults
+            ],
+            timestamp: nextBatchResults.timestamp
+          };
+          
+          // Update state with combined results
+          setDeepAuditAllResults(combinedResults);
+          
+          // If there are more to process, continue
+          if (startIndex + batchSize < 35) { // Assuming 35 free zones total
+            await processNextBatch(startIndex + batchSize, combinedResults);
+          } else {
+            // We're done with all batches
+            toast({
+              title: "Deep Audit Complete",
+              description: `Successfully audited ${combinedResults.auditResults.length} free zones.`,
+            });
+          }
+        } catch (error) {
+          console.error(`Error processing batch starting at ${startIndex}:`, error);
+          toast({
+            title: "Batch Processing Issue",
+            description: `Encountered an issue with some free zones. ${currentResults.auditResults.length} zones were processed successfully.`,
+            variant: "destructive"
+          });
+        }
+      };
+      
+      // Start processing the rest of the batches
+      processNextBatch(batchSize, firstBatchResults);
+      
     } catch (error) {
       console.error('Error running deep audit for all free zones:', error);
       toast({
         title: "Deep Audit Failed",
-        description: "An error occurred while running the deep audit. Please try again.",
+        description: "An error occurred while starting the deep audit. Please try again.",
         variant: "destructive"
       });
-    } finally {
       setIsRunningDeepAudit(false);
     }
   };
