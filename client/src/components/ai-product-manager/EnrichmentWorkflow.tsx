@@ -22,7 +22,7 @@ import {
   Globe,
   ArrowDownToLine,
   Sparkles,
-  XIcon
+  X as XIcon
 } from "lucide-react";
 import axios from "axios";
 import { apiRequest } from "@/lib/queryClient";
