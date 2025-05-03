@@ -2,17 +2,21 @@
 
 ## Task Management and Persistence Issues
 
-1. **Task Status Update Issue** - Tasks completed or failed in the enrichment process were not being updated in the `enrichment_tasks` table, causing tasks to reappear in subsequent runs despite being processed.
+1. ✅ **Task Status Update Issue** - Tasks completed or failed in the enrichment process were not being updated in the `enrichment_tasks` table, causing tasks to reappear in subsequent runs despite being processed.
 
-2. **Batch Size Parameter Not Respected** - The batch size parameter selected in the UI was not being properly passed through the API layers to the `executeEnrichmentTasks` function.
+2. ✅ **Batch Size Parameter Not Respected** - The batch size parameter selected in the UI was not being properly passed through the API layers to the `executeEnrichmentTasks` function.
 
-3. **Missing Database Columns Handling** - Tasks were failing when trying to update columns like "setup_process" and "timelines" that don't exist in the free_zones table schema.
+3. ✅ **Missing Database Columns Handling** - Tasks were failing when trying to update columns like "setup_process" and "timelines" that don't exist in the free_zones table schema.
 
 ## Database Issues
 
 4. **JSON Data Type Handling** - When working with JSON data fields in the database, proper type conversion was not being performed, causing errors with fields like `metadata`.
 
 5. **Document Table Constraints** - Document creation was failing due to not providing required fields (`filename` and `file_path`) when inserting records.
+
+6. ✅ **Database Query Results Structure Issue** - The code was directly accessing array index properties (result[0]) on database query results instead of using the rows property (result.rows[0]), causing TypeError when iterating with `documentCounts.forEach`.
+
+7. ✅ **Constant Variable Reassignment Error** - In `server/ai-product-manager/index.ts`, the `newStatus` variable was declared as a constant but later reassigned, causing a runtime error.
 
 ## UI/UX Issues
 

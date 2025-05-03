@@ -601,7 +601,7 @@ async function getFreeZoneDetailedInfo(freeZoneId: number): Promise<any> {
     const freeZone = freeZoneBasic[0];
     
     // Get document counts by category for this free zone
-    const documentCounts = await db.execute(sql`
+    const documentCountsResult = await db.execute(sql`
       SELECT category, COUNT(*) as count
       FROM ${documents}
       WHERE free_zone_id = ${freeZoneId}
@@ -610,11 +610,16 @@ async function getFreeZoneDetailedInfo(freeZoneId: number): Promise<any> {
     
     // Prepare document categories structure
     const docCategories: Record<string, number> = {};
-    documentCounts.forEach((row: any) => {
+    
+    // Make sure we have rows to process
+    const documentRows = documentCountsResult.rows || [];
+    
+    // Process each row to build category counts
+    for (const row of documentRows) {
       if (row.category && row.count) {
         docCategories[row.category] = Number(row.count);
       }
-    });
+    }
     
     // Format all fields consistently
     return {
@@ -655,7 +660,8 @@ async function countDocumentsForFreeZone(freeZoneId: number): Promise<number> {
       WHERE free_zone_id = ${freeZoneId}
     `);
     
-    return result[0]?.count ? Number(result[0].count) : 0;
+    // Properly access rows from the query result
+    return result.rows[0]?.count ? Number(result.rows[0].count) : 0;
   } catch (error) {
     console.error("Error counting documents:", error);
     return 0;
