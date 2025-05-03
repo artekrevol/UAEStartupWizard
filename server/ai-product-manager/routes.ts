@@ -546,6 +546,17 @@ router.post('/create-tasks-from-audit', async (req, res) => {
     console.log(`[AI-PM] Creating tasks from ${selectedFields.length} selected fields`);
     
     const createdTasks = [];
+    const skippedFields = [];
+    const duplicateFields = [];
+    
+    // Check for potential duplicates using field similarity
+    const allFields = selectedFields.map(item => item.field);
+    const fieldCounts = {};
+    
+    // Count occurrences of each field across all free zones
+    allFields.forEach(field => {
+      fieldCounts[field] = (fieldCounts[field] || 0) + 1;
+    });
     
     // Group selected fields by free zone for more efficient processing
     const fieldsByFreeZone = selectedFields.reduce((acc, item) => {
@@ -572,8 +583,17 @@ router.post('/create-tasks-from-audit', async (req, res) => {
       
       console.log(`[AI-PM] Processing ${fields.length} fields for ${freeZoneName || freeZoneId}`);
       
-      // Table reference - we need to use a proper table reference for Drizzle
-      // We'll use plain SQL queries since this is a dynamic table
+      // Get existing documents for this free zone to detect potential duplicates
+      const existingDocs = await db.query(
+        `SELECT category, COUNT(*) as doc_count FROM documents WHERE free_zone_id = $1 GROUP BY category`,
+        [freeZoneId]
+      );
+      
+      // Map of existing categories and their document counts
+      const existingCategories = {};
+      existingDocs.rows.forEach(row => {
+        existingCategories[row.category] = row.doc_count;
+      });
       
       // Create analysis records for each field
       for (const fieldName of fields) {
@@ -594,6 +614,35 @@ router.post('/create-tasks-from-audit', async (req, res) => {
           
           if (existingTask.rows.length > 0) {
             console.log(`[AI-PM] Task for ${freeZoneName} - ${fieldName} already exists, skipping`);
+            skippedFields.push({ freeZoneId, freeZoneName, field: fieldName, reason: 'task_exists' });
+            continue;
+          }
+          
+          // Check for potential duplicates based on similar field names or content
+          let isDuplicate = false;
+          const relatedFields = getRelatedFields(fieldName);
+          
+          for (const relatedField of relatedFields) {
+            // Skip the field itself
+            if (relatedField === fieldName) continue;
+            
+            // If the related field has existing documents, flag as potential duplicate
+            if (existingCategories[relatedField] && existingCategories[relatedField] > 2) {
+              isDuplicate = true;
+              duplicateFields.push({
+                freeZoneId,
+                freeZoneName,
+                field: fieldName,
+                relatedField,
+                docCount: existingCategories[relatedField]
+              });
+              break;
+            }
+          }
+          
+          // Skip creating task if it's a potential duplicate
+          if (isDuplicate) {
+            console.log(`[AI-PM] Potential duplicate detected for ${freeZoneName} - ${fieldName}, skipping`);
             continue;
           }
           
@@ -666,6 +715,10 @@ router.post('/create-tasks-from-audit', async (req, res) => {
       message: `Successfully created ${createdTasks.length} tasks out of ${selectedFields.length} selected fields`,
       totalSelected: selectedFields.length,
       processed: processedCount,
+      skipped: skippedFields.length,
+      duplicates: duplicateFields.length,
+      skippedFields,
+      duplicateFields,
       remaining: selectedFields.length - processedCount
     });
   } catch (error) {
@@ -673,6 +726,31 @@ router.post('/create-tasks-from-audit', async (req, res) => {
     res.status(500).json({ error: String(error) });
   }
 });
+
+/**
+ * Helper function to get related fields that might contain duplicate content
+ */
+function getRelatedFields(fieldName: string): string[] {
+  // Define sets of related fields that might contain duplicate content
+  const relatedFieldSets = [
+    ['setup_process', 'timelines', 'process'], // Process and timeline information often overlaps
+    ['fee_structure', 'costs', 'fees', 'pricing'], // Fee structure and costs are often the same content
+    ['legal_requirements', 'compliance', 'regulations'], // Legal and compliance content often overlaps
+    ['benefits', 'facilities', 'amenities'], // Benefits and facilities often contain similar content
+    ['visa_information', 'residence', 'immigration'], // Visa and residence information overlaps
+    ['license_types', 'licensing', 'permits'] // License-related content overlaps
+  ];
+  
+  // Find which set this field belongs to
+  for (const set of relatedFieldSets) {
+    if (set.includes(fieldName)) {
+      return set;
+    }
+  }
+  
+  // If no related fields found, return just the field itself
+  return [fieldName];
+}
 
 // Direct enrichment from audit results without creating tasks first
 router.post('/enrich-from-audit', async (req, res) => {

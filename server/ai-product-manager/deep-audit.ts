@@ -700,7 +700,7 @@ async function analyzePageForFields(pageContent: string, fields: string[]) {
 }
 
 /**
- * Compare database and website data to identify discrepancies
+ * Compare database and website data to identify discrepancies and duplicates
  */
 function compareData(existingData: any, liveWebsiteData: any) {
   // Find fields present in both database and website
@@ -721,6 +721,44 @@ function compareData(existingData: any, liveWebsiteData: any) {
   // Identify inconsistent fields (present in both but with potential inconsistencies)
   const inconsistentFields = [];
   
+  // Add duplicate detection
+  const potentialDuplicates = [];
+  
+  // Track document categories for duplicate detection
+  const categoryDocumentCounts = {};
+  const categoryContentFingerprints = {};
+  
+  // Analyze database documents for duplicate detection
+  for (const field of existingData.fieldsPresent) {
+    const docCount = existingData.fieldsWithDocs[field] || 0;
+    
+    // Store document counts by category for later analysis
+    categoryDocumentCounts[field] = docCount;
+    
+    // For fields with multiple documents, we'll check for potential duplication
+    if (docCount >= 3) {
+      // Compute a simple fingerprint based on document count and field name
+      // In a real implementation, we would analyze document content more deeply
+      const fingerprint = `${field}-${docCount}`;
+      categoryContentFingerprints[field] = fingerprint;
+      
+      // Check for similar fields that might be duplicates
+      Object.keys(categoryContentFingerprints).forEach(otherField => {
+        if (field !== otherField && isRelatedField(field, otherField)) {
+          // Fields are related and both have content
+          potentialDuplicates.push({
+            field1: field,
+            field2: otherField,
+            docCount1: categoryDocumentCounts[field],
+            docCount2: categoryDocumentCounts[otherField],
+            confidence: 0.7
+          });
+        }
+      });
+    }
+  }
+  
+  // Also check website content for potential duplication
   for (const field of fieldsPresentInBoth) {
     // Skip if website has no content summary for this field
     if (!liveWebsiteData.contentSummary[field]) continue;
@@ -750,8 +788,26 @@ function compareData(existingData: any, liveWebsiteData: any) {
     fieldsPresentInBoth,
     fieldsOnlyInDatabase,
     fieldsOnlyOnWebsite,
-    inconsistentFields
+    inconsistentFields,
+    potentialDuplicates,
+    hasDuplicates: potentialDuplicates.length > 0
   };
+}
+
+/**
+ * Helper function to determine if two fields are related and might contain duplicate content
+ */
+function isRelatedField(field1: string, field2: string): boolean {
+  // Define sets of related fields that might contain duplicate content
+  const relatedFieldSets = [
+    ['setup_process', 'timelines'], // Process and timeline information often overlaps
+    ['fee_structure', 'costs'],     // Fee structure and costs are often the same content
+    ['legal_requirements', 'compliance'], // Legal and compliance content often overlaps
+    ['benefits', 'facilities']      // Benefits and facilities often contain similar content
+  ];
+  
+  // Check if the two fields belong to the same related set
+  return relatedFieldSets.some(set => set.includes(field1) && set.includes(field2));
 }
 
 /**
