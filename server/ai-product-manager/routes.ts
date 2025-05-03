@@ -243,7 +243,10 @@ router.post('/execute-enrichment', async (req, res) => {
     console.log(`[AI-PM] Executing ${tasks.length} enrichment tasks with batch size ${batchSize || tasks.length}`);
     
     // Execute tasks - we reuse the existing executeEnrichmentTasks function
-    const batchResult = await executeEnrichmentTasks(tasks);
+    // Use the provided batchSize or default to the number of tasks selected
+    const actualBatchSize = batchSize || tasks.length;
+    console.log(`[AI-PM] Using batch size of ${actualBatchSize} for ${tasks.length} selected tasks`);
+    const batchResult = await executeEnrichmentTasks(tasks, actualBatchSize);
     
     // Get updated tasks after processing (important: this will reflect the changes we made to the analysis)
     const updatedTasks = await generateEnrichmentTasks();
@@ -286,7 +289,8 @@ router.post('/run-enrichment-workflow', async (req, res) => {
     
     // Execute the tasks
     console.log(`[AI-PM] Processing ${tasksToProcess.length} highest priority tasks`);
-    const batchResult = await executeEnrichmentTasks(tasksToProcess);
+    // Pass the batchSize to ensure it respects the requested number
+    const batchResult = await executeEnrichmentTasks(tasksToProcess, batchSize);
     
     // Return results
     res.json({
