@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -270,6 +270,37 @@ export default function EnrichmentWorkflow() {
     } else {
       setSelectedTasks([...selectedTasks, task]);
     }
+  };
+  
+  // Select all tasks for a specific free zone
+  const selectAllTasksForFreeZone = (freeZoneId: number, freeZoneName: string) => {
+    if (!tasks?.tasks) return;
+    
+    // Get all tasks for this free zone
+    const freeZoneTasks = tasks.tasks.filter((task: EnrichmentTask) => task.freeZoneId === freeZoneId);
+    if (freeZoneTasks.length === 0) return;
+    
+    // Get currently selected tasks from other free zones
+    const otherFreeZoneTasks = selectedTasks.filter(task => task.freeZoneId !== freeZoneId);
+    
+    // Add all tasks from this free zone to the selection
+    setSelectedTasks([...otherFreeZoneTasks, ...freeZoneTasks]);
+    
+    toast({
+      title: "Free Zone Tasks Selected",
+      description: `Selected ${freeZoneTasks.length} tasks for ${freeZoneName}.`
+    });
+  };
+  
+  // Deselect all tasks for a specific free zone
+  const deselectAllTasksForFreeZone = (freeZoneId: number, freeZoneName: string) => {
+    // Remove all tasks for this free zone from selection
+    setSelectedTasks(selectedTasks.filter(task => task.freeZoneId !== freeZoneId));
+    
+    toast({
+      title: "Tasks Deselected",
+      description: `Deselected all tasks for ${freeZoneName}.`
+    });
   };
 
   // Execute selected tasks
@@ -776,34 +807,79 @@ export default function EnrichmentWorkflow() {
                       <div className="col-span-2">Confidence</div>
                       <div className="col-span-2">Priority</div>
                     </div>
-                    
-                    {tasks.tasks.map((task: EnrichmentTask) => (
-                      <div key={`${task.freeZoneId}-${task.field}`} className="grid grid-cols-12 p-3 items-center">
-                        <div className="col-span-1">
-                          <Checkbox 
-                            checked={selectedTasks.some(t => 
-                              t.freeZoneId === task.freeZoneId && t.field === task.field
-                            )}
-                            onCheckedChange={() => toggleTaskSelection(task)}
-                            className="w-4 h-4"
-                          />
+                  
+                    {/* Group tasks by free zone */}
+                    {Object.entries(tasks.tasks.reduce((groups: {[key: string]: {id: number, name: string, tasks: EnrichmentTask[]}}, task: EnrichmentTask) => {
+                      const key = `${task.freeZoneId}`;
+                      if (!groups[key]) {
+                        groups[key] = {
+                          id: task.freeZoneId,
+                          name: task.freeZoneName,
+                          tasks: []
+                        };
+                      }
+                      groups[key].tasks.push(task);
+                      return groups;
+                    }, {})).map(([freeZoneKey, freeZoneGroup]) => (
+                      <Fragment key={freeZoneKey}>
+                        {/* Free Zone header with select/deselect controls */}
+                        <div className="grid grid-cols-12 p-2 bg-muted/30 items-center">
+                          <div className="col-span-1"></div>
+                          <div className="col-span-11 flex items-center justify-between">
+                            <span className="font-medium">{freeZoneGroup.name}</span>
+                            <div className="flex gap-1">
+                              <button 
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  selectAllTasksForFreeZone(freeZoneGroup.id, freeZoneGroup.name);
+                                }}
+                                className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                              >
+                                Select All
+                              </button>
+                              <button 
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  deselectAllTasksForFreeZone(freeZoneGroup.id, freeZoneGroup.name);
+                                }}
+                                className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                              >
+                                Clear
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                        <div className="col-span-3 truncate">{task.freeZoneName}</div>
-                        <div className="col-span-2 capitalize">{task.field.replace(/_/g, ' ')}</div>
-                        <div className="col-span-2">
-                          <Badge variant={task.status === 'missing' ? "destructive" : "outline"}>
-                            {task.status}
-                          </Badge>
-                        </div>
-                        <div className="col-span-2">
-                          {Math.round(task.confidence * 100)}%
-                        </div>
-                        <div className="col-span-2">
-                          <span className={`px-2 py-1 rounded-full text-xs text-white ${getPriorityColor(task.priority)}`}>
-                            {formatPriority(task.priority)}
-                          </span>
-                        </div>
-                      </div>
+                        
+                        {/* Tasks for this free zone */}
+                        {freeZoneGroup.tasks.map((task: EnrichmentTask) => (
+                          <div key={`${task.freeZoneId}-${task.field}`} className="grid grid-cols-12 p-3 items-center">
+                            <div className="col-span-1">
+                              <Checkbox 
+                                checked={selectedTasks.some(t => 
+                                  t.freeZoneId === task.freeZoneId && t.field === task.field
+                                )}
+                                onCheckedChange={() => toggleTaskSelection(task)}
+                                className="w-4 h-4"
+                              />
+                            </div>
+                            <div className="col-span-3 truncate">{task.freeZoneName}</div>
+                            <div className="col-span-2 capitalize">{task.field.replace(/_/g, ' ')}</div>
+                            <div className="col-span-2">
+                              <Badge variant={task.status === 'missing' ? "destructive" : "outline"}>
+                                {task.status}
+                              </Badge>
+                            </div>
+                            <div className="col-span-2">
+                              {Math.round(task.confidence * 100)}%
+                            </div>
+                            <div className="col-span-2">
+                              <span className={`px-2 py-1 rounded-full text-xs text-white ${getPriorityColor(task.priority)}`}>
+                                {formatPriority(task.priority)}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </Fragment>
                     ))}
                   </div>
                 </div>
