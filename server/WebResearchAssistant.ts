@@ -418,20 +418,28 @@ function calculateFreeZoneRelevance(query: string, freeZone: any): number {
 /**
  * Format benefits list for better readability
  */
-function formatBenefitsList(benefits: string | null): string[] {
+function formatBenefitsList(benefits: unknown): string[] {
   if (!benefits) return [];
   
+  // Handle different input types
+  if (Array.isArray(benefits)) {
+    return benefits.map(item => String(item)).filter(Boolean);
+  }
+  
+  const benefitsString = String(benefits);
+  
   // Handle array JSON format
-  if (benefits.startsWith('[')) {
+  if (benefitsString.startsWith('[')) {
     try {
-      return JSON.parse(benefits);
+      const parsed = JSON.parse(benefitsString);
+      return Array.isArray(parsed) ? parsed.map(item => String(item)) : [];
     } catch (e) {
       // Fall through to text processing if JSON parsing fails
     }
   }
   
   // Process as text with bullet points or numbering
-  return benefits
+  return benefitsString
     .split(/\n|•|\*|\d+\.|✓|✔|→|-/)
     .map(item => item.trim())
     .filter(item => item.length > 0);
@@ -440,20 +448,28 @@ function formatBenefitsList(benefits: string | null): string[] {
 /**
  * Format industries list for better readability
  */
-function formatIndustriesList(industries: string | null): string[] {
+function formatIndustriesList(industries: unknown): string[] {
   if (!industries) return [];
   
+  // Handle different input types
+  if (Array.isArray(industries)) {
+    return industries.map(item => String(item)).filter(Boolean);
+  }
+  
+  const industriesString = String(industries);
+  
   // Handle array JSON format
-  if (industries.startsWith('[')) {
+  if (industriesString.startsWith('[')) {
     try {
-      return JSON.parse(industries);
+      const parsed = JSON.parse(industriesString);
+      return Array.isArray(parsed) ? parsed.map(item => String(item)) : [];
     } catch (e) {
       // Fall through to text processing if JSON parsing fails
     }
   }
   
   // Process as text with bullet points or numbering
-  return industries
+  return industriesString
     .split(/\n|•|\*|\d+\.|✓|✔|→|-/)
     .map(item => item.trim())
     .filter(item => item.length > 0);
@@ -462,20 +478,39 @@ function formatIndustriesList(industries: string | null): string[] {
 /**
  * Format license types for better readability
  */
-function formatLicenseTypes(licenseTypes: string | null): any[] {
+function formatLicenseTypes(licenseTypes: unknown): any[] {
   if (!licenseTypes) return [];
   
+  // Handle array input
+  if (Array.isArray(licenseTypes)) {
+    return licenseTypes.map(item => {
+      if (typeof item === 'object' && item !== null) {
+        return item;
+      }
+      return { name: String(item), description: '' };
+    });
+  }
+  
+  const licenseTypesString = String(licenseTypes);
+  
   // Handle JSON format
-  if (licenseTypes.startsWith('[') || licenseTypes.startsWith('{')) {
+  if (licenseTypesString.startsWith('[') || licenseTypesString.startsWith('{')) {
     try {
-      return JSON.parse(licenseTypes);
+      const parsed = JSON.parse(licenseTypesString);
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+      // If it's an object but not an array, wrap it in an array
+      if (typeof parsed === 'object' && parsed !== null) {
+        return [parsed];
+      }
     } catch (e) {
       // Fall through to text processing if JSON parsing fails
     }
   }
   
   // Process as text
-  const licenses = licenseTypes
+  const licenses = licenseTypesString
     .split(/\n|•|\*|\d+\.|✓|✔|→|-/)
     .map(item => item.trim())
     .filter(item => item.length > 0);
@@ -616,13 +651,11 @@ async function getFreeZoneDetailedInfo(freeZoneId: number): Promise<any> {
       GROUP BY category
     `);
     
-    // Prepare document categories structure
-    const docCategories: Record<string, number> = {};
-    
     // Make sure we have rows to process
     const documentRows = documentCountsResult.rows || [];
     
     // Process each row to build category counts
+    const docCategories: Record<string, number> = {};
     for (const row of documentRows) {
       if (row.category && row.count) {
         docCategories[row.category] = Number(row.count);
@@ -636,15 +669,15 @@ async function getFreeZoneDetailedInfo(freeZoneId: number): Promise<any> {
       description: freeZone.description || "",
       location: freeZone.location || "",
       website: freeZone.website || "",
-      email: freeZone.contactEmail || "",
-      phone: freeZone.contactPhone || "",
+      email: "", // Contact email not in schema, using empty string
+      phone: "", // Contact phone not in schema, using empty string
       benefits: formatBenefitsList(freeZone.benefits),
       industries: formatIndustriesList(freeZone.industries),
-      setupProcess: freeZone.setupProcess || "",
-      legalRequirements: freeZone.legalRequirements || "",
-      feeStructure: freeZone.feeStructure || "",
+      setupProcess: "", // Setup process not in schema, using empty string
+      legalRequirements: freeZone.requirements || "", // Using requirements field from schema
+      feeStructure: "", // Fee structure not in schema, using empty string
       licenseTypes: formatLicenseTypes(freeZone.licenseTypes),
-      visaInformation: freeZone.visaInformation || "",
+      visaInformation: "", // Visa information not in schema, using empty string
       facilities: formatFacilitiesList(freeZone.facilities),
       documentCategories: docCategories,
       totalDocuments: Object.values(docCategories).reduce((a, b) => a + b, 0),
@@ -687,7 +720,7 @@ function calculateCompletenessScore(freeZone: any): number {
     'visaInformation', 'facilities'
   ];
   
-  const fieldWeights = {
+  const fieldWeights: Record<string, number> = {
     'description': 0.5,
     'location': 0.5,
     'website': 0.5,
