@@ -48,7 +48,8 @@ router.get('/analyze/:freeZoneId', async (req, res) => {
     res.json(analysis);
   } catch (error) {
     console.error('Error analyzing free zone:', error);
-    res.status(500).json({ error: error.message });
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    res.status(500).json({ error: errorMessage });
   }
 });
 
@@ -59,7 +60,8 @@ router.get('/analyze-all', async (req, res) => {
     res.json(analyses);
   } catch (error) {
     console.error('Error analyzing all free zones:', error);
-    res.status(500).json({ error: error.message });
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    res.status(500).json({ error: errorMessage });
   }
 });
 
@@ -76,7 +78,8 @@ router.post('/enrich', async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Error enriching field:', error);
-    res.status(500).json({ error: error.message });
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    res.status(500).json({ error: errorMessage });
   }
 });
 
@@ -93,7 +96,8 @@ router.post('/search', async (req, res) => {
     res.json({ results });
   } catch (error) {
     console.error('Error searching web:', error);
-    res.status(500).json({ error: error.message });
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    res.status(500).json({ error: errorMessage });
   }
 });
 
@@ -110,7 +114,8 @@ router.post('/scrape', async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Error scraping URL:', error);
-    res.status(500).json({ error: error.message });
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    res.status(500).json({ error: errorMessage });
   }
 });
 
@@ -127,7 +132,8 @@ router.post('/search-and-scrape', async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Error in search and scrape:', error);
-    res.status(500).json({ error: error.message });
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    res.status(500).json({ error: errorMessage });
   }
 });
 
@@ -139,7 +145,8 @@ router.post('/run-cycle', async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Error running AI Product Manager cycle:', error);
-    res.status(500).json({ error: error.message });
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    res.status(500).json({ error: errorMessage });
   }
 });
 
@@ -153,7 +160,8 @@ router.get('/logs', async (req, res) => {
     res.json({ logs });
   } catch (error) {
     console.error('Error getting activity logs:', error);
-    res.status(500).json({ error: error.message });
+    const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+    res.status(500).json({ error: errorMessage });
   }
 });
 
