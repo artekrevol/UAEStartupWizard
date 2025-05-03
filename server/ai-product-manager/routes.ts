@@ -585,8 +585,7 @@ router.post('/create-tasks-from-audit', async (req, res) => {
       
       // Get existing documents for this free zone to detect potential duplicates
       const existingDocs = await db.execute(
-        `SELECT category, COUNT(*) as doc_count FROM documents WHERE free_zone_id = $1 GROUP BY category`,
-        [freeZoneId]
+        `SELECT category, COUNT(*) as doc_count FROM documents WHERE free_zone_id = ${freeZoneId} GROUP BY category`
       );
       
       // Map of existing categories and their document counts
@@ -602,14 +601,12 @@ router.post('/create-tasks-from-audit', async (req, res) => {
         try {
           // Check if analysis record already exists
           const existingAnalysisRecord = await db.execute(
-            `SELECT * FROM analysis_records WHERE free_zone_id = $1 AND field = $2`,
-            [freeZoneId, fieldName]
+            `SELECT * FROM analysis_records WHERE free_zone_id = ${freeZoneId} AND field = '${fieldName}'`
           );
           
           // Check if task already exists
           const existingTask = await db.execute(
-            `SELECT * FROM enrichment_tasks WHERE free_zone_id = $1 AND field = $2 AND status = 'pending'`,
-            [freeZoneId, fieldName]
+            `SELECT * FROM enrichment_tasks WHERE free_zone_id = ${freeZoneId} AND field = '${fieldName}' AND status = 'pending'`
           );
           
           if (existingTask.rows.length > 0) {
@@ -649,18 +646,16 @@ router.post('/create-tasks-from-audit', async (req, res) => {
           // If analysis record exists, update it, otherwise create it
           if (existingAnalysisRecord.rows.length > 0) {
             await db.execute(
-              `UPDATE analysis_records SET status = 'pending', last_analyzed = NOW() WHERE free_zone_id = $1 AND field = $2`,
-              [freeZoneId, fieldName]
+              `UPDATE analysis_records SET status = 'pending', last_analyzed = NOW() WHERE free_zone_id = ${freeZoneId} AND field = '${fieldName}'`
             );
           } else {
             // Insert new analysis record with conflict handling
             await db.execute(
               `INSERT INTO analysis_records 
               (free_zone_id, field, status, confidence) 
-              VALUES ($1, $2, $3, $4)
+              VALUES (${freeZoneId}, '${fieldName}', 'pending', 0.5)
               ON CONFLICT (free_zone_id, field) DO UPDATE
-              SET status = 'pending', last_analyzed = NOW()`,
-              [freeZoneId, fieldName, 'pending', 0.5]
+              SET status = 'pending', last_analyzed = NOW()`
             );
           }
           
