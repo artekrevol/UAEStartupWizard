@@ -162,8 +162,12 @@ export async function performWebResearch(query: string): Promise<any> {
         };
       });
       
-      // Sort by relevance score
-      enhancedResults.sort((a, b) => b.confidence - a.confidence);
+      // Sort by relevance score - ensure confidence values exist and are numbers
+      enhancedResults.sort((a, b) => {
+        const aConfidence = typeof a.confidence === 'number' ? a.confidence : 0;
+        const bConfidence = typeof b.confidence === 'number' ? b.confidence : 0;
+        return bConfidence - aConfidence;
+      });
       
       return {
         source: "internal",
@@ -225,8 +229,12 @@ export async function performWebResearch(query: string): Promise<any> {
           };
         }));
         
-        // Sort by relevance score
-        enhancedResults.sort((a, b) => b.confidence - a.confidence);
+        // Sort by relevance score - ensure confidence values exist and are numbers
+        enhancedResults.sort((a, b) => {
+          const aConfidence = typeof a.confidence === 'number' ? a.confidence : 0;
+          const bConfidence = typeof b.confidence === 'number' ? b.confidence : 0;
+          return bConfidence - aConfidence;
+        });
         
         return {
           source: "free_zones",
@@ -640,7 +648,7 @@ async function getFreeZoneDetailedInfo(freeZoneId: number): Promise<any> {
       facilities: formatFacilitiesList(freeZone.facilities),
       documentCategories: docCategories,
       totalDocuments: Object.values(docCategories).reduce((a, b) => a + b, 0),
-      lastUpdated: freeZone.updatedAt || freeZone.createdAt,
+      lastUpdated: freeZone.lastUpdated || new Date(),
       completenessScore: calculateCompletenessScore(freeZone)
     };
   } catch (error) {
@@ -834,7 +842,8 @@ export async function getFreeZoneKnowledge(freeZoneName: string): Promise<any> {
         benefits: freeZone.benefits,
         industries: freeZone.industries,
         requirements: freeZone.requirements,
-        additionalInfo: freeZone.additionalInfo
+        // Removed additionalInfo as it might not exist in the schema
+        // additionalInfo: freeZone.additionalInfo
       },
       relatedDocuments: relatedDocs.map(doc => ({
         id: doc.id,
