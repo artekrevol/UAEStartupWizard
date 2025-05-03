@@ -639,6 +639,65 @@ router.post('/create-tasks-from-audit', async (req, res) => {
   }
 });
 
+// Direct enrichment from audit results without creating tasks first
+router.post('/enrich-from-audit', async (req, res) => {
+  try {
+    const { selectedFields, batchSize = 5 } = req.body;
+    
+    if (!selectedFields || !Array.isArray(selectedFields) || selectedFields.length === 0) {
+      return res.status(400).json({ error: 'No fields selected for enrichment' });
+    }
+    
+    console.log(`[AI-PM] Direct enrichment for ${selectedFields.length} fields, batch size: ${batchSize}`);
+    
+    // Process only a batch at a time to avoid overwhelming the system
+    const fieldsToProcess = selectedFields.slice(0, batchSize);
+    
+    // Run enrichment directly using the enrichFreeZoneData function
+    const enrichmentResults = [];
+    
+    for (const field of fieldsToProcess) {
+      try {
+        const result = await enrichFreeZoneData(field.freeZoneId, field.freeZoneName, field.field);
+        
+        if (result) {
+          enrichmentResults.push({
+            freeZoneId: field.freeZoneId,
+            freeZoneName: field.freeZoneName,
+            field: field.field,
+            originalStatus: 'missing',
+            newStatus: 'complete',
+            content: result.content || '',
+            source: result.source || '',
+            confidence: result.confidence || 0.8
+          });
+        }
+      } catch (error) {
+        console.error(`[AI-PM] Error enriching ${field.freeZoneName} - ${field.field}:`, error);
+      }
+    }
+    
+    // Log the activity
+    await logActivity(
+      'direct-enrichment-from-audit',
+      `Enriched ${enrichmentResults.length} fields directly from audit results`,
+      { count: enrichmentResults.length, batchSize },
+      'enrichment-workflow',
+      'info'
+    );
+    
+    res.json({
+      success: true,
+      processed: fieldsToProcess.length,
+      results: enrichmentResults,
+      remainingFields: selectedFields.length - fieldsToProcess.length
+    });
+  } catch (error) {
+    console.error('Error in direct enrichment from audit:', error);
+    res.status(500).json({ error: String(error) });
+  }
+});
+
 // Test endpoint for logging
 router.post('/logs/test', async (req, res) => {
   try {

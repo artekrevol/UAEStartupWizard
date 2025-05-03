@@ -309,19 +309,99 @@ export default function EnrichmentWorkflow() {
       });
     } else {
       // Turn on auto mode
-      const interval = setInterval(() => {
-        runWorkflowMutation.mutate({ batchSize });
+      const interval = setInterval(async () => {
+        try {
+          // If there are existing deep audit results, use them directly for enrichment
+          if (deepAuditAllResults && deepAuditAllResults.auditResults) {
+            const allMissingFields = deepAuditAllResults.auditResults
+              .filter(auditResult => !auditResult.error)
+              .map(auditResult => ({
+                freeZoneId: auditResult.freeZoneId,
+                freeZoneName: auditResult.freeZoneName,
+                fields: auditResult.result?.existingData?.fieldsMissing || []
+              }))
+              .filter(item => item.fields.length > 0);
+
+            // Prepare fields for direct enrichment
+            const selectedFields = allMissingFields.flatMap(item => 
+              item.fields.map(field => ({
+                freeZoneId: item.freeZoneId,
+                freeZoneName: item.freeZoneName,
+                field
+              }))
+            );
+
+            // Use the new direct enrichment endpoint
+            if (selectedFields.length > 0) {
+              await axios.post('/api/ai-pm/enrich-from-audit', {
+                selectedFields,
+                batchSize: 5 // Moderate batch size for auto
+              });
+              
+              // Refresh data after processing
+              refetchTasks();
+              refetchMetrics();
+              
+              console.log(`Auto mode: processed ${Math.min(5, selectedFields.length)} fields from audit`);
+            } else {
+              console.log('Auto mode: no missing fields found in audit results');
+            }
+          } else {
+            // Fall back to standard workflow if no audit results exist
+            await runWorkflowMutation.mutateAsync({ batchSize: 5 });
+          }
+        } catch (error) {
+          console.error('Auto mode enrichment error:', error);
+        }
       }, 1000 * 60 * 10); // Run every 10 minutes
       
       setAutoInterval(interval);
       setAutoMode(true);
       
-      // Run immediately
-      runWorkflowMutation.mutate({ batchSize });
+      // Run immediately by triggering the same process
+      (async () => {
+        try {
+          if (deepAuditAllResults && deepAuditAllResults.auditResults) {
+            const allMissingFields = deepAuditAllResults.auditResults
+              .filter(auditResult => !auditResult.error)
+              .map(auditResult => ({
+                freeZoneId: auditResult.freeZoneId,
+                freeZoneName: auditResult.freeZoneName,
+                fields: auditResult.result?.existingData?.fieldsMissing || []
+              }))
+              .filter(item => item.fields.length > 0);
+
+            const selectedFields = allMissingFields.flatMap(item => 
+              item.fields.map(field => ({
+                freeZoneId: item.freeZoneId,
+                freeZoneName: item.freeZoneName,
+                field
+              }))
+            );
+
+            if (selectedFields.length > 0) {
+              await axios.post('/api/ai-pm/enrich-from-audit', {
+                selectedFields,
+                batchSize: 5
+              });
+              refetchTasks();
+              refetchMetrics();
+            } else {
+              // If no fields to process, run a standard workflow
+              await runWorkflowMutation.mutateAsync({ batchSize: 5 });
+            }
+          } else {
+            // If no audit, run a standard workflow
+            await runWorkflowMutation.mutateAsync({ batchSize: 5 });
+          }
+        } catch (error) {
+          console.error('Initial auto mode error:', error);
+        }
+      })();
       
       toast({
         title: "Auto mode enabled",
-        description: "Automatic enrichment will run every 10 minutes",
+        description: "Automatic enrichment will run every 10 minutes using latest audit data",
       });
     }
   };
