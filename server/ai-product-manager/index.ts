@@ -357,11 +357,21 @@ export async function enrichFreeZoneData(
     const fieldStatus = fieldsAnalysis[0].status as 'missing' | 'incomplete';
     
     // Check if the field has a recommendation to determine if it really needs enrichment
-    // Only block enrichment if the field is marked complete AND has no recommendation
+    // If the field is already complete and has no recommendation, return a success result instead of throwing an error
     if (fieldStatus === 'complete' && 
         (!fieldsAnalysis[0].recommendation || 
          fieldsAnalysis[0].recommendation === 'No recommendation needed')) {
-      throw new Error(`Field "${field}" is already complete for free zone ${freeZone.name}`);
+      console.log(`[AI-PM] Field "${field}" is already complete for free zone ${freeZone.name} - returning success`);
+      return {
+        freeZoneId,
+        freeZoneName: freeZone.name,
+        field,
+        originalStatus: 'incomplete', // Doesn't matter since it's already complete
+        newStatus: 'complete',
+        content: 'Already complete',
+        source: 'Database',
+        confidence: 0.9
+      };
     }
     
     // Use web research to find information about this field
