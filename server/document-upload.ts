@@ -429,8 +429,17 @@ const documentStorage = multer.diskStorage({
     cb(null, uploadsDir);
   },
   filename: (req, file, cb) => {
+    // Generate a unique filename suffix
     const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
-    const ext = path.extname(file.originalname);
+    
+    // Sanitize the original filename to remove potentially dangerous characters
+    const originalExt = path.extname(file.originalname);
+    const sanitizedName = sanitizeFilename(file.originalname.slice(0, file.originalname.length - originalExt.length));
+    
+    // Use a limited character set for file extensions
+    const ext = originalExt.toLowerCase();
+    
+    // Create the final filename
     cb(null, `${file.fieldname}-${uniqueSuffix}${ext}`);
   }
 });
@@ -482,19 +491,34 @@ export function processUploadedDocument(req: Request, res: Response, next: NextF
     }
     
     // Extract document type and category from the request
-    const { documentType = 'general', category = 'general', title, freeZoneId } = req.body;
+    // Validate and sanitize inputs to prevent injection
+    const documentType = (req.body.documentType || 'general').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 50);
+    const category = (req.body.category || 'general').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 50);
+    const title = req.body.title ? String(req.body.title).slice(0, 200) : '';
+    
+    // Validate freeZoneId is a valid integer
+    let freeZoneId: number | null = null;
+    if (req.body.freeZoneId) {
+      const parsedId = parseInt(req.body.freeZoneId);
+      if (!isNaN(parsedId) && parsedId > 0) {
+        freeZoneId = parsedId;
+      }
+    }
+    
+    // Clean any potential malicious filenames
+    const cleanOriginalName = sanitizeFilename(file.originalname);
     
     // Add metadata to the request for the next middleware
     req.body.documentFile = {
       filename: file.filename,
-      originalName: file.originalname,
+      originalName: cleanOriginalName,
       filePath: file.path,
       fileSize: file.size,
       mimetype: file.mimetype,
       documentType,
       category,
-      title: title || file.originalname.replace(/\.[^/.]+$/, ''),
-      freeZoneId: freeZoneId ? parseInt(freeZoneId) : null
+      title: title || cleanOriginalName.replace(/\.[^/.]+$/, ''),
+      freeZoneId
     };
     
     next();

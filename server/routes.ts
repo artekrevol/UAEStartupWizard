@@ -14,6 +14,7 @@ import { db } from "./db";
 import { eq, sql } from "drizzle-orm";
 import { businessActivityCategories, businessActivities, freeZones, documents, issuesLog } from "../shared/schema";
 import { documentUpload, processUploadedDocument, processDMCCDocuments, processSAIFZoneDocuments } from "./document-upload";
+import { validateFileUpload } from "./middleware/upload-validator";
 import { spawn } from 'child_process';
 import { registerAIProductManagerRoutes } from "./ai-product-manager/register-routes";
 import { registerDocumentFetcherRoutes } from "./document-fetcher-routes";
