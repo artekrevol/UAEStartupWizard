@@ -2128,7 +2128,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: req.body.message,
         stack_trace: req.body.stackTrace || req.body.stack_trace,
         url: req.body.url,
-        userAgent: req.headers["user-agent"],
+        user_agent: req.headers["user-agent"], // Changed from userAgent to user_agent to match schema
         component: req.body.component,
         action: req.body.action,
         metadata: req.body.metadata,
