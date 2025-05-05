@@ -432,14 +432,13 @@ const documentStorage = multer.diskStorage({
     // Generate a unique filename suffix
     const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
     
-    // Sanitize the original filename to remove potentially dangerous characters
-    const originalExt = path.extname(file.originalname);
-    const sanitizedName = sanitizeFilename(file.originalname.slice(0, file.originalname.length - originalExt.length));
+    // Use our enhanced sanitizeFilename function to fully sanitize the name and extension
+    const safeFilename = sanitizeFilename(file.originalname);
     
-    // Use a limited character set for file extensions
-    const ext = originalExt.toLowerCase();
+    // Get the safe extension from the sanitized filename
+    const ext = path.extname(safeFilename);
     
-    // Create the final filename
+    // Create the final filename with the fieldname prefix for better organization
     cb(null, `${file.fieldname}-${uniqueSuffix}${ext}`);
   }
 });
@@ -449,23 +448,35 @@ const documentStorage = multer.diskStorage({
  */
 const fileFilter = (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
   // Accept PDFs, docs, images, text files, etc.
+  // Keep this synchronized with ALLOWED_MIME_TYPES in middleware/upload-validator.ts
   const allowedMimes = [
+    // PDF
     'application/pdf',
+    // Word
     'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    // Excel
     'application/vnd.ms-excel',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    // PowerPoint
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    // Text
+    'text/plain',
+    'text/csv',
+    'text/markdown',
+    // Images
     'image/jpeg',
     'image/png',
-    'text/plain', // Added for testing
-    'text/csv',
-    'text/markdown'
+    'image/gif'
   ];
   
   if (allowedMimes.includes(file.mimetype)) {
+    // Sanitize filename before accepting
+    file.originalname = sanitizeFilename(file.originalname);
     cb(null, true);
   } else {
-    cb(new Error(`Unsupported file type: ${file.mimetype}`));
+    cb(new Error(`Unsupported file type: ${file.mimetype}. Only document, image, and text files are allowed.`));
   }
 };
 

@@ -2126,7 +2126,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         type: req.body.type,
         severity: req.body.severity,
         message: req.body.message,
-        stackTrace: req.body.stackTrace,
+        stack_trace: req.body.stackTrace || req.body.stack_trace,
         url: req.body.url,
         userAgent: req.headers["user-agent"],
         component: req.body.component,
