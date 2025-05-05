@@ -2,11 +2,31 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializeScraper } from "./scraper";
+import { apiRateLimiter } from "./middleware/rate-limiter";
 import path from "path";
 import fs from "fs";
 import { exec } from "child_process";
+import helmet from "helmet";
 
 const app = express();
+
+// Apply Helmet for security headers
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"], // Required for development
+      connectSrc: ["'self'", "https://api.openai.com"],
+      imgSrc: ["'self'", "data:", "https://*"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+}));
+
+// Apply API rate limiting to all API endpoints
+app.use('/api', apiRateLimiter);
+
 // Increase payload size limit to 100MB for handling large audit results
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: false, limit: '100mb' }));
@@ -82,12 +102,42 @@ app.use((req, res, next) => {
     log(`Error setting up scraper scheduler: ${error.message}`);
   }
 
+  // Improved error handling middleware to prevent exposing sensitive information
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    // Log the full error for debugging purposes
+    console.error('Application error:', err);
+    
     const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-    throw err;
+    
+    // Don't send internal error details to the client in production
+    const isProd = app.get('env') === 'production';
+    
+    // Sanitize error messages in production
+    let message = isProd ? 'An unexpected error occurred' : (err.message || 'Internal Server Error');
+    
+    // Handle specific error types with appropriate messages
+    if (err.code === '42703') { // PostgreSQL column does not exist
+      message = isProd ? 'Database query error' : 'Invalid database column referenced';
+    } else if (err.code && err.code.startsWith('23')) { // PostgreSQL constraint violations
+      message = isProd ? 'Data validation error' : 'Database constraint violation';
+    } else if (err.type === 'entity.too.large') {
+      message = 'Request entity too large';
+    } else if (err.code === 'ETIMEDOUT' || err.code === 'ECONNABORTED') {
+      message = 'Service timeout, please try again';
+    }
+    
+    // Send a sanitized response
+    res.status(status).json({ 
+      message,
+      error: isProd ? undefined : err.name, 
+      // Include a request ID for tracking in logs, if available
+      requestId: _req.headers['x-request-id'] || undefined
+    });
+    
+    // Don't throw the error in production - just log it
+    if (!isProd) {
+      throw err; // Re-throw for development environment only
+    }
   });
 
   if (app.get("env") === "development") {

@@ -1,7 +1,24 @@
 import OpenAI from "openai";
+import { RateLimiterMemory } from 'rate-limiter-flexible';
+
+// Verify OpenAI API key is set
+if (!process.env.OPENAI_API_KEY) {
+  console.error('ERROR: OPENAI_API_KEY environment variable is not set');
+  // Don't throw error to allow app to start, but API calls will fail gracefully
+}
+
+// Set up rate limiting to prevent abuse
+const rateLimiter = new RateLimiterMemory({
+  points: 50, // Number of points
+  duration: 60, // Per 60 seconds
+});
 
 // the newest OpenAI model is "gpt-4o" which was released May 13, 2024
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = new OpenAI({ 
+  apiKey: process.env.OPENAI_API_KEY,
+  maxRetries: 3, // Automatically retry failed requests up to 3 times
+  timeout: 30000 // 30 second timeout for API requests
+});
 
 function getMockRecommendations(requirements: {
   budget: number;
