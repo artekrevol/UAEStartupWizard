@@ -266,14 +266,20 @@ async function executeEnrichmentTask(task: EnrichmentTask, timeoutMs: number = 6
       // Update task status in database to completed
       if (task.id) {
         try {
+          // Validate task.id is a number before using it in SQL
+          const taskId = Number(task.id);
+          if (isNaN(taskId)) {
+            throw new Error('Invalid task ID');
+          }
+          
           await db.execute(sql`
             UPDATE enrichment_tasks
             SET status = 'completed',
                 completed_at = NOW(),
                 result = ${JSON.stringify(result)}
-            WHERE id = ${task.id}
+            WHERE id = ${taskId}
           `);
-          console.log(`[AI-PM] Updated task ID ${task.id} status to completed in database`);
+          console.log(`[AI-PM] Updated task ID ${taskId} status to completed in database`);
         } catch (updateError) {
           console.error(`[AI-PM] Error updating task status: ${updateError}`);
         }
@@ -291,14 +297,20 @@ async function executeEnrichmentTask(task: EnrichmentTask, timeoutMs: number = 6
       // Update task status in database to failed
       if (task.id) {
         try {
+          // Validate task.id is a number before using it in SQL
+          const taskId = Number(task.id);
+          if (isNaN(taskId)) {
+            throw new Error('Invalid task ID');
+          }
+          
           await db.execute(sql`
             UPDATE enrichment_tasks
             SET status = 'failed',
                 completed_at = NOW(),
                 result = ${JSON.stringify({ error: (error as Error).message })}
-            WHERE id = ${task.id}
+            WHERE id = ${taskId}
           `);
-          console.log(`[AI-PM] Updated task ID ${task.id} status to failed in database`);
+          console.log(`[AI-PM] Updated task ID ${taskId} status to failed in database`);
         } catch (updateError) {
           console.error(`[AI-PM] Error updating task status: ${updateError}`);
         }

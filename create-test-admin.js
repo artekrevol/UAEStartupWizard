@@ -17,8 +17,10 @@ async function hashPassword(password) {
 }
 
 async function createTestAdmin() {
-  const username = 'admin';
-  const password = 'admin123';
+  // Use environment variables for admin credentials
+  const username = process.env.ADMIN_USERNAME || 'admin';
+  // Generate a secure random password if not provided
+  const password = process.env.ADMIN_PASSWORD || require('crypto').randomBytes(16).toString('hex');
   const hashedPassword = await hashPassword(password);
   
   const pool = new Pool({
