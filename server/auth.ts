@@ -6,6 +6,8 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
 import { User as SelectUser } from "@shared/schema";
+import { authRateLimiter } from "./middleware/rate-limiter";
+import { validateRegister, validateLogin } from "./middleware/validators";
 
 declare global {
   namespace Express {
@@ -45,11 +47,27 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction) {
 }
 
 export function setupAuth(app: Express) {
+  // Set a default session secret if not provided, but log a warning
+  if (!process.env.SESSION_SECRET) {
+    console.warn('WARNING: SESSION_SECRET environment variable not set. Using a random default for this session only.');
+    // This is safe as it generates a new secret on each server restart
+    process.env.SESSION_SECRET = randomBytes(32).toString('hex');
+  }
+  
+  const isProd = app.get('env') === 'production';
+  
   const sessionSettings: session.SessionOptions = {
-    secret: process.env.SESSION_SECRET!,
+    secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     store: storage.sessionStore,
+    name: 'uae_business_assist_sid', // Custom session name instead of default 'connect.sid'
+    cookie: {
+      httpOnly: true, // Prevents client-side JS from reading the cookie
+      secure: isProd, // Requires HTTPS in production
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+      sameSite: 'lax' // Provides CSRF protection
+    }
   };
 
   app.set("trust proxy", 1);
@@ -74,7 +92,7 @@ export function setupAuth(app: Express) {
     done(null, user);
   });
 
-  app.post("/api/register", async (req, res, next) => {
+  app.post("/api/register", authRateLimiter, validateRegister, async (req, res, next) => {
     const existingUser = await storage.getUserByUsername(req.body.username);
     if (existingUser) {
       return res.status(400).send("Username already exists");
@@ -91,7 +109,7 @@ export function setupAuth(app: Express) {
     });
   });
 
-  app.post("/api/login", passport.authenticate("local"), (req, res) => {
+  app.post("/api/login", authRateLimiter, validateLogin, passport.authenticate("local"), (req, res) => {
     res.status(200).json(req.user);
   });
 
