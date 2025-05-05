@@ -1578,7 +1578,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Document upload endpoint with file attachment
-  app.post("/api/documents/upload", documentUpload.single('file'), processUploadedDocument, async (req: Request, res: Response) => {
+  app.post("/api/documents/upload", validateFileUpload, documentUpload.single('file'), processUploadedDocument, async (req: Request, res: Response) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     
     try {
@@ -1727,7 +1727,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Process SAIF Zone documents - requires admin
-  app.post("/api/documents/process-saif-zone", requireAdmin, async (req, res) => {
+  app.post("/api/documents/process-saif-zone", requireAdmin, validateFileUpload, async (req, res) => {
     try {
       console.log("Starting SAIF Zone document processing...");
       const result = await processSAIFZoneDocuments();
@@ -1977,7 +1977,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Create new SAIF Zone form (Admin only)
-  app.post("/api/saif-zone-forms", requireAdmin, async (req, res) => {
+  app.post("/api/saif-zone-forms", requireAdmin, validateFileUpload, async (req, res) => {
     try {
       const formData: InsertSaifZoneForm = req.body;
       const newForm = await storage.createSaifZoneForm(formData);

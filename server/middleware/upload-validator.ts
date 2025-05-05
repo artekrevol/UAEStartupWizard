@@ -2,15 +2,22 @@ import { Request, Response, NextFunction } from 'express';
 import path from 'path';
 
 const ALLOWED_MIME_TYPES = [
+  // PDF
   'application/pdf',
+  // Word
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  // Excel
   'application/vnd.ms-excel',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  // PowerPoint
   'application/vnd.ms-powerpoint',
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  // Text
   'text/plain',
   'text/csv',
+  'text/markdown',
+  // Images
   'image/jpeg',
   'image/png',
   'image/gif'
@@ -78,19 +85,40 @@ export function validateFileUpload(req: Request, res: Response, next: NextFuncti
 
 /**
  * Utility function to sanitize a filename
- * Removes potentially dangerous characters and ensures proper extension
+ * Removes potentially dangerous characters, controls file extensions, and prevents path traversal
  */
 export function sanitizeFilename(filename: string): string {
+  if (!filename || typeof filename !== 'string') {
+    return 'file_' + Date.now();
+  }
+
   // Remove any path components (e.g., "../../")
   let sanitized = path.basename(filename);
   
-  // Replace any non-alphanumeric characters except for periods, hyphens, and underscores
-  sanitized = sanitized.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+  // Split filename and extension
+  const extname = path.extname(sanitized);
+  const basename = path.basename(sanitized, extname);
+  
+  // Clean the basename - replace any non-alphanumeric characters except for hyphens and underscores
+  const cleanBasename = basename
+    .replace(/[^a-zA-Z0-9\-_]/g, '_')  // Replace invalid chars with underscores
+    .replace(/^[\-_.]+/, '')            // Remove leading special chars
+    .slice(0, 200);                     // Limit basename length
+  
+  // Clean the extension - only allow specific extensions
+  const allowedExtensions = [
+    '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+    '.txt', '.csv', '.jpg', '.jpeg', '.png', '.gif', '.md'
+  ];
+  
+  // Normalize extension to lowercase and check if it's allowed
+  const normalizedExt = extname.toLowerCase();
+  const finalExt = allowedExtensions.includes(normalizedExt) ? normalizedExt : '.txt';
   
   // Ensure filename isn't empty after sanitization
-  if (!sanitized || sanitized === '.') {
-    sanitized = 'file_' + Date.now();
+  if (!cleanBasename) {
+    return 'file_' + Date.now() + finalExt;
   }
   
-  return sanitized;
+  return cleanBasename + finalExt;
 }
