@@ -139,6 +139,22 @@ export async function getBusinessRecommendations(requirements: {
   estimatedCost: number;
 }> {
   try {
+    // Validate inputs to ensure no harmful inputs are sent to OpenAI
+    const validatedRequirements = {
+      budget: Math.max(0, Math.min(1000000000, requirements.budget)), // Limit to reasonable range
+      industry: (requirements.industry || '').slice(0, 100), // Limit string length
+      employees: Math.max(1, Math.min(100000, requirements.employees)),
+      activities: (requirements.activities || []).slice(0, 10).map(a => a.slice(0, 100)) // Limit array size and item length
+    };
+    
+    // Apply rate limiting
+    try {
+      await rateLimiter.consume('getBusinessRecommendations'); 
+    } catch (error) {
+      console.warn('Rate limit exceeded for business recommendations');
+      return getMockRecommendations(validatedRequirements);
+    }
+    
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
@@ -168,6 +184,22 @@ export async function getBusinessRecommendations(requirements: {
 
 export async function generateDocumentRequirements(businessType: string, freeZone: string): Promise<string[]> {
   try {
+    // Validate inputs
+    const sanitizedBusinessType = (businessType || '').trim().slice(0, 100);
+    const sanitizedFreeZone = (freeZone || '').trim().slice(0, 100);
+    
+    if (!sanitizedBusinessType || !sanitizedFreeZone) {
+      throw new Error('Business type and free zone must be provided');
+    }
+    
+    // Apply rate limiting
+    try {
+      await rateLimiter.consume('generateDocumentRequirements');
+    } catch (error) {
+      console.warn('Rate limit exceeded for document requirements generation');
+      return getMockDocuments(sanitizedBusinessType);
+    }
+    
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
@@ -237,12 +269,57 @@ export async function getUAEBusinessAssistantResponse({
   sources: Array<{ title: string; content: string }>;
 }> {
   try {
+    // Validate and sanitize input
+    const sanitizedQuery = (query || '').trim().slice(0, 500);
+    
+    if (!sanitizedQuery) {
+      return {
+        answer: "I couldn't understand your question. Please provide a clear question about UAE business setup.",
+        sources: []
+      };
+    }
+    
+    // Apply rate limiting
+    try {
+      await rateLimiter.consume('getUAEBusinessAssistantResponse');
+    } catch (error) {
+      console.warn('Rate limit exceeded for UAE business assistant');
+      // Fall through to the mock response mechanism in the catch block
+      throw new Error('Rate limit exceeded');
+    }
+    
+    // Validate context data to prevent injection attacks
+    const validatedFreeZoneData = freeZoneData?.map(zone => ({
+      name: (zone.name || '').slice(0, 100),
+      description: (zone.description || '').slice(0, 1000),
+      location: (zone.location || '').slice(0, 100),
+      benefits: Array.isArray(zone.benefits) ? zone.benefits.slice(0, 10).map(b => String(b).slice(0, 100)) : [],
+      requirements: Array.isArray(zone.requirements) ? zone.requirements.slice(0, 10).map(r => String(r).slice(0, 100)) : [],
+      industries: Array.isArray(zone.industries) ? zone.industries.slice(0, 10).map(i => String(i).slice(0, 100)) : []
+    }));
+    
+    const validatedEstablishmentGuideData = establishmentGuideData?.map(guide => ({
+      category: (guide.category || '').slice(0, 100),
+      title: (guide.title || '').slice(0, 200),
+      content: (guide.content || '').slice(0, 2000),
+      requirements: Array.isArray(guide.requirements) ? guide.requirements.slice(0, 10).map(r => String(r).slice(0, 100)) : [],
+      documents: Array.isArray(guide.documents) ? guide.documents.slice(0, 10).map(d => String(d).slice(0, 100)) : [],
+      steps: Array.isArray(guide.steps) ? guide.steps.slice(0, 10) : []
+    }));
+    
+    const validatedUserContext = userBusinessContext ? {
+      industry: (userBusinessContext.industry || '').slice(0, 100),
+      businessType: (userBusinessContext.businessType || '').slice(0, 100),
+      freeZone: (userBusinessContext.freeZone || '').slice(0, 100),
+      budget: userBusinessContext.budget ? Math.max(0, Math.min(1000000000, userBusinessContext.budget)) : undefined,
+      employees: userBusinessContext.employees ? Math.max(0, Math.min(100000, userBusinessContext.employees)) : undefined
+    } : undefined;
     // Prepare context from database records
     let contextText = "";
     const sources: Array<{ title: string; content: string }> = [];
     
     // Add free zone data to context
-    if (freeZoneData && freeZoneData.length > 0) {
+    if (validatedFreeZoneData && validatedFreeZoneData.length > 0) {
       freeZoneData.forEach(zone => {
         const zoneContext = `
 Free Zone: ${zone.name}

@@ -1,11 +1,21 @@
 import { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 
+// Password strength validator
+const passwordSchema = z.string()
+  .min(10, "Password must be at least 10 characters")
+  .max(100, "Password is too long (maximum 100 characters)")
+  .refine(password => /[A-Z]/.test(password), "Password must contain at least one uppercase letter")
+  .refine(password => /[a-z]/.test(password), "Password must contain at least one lowercase letter")
+  .refine(password => /[0-9]/.test(password), "Password must contain at least one number")
+  .refine(password => /[^A-Za-z0-9]/.test(password), "Password must contain at least one special character");
+
 // User registration schema
 const userRegisterSchema = z.object({
-  username: z.string().min(3).max(50),
-  password: z.string().min(8).max(100),
-  company_name: z.string().optional(),
+  username: z.string().min(3).max(50)
+    .refine(username => /^[a-zA-Z0-9_-]+$/.test(username), "Username can only contain letters, numbers, underscore, and hyphen"),
+  password: passwordSchema,
+  company_name: z.string().max(200).optional(),
   role: z.enum(['user', 'admin']).optional().default('user'),
 });
 

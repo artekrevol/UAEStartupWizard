@@ -93,24 +93,44 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/register", authRateLimiter, validateRegister, async (req, res, next) => {
-    const existingUser = await storage.getUserByUsername(req.body.username);
-    if (existingUser) {
-      return res.status(400).send("Username already exists");
+    try {
+      const existingUser = await storage.getUserByUsername(req.body.username);
+      if (existingUser) {
+        return res.status(400).json({ message: "Username already exists" });
+      }
+
+      // Only include allowed fields to prevent mass assignment vulnerabilities
+      const safeUserData = {
+        username: req.body.username,
+        password: await hashPassword(req.body.password),
+        company_name: req.body.company_name,
+        // Force role to 'user' on registration regardless of what was provided
+        // Admin roles should be assigned through a separate secure process
+        role: 'user'
+      };
+
+      const user = await storage.createUser(safeUserData);
+
+      req.login(user, (err) => {
+        if (err) return next(err);
+        
+        // Remove sensitive data before sending response
+        const { password, ...safeResponseData } = user;
+        res.status(201).json(safeResponseData);
+      });
+    } catch (error) {
+      next(error);
     }
-
-    const user = await storage.createUser({
-      ...req.body,
-      password: await hashPassword(req.body.password),
-    });
-
-    req.login(user, (err) => {
-      if (err) return next(err);
-      res.status(201).json(user);
-    });
   });
 
   app.post("/api/login", authRateLimiter, validateLogin, passport.authenticate("local"), (req, res) => {
-    res.status(200).json(req.user);
+    // Sanitize the user object before sending to client
+    if (req.user) {
+      const { password, ...safeUserData } = req.user;
+      res.status(200).json(safeUserData);
+    } else {
+      res.status(401).json({ message: 'Authentication failed' });
+    }
   });
 
   app.post("/api/logout", (req, res, next) => {
@@ -122,6 +142,12 @@ export function setupAuth(app: Express) {
 
   app.get("/api/user", (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    res.json(req.user);
+    // Sanitize the user object before sending to client
+    if (req.user) {
+      const { password, ...safeUserData } = req.user;
+      res.json(safeUserData);
+    } else {
+      res.sendStatus(401);
+    }
   });
 }
