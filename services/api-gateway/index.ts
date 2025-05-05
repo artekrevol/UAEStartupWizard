@@ -25,40 +25,20 @@ const apiLimiter = rateLimit({
 });
 app.use(apiLimiter);
 
-// Authentication middleware (JWT verification)
-function authenticateJWT(req: express.Request, res: express.Response, next: express.NextFunction) {
-  // Will be implemented with actual JWT validation
-  // For now, we'll just validate if Authorization header exists
-  const authHeader = req.headers.authorization;
-  
-  if (authHeader) {
-    // In production, validate the token and set user info on request
-    // req.user = decodedToken.user;
-    next();
-  } else {
-    // Public routes will be defined separately
-    // Check if this is a public route
-    if (isPublicRoute(req.path, req.method)) {
-      next();
-    } else {
-      res.status(401).json({ message: 'Unauthorized' });
-    }
-  }
-}
+// Import authentication middleware
+import { authenticateJWT } from './middleware/auth';
 
-// Define public routes that don't need authentication
-function isPublicRoute(path: string, method: string): boolean {
-  const publicRoutes = [
-    { path: '/api/auth/login', method: 'POST' },
-    { path: '/api/auth/register', method: 'POST' },
-    { path: '/api/freezone/public', method: 'GET' },
-    // Add other public routes as needed
-  ];
-  
-  return publicRoutes.some(route => 
-    path.startsWith(route.path) && (route.method === '*' || route.method === method)
-  );
-}
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    services: {
+      gateway: 'online'
+      // Other service statuses would be fetched dynamically
+    }
+  });
+});
 
 // Apply authentication to all API routes
 app.use('/api', authenticateJWT);
