@@ -911,7 +911,7 @@ export default function EnrichmentWorkflow() {
                       groups[key].tasks.push(task);
                       return groups;
                     }, {})).map(([freeZoneKey, freeZoneGroup]) => (
-                      <React.Fragment key={freeZoneKey.toString()}>
+                      <div key={freeZoneKey.toString()} className="task-group-container">
                         {/* Free Zone header with select/deselect controls */}
                         <div className="grid grid-cols-12 p-2 bg-muted/30 items-center">
                           <div className="col-span-1"></div>
@@ -969,7 +969,7 @@ export default function EnrichmentWorkflow() {
                             </div>
                           </div>
                         ))}
-                      </React.Fragment>
+                      </div>
                     ))}
                   </div>
                 </div>
