@@ -9,6 +9,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { 
   CheckIcon, 
   RefreshCw, 
@@ -148,6 +157,10 @@ export default function EnrichmentWorkflow() {
   const [deepAuditAllResults, setDeepAuditAllResults] = useState<DeepAuditAllResult | null>(null);
   const [selectedAuditResults, setSelectedAuditResults] = useState<{freeZoneId: number, fields: string[]}[]>([]);
   const [isCreatingTasks, setIsCreatingTasks] = useState(false);
+  
+  // Dialog state for task confirmation
+  const [showConfirmationDialog, setShowConfirmationDialog] = useState(false);
+  const [tasksToConfirm, setTasksToConfirm] = useState<{tasks: EnrichmentTask[], batchSize: number} | null>(null);
 
   // Define response types for the API
   interface EnrichmentTasksResponse {
@@ -327,7 +340,7 @@ export default function EnrichmentWorkflow() {
     });
   };
 
-  // Execute selected tasks
+  // Execute selected tasks with confirmation dialog where needed
   const executeSelectedTasks = () => {
     if (selectedTasks.length === 0) {
       toast({
@@ -338,30 +351,42 @@ export default function EnrichmentWorkflow() {
       return;
     }
     
-    // Warn if too many tasks selected
-    const MAX_RECOMMENDED_TASKS = 10;
-    if (selectedTasks.length > MAX_RECOMMENDED_TASKS) {
-      // Ask for confirmation
-      if (!window.confirm(`You've selected ${selectedTasks.length} tasks, which may take a long time to process and could cause timeouts. It's recommended to process no more than ${MAX_RECOMMENDED_TASKS} tasks at once. Do you want to continue anyway?`)) {
-        return;
-      }
-    }
-    
     // Limit batch size to a maximum of 10 tasks at a time to prevent overwhelming the system
     const effectiveBatchSize = Math.min(selectedTasks.length, 10);
     
+    // Warn if too many tasks selected
+    const MAX_RECOMMENDED_TASKS = 10;
+    if (selectedTasks.length > MAX_RECOMMENDED_TASKS) {
+      // Show confirmation dialog instead of window.confirm
+      setTasksToConfirm({
+        tasks: selectedTasks,
+        batchSize: effectiveBatchSize
+      });
+      setShowConfirmationDialog(true);
+      return;
+    }
+    
+    // If not too many tasks, execute directly
+    executeEnrichmentTasksWithBatchSize(selectedTasks, effectiveBatchSize);
+  };
+  
+  // Execute tasks after confirmation or directly if under the limit
+  const executeEnrichmentTasksWithBatchSize = (tasks: EnrichmentTask[], batchSize: number) => {
     executeEnrichmentMutation.mutate({ 
-      tasks: selectedTasks, 
-      batchSize: effectiveBatchSize 
+      tasks: tasks, 
+      batchSize: batchSize 
     });
     
     // Show toast about batch size if it was limited
-    if (effectiveBatchSize < selectedTasks.length) {
+    if (batchSize < tasks.length) {
       toast({
         title: "Batch size limited",
-        description: `For better performance, only ${effectiveBatchSize} tasks will be processed at once, even though ${selectedTasks.length} were selected.`
+        description: `For better performance, only ${batchSize} tasks will be processed at once, even though ${tasks.length} were selected.`
       });
     }
+    
+    // Close dialog if it was open
+    setShowConfirmationDialog(false);
   };
 
   // Run enrichment workflow
@@ -1347,6 +1372,37 @@ export default function EnrichmentWorkflow() {
           </Card>
         </TabsContent>
       </Tabs>
+      
+      {/* Confirmation Dialog for Large Task Selections */}
+      <Dialog open={showConfirmationDialog} onOpenChange={setShowConfirmationDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Warning: Large Task Selection</DialogTitle>
+            <DialogDescription>
+              You've selected {tasksToConfirm?.tasks.length || 0} tasks, which may take a long time to process and could cause timeouts. 
+              It's recommended to process no more than 10 tasks at once.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 text-amber-600">
+            <AlertTriangleIcon className="h-6 w-6 inline-block mr-2" />
+            <span>Processing too many tasks at once can lead to performance issues or timeouts.</span>
+          </div>
+          <DialogFooter className="flex justify-between">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowConfirmationDialog(false)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => tasksToConfirm && executeEnrichmentTasksWithBatchSize(tasksToConfirm.tasks, tasksToConfirm.batchSize)}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              Proceed Anyway
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
