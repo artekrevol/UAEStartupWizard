@@ -8,6 +8,7 @@ import { InsertDocument } from '@shared/schema';
 import { db } from './db';
 import { sql } from 'drizzle-orm';
 import { documents } from '@shared/schema';
+import { sanitizeFilename } from './middleware/upload-validator';
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(process.cwd(), 'uploads');
