@@ -155,6 +155,20 @@ export const aiTrainingData = pgTable('ai_training_data', {
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
+// SAIF Zone Forms
+export const saifZoneForms = pgTable('saif_zone_forms', {
+  id: serial('id').primaryKey(),
+  title: text('title').notNull(),
+  description: text('description'),
+  formType: text('form_type').notNull(),
+  fileUrl: text('file_url'),
+  requirements: jsonb('requirements').default({}),
+  formFields: jsonb('form_fields').default([]),
+  submission: jsonb('submission').default({}),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
 // Document Types (reference data)
 export const documentTypes = pgTable('document_types', {
   id: serial('id').primaryKey(),
@@ -256,6 +270,7 @@ export const insertTemplateSubmissionSchema = createInsertSchema(templateSubmiss
 export const insertBusinessSetupSchema = createInsertSchema(businessSetup).omit({ id: true });
 export const insertAiTrainingDataSchema = createInsertSchema(aiTrainingData).omit({ id: true });
 export const insertDocumentTypeSchema = createInsertSchema(documentTypes).omit({ id: true });
+export const insertSaifZoneFormSchema = createInsertSchema(saifZoneForms).omit({ id: true });
 export const insertAssistantMemorySchema = createInsertSchema(assistantMemory).omit({ id: true });
 export const insertIssuesLogSchema = createInsertSchema(issuesLog).omit({ id: true });
 export const insertConversationSchema = createInsertSchema(conversations).omit({ id: true });
@@ -275,6 +290,7 @@ export type TemplateSubmission = typeof templateSubmissions.$inferSelect;
 export type BusinessSetup = typeof businessSetup.$inferSelect;
 export type AiTrainingData = typeof aiTrainingData.$inferSelect;
 export type DocumentType = typeof documentTypes.$inferSelect;
+export type SaifZoneForm = typeof saifZoneForms.$inferSelect;
 export type AssistantMemory = typeof assistantMemory.$inferSelect;
 export type IssuesLog = typeof issuesLog.$inferSelect;
 export type Conversation = typeof conversations.$inferSelect;
@@ -293,6 +309,7 @@ export type InsertTemplateSubmission = z.infer<typeof insertTemplateSubmissionSc
 export type InsertBusinessSetup = z.infer<typeof insertBusinessSetupSchema>;
 export type InsertAiTrainingData = z.infer<typeof insertAiTrainingDataSchema>;
 export type InsertDocumentType = z.infer<typeof insertDocumentTypeSchema>;
+export type InsertSaifZoneForm = z.infer<typeof insertSaifZoneFormSchema>;
 export type InsertAssistantMemory = z.infer<typeof insertAssistantMemorySchema>;
 export type InsertIssuesLog = z.infer<typeof insertIssuesLogSchema>;
 export type InsertConversation = z.infer<typeof insertConversationSchema>;
