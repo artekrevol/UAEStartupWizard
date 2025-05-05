@@ -337,11 +337,31 @@ export default function EnrichmentWorkflow() {
       });
       return;
     }
-
+    
+    // Warn if too many tasks selected
+    const MAX_RECOMMENDED_TASKS = 10;
+    if (selectedTasks.length > MAX_RECOMMENDED_TASKS) {
+      // Ask for confirmation
+      if (!window.confirm(`You've selected ${selectedTasks.length} tasks, which may take a long time to process and could cause timeouts. It's recommended to process no more than ${MAX_RECOMMENDED_TASKS} tasks at once. Do you want to continue anyway?`)) {
+        return;
+      }
+    }
+    
+    // Limit batch size to a maximum of 10 tasks at a time to prevent overwhelming the system
+    const effectiveBatchSize = Math.min(selectedTasks.length, 10);
+    
     executeEnrichmentMutation.mutate({ 
       tasks: selectedTasks, 
-      batchSize: selectedTasks.length 
+      batchSize: effectiveBatchSize 
     });
+    
+    // Show toast about batch size if it was limited
+    if (effectiveBatchSize < selectedTasks.length) {
+      toast({
+        title: "Batch size limited",
+        description: `For better performance, only ${effectiveBatchSize} tasks will be processed at once, even though ${selectedTasks.length} were selected.`
+      });
+    }
   };
 
   // Run enrichment workflow

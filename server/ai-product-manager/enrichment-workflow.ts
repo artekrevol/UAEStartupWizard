@@ -241,6 +241,135 @@ export async function generateEnrichmentTasks(): Promise<EnrichmentTask[]> {
  * @param tasks The tasks to execute
  * @param batchSize Maximum number of tasks to execute in this batch
  */
+/**
+ * Execute a single enrichment task with timeout protection
+ */
+async function executeEnrichmentTask(task: EnrichmentTask, timeoutMs: number = 60000): Promise<{
+  task: EnrichmentTask,
+  success: boolean,
+  result?: any,
+  error?: string
+}> {
+  // Create a promise that rejects after the timeout
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error(`Task execution timed out after ${timeoutMs}ms`)), timeoutMs);
+  });
+  
+  // Create the actual task execution promise
+  const executionPromise = (async () => {
+    try {
+      // Execute the enrichment
+      const result = await enrichFreeZoneData(task.freeZoneId, task.field);
+      
+      // Update task status in database to completed
+      if (task.id) {
+        try {
+          await db.execute(sql`
+            UPDATE enrichment_tasks
+            SET status = 'completed',
+                completed_at = NOW(),
+                result = ${JSON.stringify(result)}
+            WHERE id = ${task.id}
+          `);
+          console.log(`[AI-PM] Updated task ID ${task.id} status to completed in database`);
+        } catch (updateError) {
+          console.error(`[AI-PM] Error updating task status: ${updateError}`);
+        }
+      }
+      
+      // Return successful result
+      return {
+        task,
+        success: true,
+        result
+      };
+    } catch (error) {
+      console.error(`Error executing task for ${task.freeZoneName} - ${task.field}: ${error}`);
+      
+      // Update task status in database to failed
+      if (task.id) {
+        try {
+          await db.execute(sql`
+            UPDATE enrichment_tasks
+            SET status = 'failed',
+                completed_at = NOW(),
+                result = ${JSON.stringify({ error: (error as Error).message })}
+            WHERE id = ${task.id}
+          `);
+          console.log(`[AI-PM] Updated task ID ${task.id} status to failed in database`);
+        } catch (updateError) {
+          console.error(`[AI-PM] Error updating task status: ${updateError}`);
+        }
+      }
+      
+      // Log the task failure
+      await logActivity(
+        'enrichment-task-failed',
+        `Failed to enrich ${task.field} for ${task.freeZoneName}: ${(error as Error).message}`,
+        { 
+          freeZoneId: task.freeZoneId,
+          freeZoneName: task.freeZoneName,
+          field: task.field,
+          error: (error as Error).message
+        },
+        'ai-product-manager',
+        'warning'
+      );
+      
+      // Return failed result
+      return {
+        task,
+        success: false,
+        error: (error as Error).message
+      };
+    }
+  })();
+  
+  // Race between the execution and timeout
+  try {
+    return await Promise.race([executionPromise, timeoutPromise]);
+  } catch (error) {
+    // If we got here, it's likely a timeout
+    console.error(`Task execution for ${task.freeZoneName} - ${task.field} timed out`);
+    
+    // Update task status in database to failed
+    if (task.id) {
+      try {
+        await db.execute(sql`
+          UPDATE enrichment_tasks
+          SET status = 'failed',
+              completed_at = NOW(),
+              result = ${JSON.stringify({ error: (error as Error).message })}
+          WHERE id = ${task.id}
+        `);
+        console.log(`[AI-PM] Updated task ID ${task.id} status to failed in database (timeout)`);
+      } catch (updateError) {
+        console.error(`[AI-PM] Error updating task status: ${updateError}`);
+      }
+    }
+    
+    // Log the timeout
+    await logActivity(
+      'enrichment-task-timeout',
+      `Task timed out for ${task.field} on ${task.freeZoneName}: ${(error as Error).message}`,
+      { 
+        freeZoneId: task.freeZoneId,
+        freeZoneName: task.freeZoneName,
+        field: task.field,
+        error: (error as Error).message
+      },
+      'ai-product-manager',
+      'warning'
+    );
+    
+    return {
+      task,
+      success: false,
+      error: `Task execution timed out after ${timeoutMs}ms`
+    };
+  }
+}
+
 export async function executeEnrichmentTasks(
   tasks: EnrichmentTask[], 
   batchSize: number = 3
@@ -251,93 +380,41 @@ export async function executeEnrichmentTasks(
   results: any[]
 }> {
   try {
+    // Ensure batchSize doesn't exceed a reasonable limit to prevent overwhelming the system
+    const effectiveBatchSize = Math.min(batchSize, 10);
+    
     // Log the batch execution start
     await logActivity(
       'enrichment-batch-start',
-      `Starting batch execution of ${Math.min(tasks.length, batchSize)} enrichment tasks`,
+      `Starting batch execution of ${Math.min(tasks.length, effectiveBatchSize)} enrichment tasks`,
       { 
         totalTasks: tasks.length,
-        batchSize
+        batchSize: effectiveBatchSize
       }
     );
     
-    const tasksToExecute = tasks.slice(0, batchSize);
+    const tasksToExecute = tasks.slice(0, effectiveBatchSize);
     const results = [];
     
     let successfulTasks = 0;
     let failedTasks = 0;
     
-    // Execute each task
+    // Execute each task with a 2-minute timeout
     for (const task of tasksToExecute) {
-      try {
-        // Execute the enrichment
-        const result = await enrichFreeZoneData(task.freeZoneId, task.field);
-        
-        // Update task status in database to completed
-        if (task.id) {
-          try {
-            await db.execute(sql`
-              UPDATE enrichment_tasks
-              SET status = 'completed',
-                  completed_at = NOW(),
-                  result = ${JSON.stringify(result)}
-              WHERE id = ${task.id}
-            `);
-            console.log(`[AI-PM] Updated task ID ${task.id} status to completed in database`);
-          } catch (updateError) {
-            console.error(`[AI-PM] Error updating task status: ${updateError}`);
-          }
-        }
-        
-        // Record the successful result
-        results.push({
-          task,
-          success: true,
-          result
-        });
-        
+      console.log(`[AI-PM] Executing task for ${task.freeZoneName} - ${task.field}`);
+      const taskResult = await executeEnrichmentTask(task, 120000); // 2-minute timeout
+      
+      results.push(taskResult);
+      
+      if (taskResult.success) {
         successfulTasks++;
-      } catch (error) {
-        console.error(`Error executing task for ${task.freeZoneName} - ${task.field}: ${error}`);
-        
-        // Update task status in database to failed
-        if (task.id) {
-          try {
-            await db.execute(sql`
-              UPDATE enrichment_tasks
-              SET status = 'failed',
-                  completed_at = NOW(),
-                  result = ${JSON.stringify({ error: (error as Error).message })}
-              WHERE id = ${task.id}
-            `);
-            console.log(`[AI-PM] Updated task ID ${task.id} status to failed in database`);
-          } catch (updateError) {
-            console.error(`[AI-PM] Error updating task status: ${updateError}`);
-          }
-        }
-        
-        // Record the failed result
-        results.push({
-          task,
-          success: false,
-          error: (error as Error).message
-        });
-        
+      } else {
         failedTasks++;
-        
-        // Log the task failure
-        await logActivity(
-          'enrichment-task-failed',
-          `Failed to enrich ${task.field} for ${task.freeZoneName}: ${(error as Error).message}`,
-          { 
-            freeZoneId: task.freeZoneId,
-            freeZoneName: task.freeZoneName,
-            field: task.field,
-            error: (error as Error).message
-          },
-          'ai-product-manager',
-          'warning'
-        );
+      }
+      
+      // Add a small delay between tasks to avoid API rate limits
+      if (tasksToExecute.length > 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000)); // 1-second delay
       }
     }
     
@@ -502,20 +579,21 @@ export async function analyzeEnrichmentPerformance(): Promise<{
     const avgContentLength = contentLengthCount > 0 ? totalContentLength / contentLengthCount : 0;
     
     // Find most enriched fields
-    const fieldCounts = {};
-    const freeZoneCounts = {};
+    const fieldCounts: Record<string, number> = {};
+    const freeZoneCounts: Record<string, number> = {};
     
     for (const log of successfulLogs) {
       const metadata = typeof log.metadata === 'string' 
         ? JSON.parse(log.metadata) 
         : log.metadata;
       
-      if (metadata) {
-        if (metadata.field) {
+      // Ensure we're working with a properly typed metadata object
+      if (metadata && typeof metadata === 'object') {
+        if (metadata.field && typeof metadata.field === 'string') {
           fieldCounts[metadata.field] = (fieldCounts[metadata.field] || 0) + 1;
         }
         
-        if (metadata.freeZoneName) {
+        if (metadata.freeZoneName && typeof metadata.freeZoneName === 'string') {
           freeZoneCounts[metadata.freeZoneName] = (freeZoneCounts[metadata.freeZoneName] || 0) + 1;
         }
       }
