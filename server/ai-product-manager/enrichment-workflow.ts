@@ -18,7 +18,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // Define importance weights for different fields
 // Higher weight means higher priority for enrichment
-const FIELD_IMPORTANCE = {
+const FIELD_IMPORTANCE: Record<string, number> = {
   setup_process: 10,
   legal_requirements: 9,
   fee_structure: 8,
@@ -186,7 +186,9 @@ export async function generateEnrichmentTasks(): Promise<EnrichmentTask[]> {
       
       // Generate tasks for each incomplete field
       for (const field of incompleteFields) {
-        const importance = FIELD_IMPORTANCE[field.field] || 5; // Default importance if not specified
+        // Ensure field.field is a string and exists in our importance mapping
+        const fieldName = (field.field && typeof field.field === 'string') ? field.field : '';
+        const importance = fieldName && FIELD_IMPORTANCE[fieldName] ? FIELD_IMPORTANCE[fieldName] : 5; // Default importance if not specified
         
         // Calculate priority score based on importance, status and confidence
         // Missing fields get higher priority than incomplete ones
@@ -199,7 +201,7 @@ export async function generateEnrichmentTasks(): Promise<EnrichmentTask[]> {
         allTasks.push({
           freeZoneId: analysis.freeZoneId,
           freeZoneName: analysis.freeZoneName,
-          field: field.field,
+          field: fieldName, // Use the validated fieldName instead of direct access
           status: field.status,
           confidence: field.confidence || 0.5,
           importance,
