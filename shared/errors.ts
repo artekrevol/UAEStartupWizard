@@ -1,116 +1,161 @@
 /**
- * Shared Error Types and Handling
- * 
- * Provides standardized error types and handling across microservices
+ * Error handling utilities for the application
  */
 
-/**
- * Error codes used throughout the application
- */
+// Error codes for specific errors
 export enum ErrorCode {
-  // Client errors - 4xx
-  INVALID_INPUT = 'INVALID_INPUT',
+  // Generic errors
+  UNKNOWN_ERROR = 'UNKNOWN_ERROR',
   VALIDATION_ERROR = 'VALIDATION_ERROR',
-  UNAUTHORIZED = 'UNAUTHORIZED',
-  INVALID_TOKEN = 'INVALID_TOKEN',
-  TOKEN_EXPIRED = 'TOKEN_EXPIRED',
-  INVALID_CREDENTIALS = 'INVALID_CREDENTIALS',
-  FORBIDDEN = 'FORBIDDEN',
-  NOT_FOUND = 'NOT_FOUND',
-  USER_NOT_FOUND = 'USER_NOT_FOUND',
-  DOCUMENT_NOT_FOUND = 'DOCUMENT_NOT_FOUND',
-  CONFLICT = 'CONFLICT',
-  USER_ALREADY_EXISTS = 'USER_ALREADY_EXISTS',
-  RATE_LIMIT_EXCEEDED = 'RATE_LIMIT_EXCEEDED',
-  
-  // Server errors - 5xx
-  INTERNAL_ERROR = 'INTERNAL_ERROR',
   DATABASE_ERROR = 'DATABASE_ERROR',
-  SERVICE_UNAVAILABLE = 'SERVICE_UNAVAILABLE'
+  NOT_FOUND = 'NOT_FOUND',
+  FORBIDDEN = 'FORBIDDEN',
+  UNAUTHORIZED = 'UNAUTHORIZED',
+  CONFLICT = 'CONFLICT',
+  BAD_REQUEST = 'BAD_REQUEST',
+  
+  // User-related errors
+  USER_NOT_FOUND = 'USER_NOT_FOUND',
+  USER_ALREADY_EXISTS = 'USER_ALREADY_EXISTS',
+  INVALID_CREDENTIALS = 'INVALID_CREDENTIALS',
+  SESSION_EXPIRED = 'SESSION_EXPIRED',
+  
+  // Document-related errors
+  DOCUMENT_NOT_FOUND = 'DOCUMENT_NOT_FOUND',
+  DOCUMENT_ALREADY_EXISTS = 'DOCUMENT_ALREADY_EXISTS',
+  DOCUMENT_UPLOAD_FAILED = 'DOCUMENT_UPLOAD_FAILED',
+  
+  // Freezone-related errors
+  FREEZONE_NOT_FOUND = 'FREEZONE_NOT_FOUND',
+  FREEZONE_ALREADY_EXISTS = 'FREEZONE_ALREADY_EXISTS',
+  CATEGORY_NOT_FOUND = 'CATEGORY_NOT_FOUND',
+  ACTIVITY_NOT_FOUND = 'ACTIVITY_NOT_FOUND',
+  
+  // API-related errors
+  API_RATE_LIMIT_EXCEEDED = 'API_RATE_LIMIT_EXCEEDED',
+  API_UNAVAILABLE = 'API_UNAVAILABLE',
+  
+  // External service errors
+  EXTERNAL_SERVICE_ERROR = 'EXTERNAL_SERVICE_ERROR',
+  AI_SERVICE_ERROR = 'AI_SERVICE_ERROR',
+  
+  // File-related errors
+  FILE_NOT_FOUND = 'FILE_NOT_FOUND',
+  FILE_TOO_LARGE = 'FILE_TOO_LARGE',
+  INVALID_FILE_TYPE = 'INVALID_FILE_TYPE',
+  
+  // Data enrichment errors
+  ENRICHMENT_FAILED = 'ENRICHMENT_FAILED',
+  SCRAPER_ERROR = 'SCRAPER_ERROR'
 }
 
-/**
- * Custom exception class for service-specific errors
- */
+// Base exception class
 export class ServiceException extends Error {
-  code: ErrorCode;
-  details?: Record<string, any>;
+  public code: ErrorCode;
+  public details?: any;
+  public status: number;
   
-  constructor(code: ErrorCode, message: string, details?: Record<string, any>) {
+  constructor(code: ErrorCode, message: string, details?: any, status: number = 500) {
     super(message);
+    this.name = 'ServiceException';
     this.code = code;
     this.details = details;
-    this.name = 'ServiceException';
+    this.status = status;
     
-    // Ensure stack trace works in derived classes
+    // Ensure proper prototype chain for instanceof checks
     Object.setPrototypeOf(this, ServiceException.prototype);
   }
 }
 
-/**
- * Database specific exception
- */
+// Database-specific exception
 export class DatabaseException extends ServiceException {
-  constructor(message: string, details?: Record<string, any>) {
-    super(ErrorCode.DATABASE_ERROR, message, details);
+  constructor(message: string, details?: any) {
+    super(ErrorCode.DATABASE_ERROR, message, details, 500);
     this.name = 'DatabaseException';
     
-    // Ensure stack trace works in derived classes
+    // Ensure proper prototype chain for instanceof checks
     Object.setPrototypeOf(this, DatabaseException.prototype);
   }
 }
 
-/**
- * Validation exception for input validation errors
- */
+// Validation exception
 export class ValidationException extends ServiceException {
-  constructor(message: string, details?: Record<string, any>) {
-    super(ErrorCode.VALIDATION_ERROR, message, details);
+  constructor(message: string, details?: any) {
+    super(ErrorCode.VALIDATION_ERROR, message, details, 400);
     this.name = 'ValidationException';
     
-    // Ensure stack trace works in derived classes
+    // Ensure proper prototype chain for instanceof checks
     Object.setPrototypeOf(this, ValidationException.prototype);
   }
 }
 
-/**
- * Resource not found exception
- */
+// Not found exception
 export class NotFoundException extends ServiceException {
-  constructor(resourceType: string, id: string | number) {
+  constructor(resourceType: string, resourceId: number | string) {
     super(
-      ErrorCode.NOT_FOUND, 
-      `${resourceType} with ID ${id} not found`
+      ErrorCode.NOT_FOUND,
+      `${resourceType} with ID ${resourceId} not found`,
+      { resourceType, resourceId },
+      404
     );
     this.name = 'NotFoundException';
     
-    // Ensure stack trace works in derived classes
+    // Ensure proper prototype chain for instanceof checks
     Object.setPrototypeOf(this, NotFoundException.prototype);
   }
 }
 
-/**
- * Exception for unauthorized access
- */
-export class UnauthorizedException extends ServiceException {
-  constructor(message: string = 'Unauthorized access') {
-    super(ErrorCode.UNAUTHORIZED, message);
-    this.name = 'UnauthorizedException';
+// Authentication exception
+export class AuthenticationException extends ServiceException {
+  constructor(message: string, details?: any) {
+    super(ErrorCode.UNAUTHORIZED, message, details, 401);
+    this.name = 'AuthenticationException';
     
-    // Ensure stack trace works in derived classes
-    Object.setPrototypeOf(this, UnauthorizedException.prototype);
+    // Ensure proper prototype chain for instanceof checks
+    Object.setPrototypeOf(this, AuthenticationException.prototype);
   }
 }
 
-/**
- * Exception for forbidden access (authorized but not allowed)
- */
-export class ForbiddenException extends ServiceException {
-  constructor(message: string = 'Access forbidden') {
-    super(ErrorCode.FORBIDDEN, message);
-    this.name = 'ForbiddenException';
+// Authorization exception
+export class AuthorizationException extends ServiceException {
+  constructor(message: string, details?: any) {
+    super(ErrorCode.FORBIDDEN, message, details, 403);
+    this.name = 'AuthorizationException';
     
-    // Ensure stack trace works in derived classes
-    Object.setPrototypeOf(this, ForbiddenException.prototype);
+    // Ensure proper prototype chain for instanceof checks
+    Object.setPrototypeOf(this, AuthorizationException.prototype);
+  }
+}
+
+// Rate limit exception
+export class RateLimitException extends ServiceException {
+  constructor(message: string, details?: any) {
+    super(ErrorCode.API_RATE_LIMIT_EXCEEDED, message, details, 429);
+    this.name = 'RateLimitException';
+    
+    // Ensure proper prototype chain for instanceof checks
+    Object.setPrototypeOf(this, RateLimitException.prototype);
+  }
+}
+
+// External service exception
+export class ExternalServiceException extends ServiceException {
+  constructor(message: string, details?: any) {
+    super(ErrorCode.EXTERNAL_SERVICE_ERROR, message, details, 502);
+    this.name = 'ExternalServiceException';
+    
+    // Ensure proper prototype chain for instanceof checks
+    Object.setPrototypeOf(this, ExternalServiceException.prototype);
+  }
+}
+
+// AI service exception
+export class AIServiceException extends ServiceException {
+  constructor(message: string, details?: any) {
+    super(ErrorCode.AI_SERVICE_ERROR, message, details, 502);
+    this.name = 'AIServiceException';
+    
+    // Ensure proper prototype chain for instanceof checks
+    Object.setPrototypeOf(this, AIServiceException.prototype);
   }
 }

@@ -1,90 +1,75 @@
-import { NextFunction, Request, Response } from 'express';
-import { ServiceException, ErrorCode } from '../errors';
+import { Request, Response, NextFunction } from 'express';
+import { 
+  ServiceException, 
+  ErrorCode, 
+  ValidationException, 
+  DatabaseException, 
+  AuthenticationException,
+  AuthorizationException,
+  RateLimitException,
+  ExternalServiceException
+} from '../errors';
 
 /**
- * Map error codes to HTTP status codes
+ * Async handler to catch errors in async route handlers
+ * @param fn The route handler function
+ * @returns A function that handles errors in async route handlers
  */
-const ERROR_CODE_TO_STATUS = {
-  // Client errors - 4xx
-  [ErrorCode.INVALID_INPUT]: 400,
-  [ErrorCode.VALIDATION_ERROR]: 400,
-  [ErrorCode.UNAUTHORIZED]: 401,
-  [ErrorCode.INVALID_TOKEN]: 401,
-  [ErrorCode.TOKEN_EXPIRED]: 401,
-  [ErrorCode.INVALID_CREDENTIALS]: 401,
-  [ErrorCode.FORBIDDEN]: 403,
-  [ErrorCode.NOT_FOUND]: 404,
-  [ErrorCode.USER_NOT_FOUND]: 404,
-  [ErrorCode.DOCUMENT_NOT_FOUND]: 404,
-  [ErrorCode.CONFLICT]: 409,
-  [ErrorCode.USER_ALREADY_EXISTS]: 409,
-  [ErrorCode.RATE_LIMIT_EXCEEDED]: 429,
-  
-  // Server errors - 5xx
-  [ErrorCode.INTERNAL_ERROR]: 500,
-  [ErrorCode.DATABASE_ERROR]: 500,
-  [ErrorCode.SERVICE_UNAVAILABLE]: 503,
+export const asyncHandler = (fn: Function) => (req: Request, res: Response, next: NextFunction) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
 };
 
 /**
- * Centralized error handling middleware
- * Formats and returns consistent error responses
+ * Global error handler middleware
  */
-export const errorHandler = (
-  err: Error | ServiceException,
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  const isServiceError = err instanceof ServiceException;
+export const errorHandler = (err: Error, req: Request, res: Response, next: NextFunction) => {
+  console.error(`[Error] ${err.message}`, err);
   
-  // Default error values
-  let statusCode = 500;
-  let message = 'Internal Server Error';
-  let errorCode = ErrorCode.INTERNAL_ERROR;
-  let errorDetails = null;
-  
-  // Handle service errors (expected errors)
-  if (isServiceError) {
-    const serviceError = err as ServiceException;
-    errorCode = serviceError.code;
-    statusCode = ERROR_CODE_TO_STATUS[errorCode] || 500;
-    message = serviceError.message;
-    errorDetails = serviceError.details;
-  } else {
-    // Log unexpected errors for monitoring
-    console.error('Unexpected error:', err);
+  // Handle ServiceException
+  if (err instanceof ServiceException) {
+    return res.status(err.status).json({
+      status: 'error',
+      code: err.code,
+      message: err.message,
+      details: err.details
+    });
   }
   
-  // Development vs Production error response
-  const isDev = process.env.NODE_ENV === 'development';
+  // Handle 404 errors
+  if (err.message === 'Not Found') {
+    return res.status(404).json({
+      status: 'error',
+      code: ErrorCode.NOT_FOUND,
+      message: 'Resource not found'
+    });
+  }
   
-  const errorResponse = {
-    status: 'error',
-    code: errorCode,
-    message,
-    ...(isDev && { stack: err.stack }),
-    ...(errorDetails && { details: errorDetails })
-  };
+  // Handle validation errors from express-validator
+  if (err.name === 'ValidationError') {
+    return res.status(400).json({
+      status: 'error',
+      code: ErrorCode.VALIDATION_ERROR,
+      message: 'Validation error',
+      details: err
+    });
+  }
   
-  res.status(statusCode).json(errorResponse);
-};
-
-/**
- * Middleware for handling 404 Not Found errors
- */
-export const notFoundHandler = (req: Request, res: Response) => {
-  res.status(404).json({
+  // Handle unexpected errors
+  return res.status(500).json({
     status: 'error',
-    message: `Route not found: ${req.method} ${req.originalUrl}`
+    code: ErrorCode.UNKNOWN_ERROR,
+    message: 'An unexpected error occurred',
+    details: process.env.NODE_ENV === 'development' ? err.message : undefined
   });
 };
 
 /**
- * Async route handler wrapper to avoid try/catch blocks in routes
+ * 404 handler middleware
  */
-export const asyncHandler = (fn: Function) => {
-  return (req: Request, res: Response, next: NextFunction) => {
-    Promise.resolve(fn(req, res, next)).catch(next);
-  };
+export const notFoundHandler = (req: Request, res: Response, next: NextFunction) => {
+  res.status(404).json({
+    status: 'error',
+    code: ErrorCode.NOT_FOUND,
+    message: `Route not found: ${req.method} ${req.originalUrl}`
+  });
 };
