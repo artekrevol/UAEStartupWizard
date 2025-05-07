@@ -80,7 +80,7 @@ export const scrapeFreeZones = async (): Promise<{ count: number, freeZones: any
     console.log(`[Scraper] Found ${freeZones.length} potential free zones`);
     
     // Progress update
-    eventBus.publish('scraper-progress', {
+    communicator.broadcast('scraper.progress', {
       type: 'free-zones',
       status: 'in-progress',
       progress: 50,
@@ -98,13 +98,13 @@ export const scrapeFreeZones = async (): Promise<{ count: number, freeZones: any
     console.log(`[Scraper] Processed ${freeZones.length} free zones`);
     
     // Final progress update
-    eventBus.publish('scraper-progress', {
+    communicator.broadcast('scraper.progress', {
       type: 'free-zones',
       status: 'completed',
       progress: 100,
       message: `Completed processing ${freeZones.length} free zones`,
       timestamp: new Date().toISOString()
-    });
+    }, { priority: MessagePriority.HIGH });
     
     return {
       count: freeZones.length,
@@ -114,13 +114,13 @@ export const scrapeFreeZones = async (): Promise<{ count: number, freeZones: any
     console.error(`[Scraper] Error scraping free zones: ${error}`);
     
     // Publish error event
-    eventBus.publish('scraper-progress', {
+    communicator.broadcast('scraper.progress', {
       type: 'free-zones',
       status: 'error',
       progress: 0,
       message: `Error scraping free zones: ${error instanceof Error ? error.message : String(error)}`,
       timestamp: new Date().toISOString()
-    });
+    }, { priority: MessagePriority.HIGH });
     
     throw error;
   }
@@ -134,7 +134,7 @@ export const scrapeEstablishmentGuides = async (): Promise<{ count: number, guid
     console.log('[Scraper] Starting establishment guides scraping...');
     
     // Publish progress event
-    eventBus.publish('scraper-progress', {
+    communicator.broadcast('scraper.progress', {
       type: 'establishment-guides',
       status: 'in-progress',
       progress: 0,
@@ -201,7 +201,7 @@ export const scrapeEstablishmentGuides = async (): Promise<{ count: number, guid
     console.log(`[Scraper] Found ${guides.length} establishment guides`);
     
     // Progress update
-    eventBus.publish('scraper-progress', {
+    communicator.broadcast('scraper.progress', {
       type: 'establishment-guides',
       status: 'in-progress',
       progress: 50,
@@ -219,13 +219,13 @@ export const scrapeEstablishmentGuides = async (): Promise<{ count: number, guid
     console.log(`[Scraper] Processed ${guides.length} establishment guides`);
     
     // Final progress update
-    eventBus.publish('scraper-progress', {
+    communicator.broadcast('scraper.progress', {
       type: 'establishment-guides',
       status: 'completed',
       progress: 100,
       message: `Completed processing ${guides.length} establishment guides`,
       timestamp: new Date().toISOString()
-    });
+    }, { priority: MessagePriority.HIGH });
     
     return {
       count: guides.length,
@@ -235,13 +235,13 @@ export const scrapeEstablishmentGuides = async (): Promise<{ count: number, guid
     console.error(`[Scraper] Error scraping establishment guides: ${error}`);
     
     // Publish error event
-    eventBus.publish('scraper-progress', {
+    communicator.broadcast('scraper.progress', {
       type: 'establishment-guides',
       status: 'error',
       progress: 0,
       message: `Error scraping establishment guides: ${error instanceof Error ? error.message : String(error)}`,
       timestamp: new Date().toISOString()
-    });
+    }, { priority: MessagePriority.HIGH });
     
     throw error;
   }
@@ -257,7 +257,7 @@ export const scrapeFreeZoneWebsite = async (url: string, freeZoneId?: number): P
     console.log(`[Scraper] Starting free zone website scraping for ${url}...`);
     
     // Publish progress event
-    eventBus.publish('scraper-progress', {
+    communicator.broadcast('scraper.progress', {
       type: 'free-zone-website',
       status: 'in-progress',
       progress: 0,
@@ -314,7 +314,7 @@ export const scrapeFreeZoneWebsite = async (url: string, freeZoneId?: number): P
     };
     
     // Progress update
-    eventBus.publish('scraper-progress', {
+    communicator.broadcast('scraper.progress', {
       type: 'free-zone-website',
       status: 'completed',
       progress: 100,
@@ -322,27 +322,25 @@ export const scrapeFreeZoneWebsite = async (url: string, freeZoneId?: number): P
       url,
       freeZoneId,
       timestamp: new Date().toISOString()
-    });
-    
-    console.log(`[Scraper] Completed free zone website scraping for ${url}`);
+    }, { priority: MessagePriority.HIGH });
     
     return {
       success: true,
       data: websiteData
     };
   } catch (error) {
-    console.error(`[Scraper] Error scraping free zone website: ${error}`);
+    console.error(`[Scraper] Error scraping free zone website ${url}: ${error}`);
     
     // Publish error event
-    eventBus.publish('scraper-progress', {
+    communicator.broadcast('scraper.progress', {
       type: 'free-zone-website',
       status: 'error',
       progress: 0,
-      message: `Error scraping free zone website: ${error instanceof Error ? error.message : String(error)}`,
+      message: `Error scraping free zone website ${url}: ${error instanceof Error ? error.message : String(error)}`,
       url,
       freeZoneId,
       timestamp: new Date().toISOString()
-    });
+    }, { priority: MessagePriority.HIGH });
     
     return {
       success: false,

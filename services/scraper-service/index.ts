@@ -3,13 +3,17 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { json, urlencoded } from 'body-parser';
 import cron from 'node-cron';
-import { eventBus } from '../../shared/event-bus';
+import { initCommunication, MessagePriority } from '../../shared/communication/service-communicator';
 import scraperRoutes from './routes/scraperRoutes';
-import { scrapeFreeZones, scrapeEstablishmentGuides } from './utils/scraper';
+import { scrapeFreeZones, scrapeEstablishmentGuides, scrapeFreeZoneWebsite } from './utils/scraper-with-communication';
 
 // Initialize Express app
 const app = express();
 const PORT = process.env.SCRAPER_SERVICE_PORT || 3004;
+const SERVICE_NAME = 'scraper-service';
+
+// Initialize communication system
+const communicator = initCommunication(SERVICE_NAME);
 
 // Middleware
 app.use(helmet());
@@ -21,7 +25,7 @@ app.use(urlencoded({ extended: true, limit: '10mb' }));
 app.get('/health', (req, res) => {
   res.status(200).json({
     status: 'healthy',
-    service: 'scraper-service',
+    service: SERVICE_NAME,
     timestamp: new Date().toISOString(),
     uptime: process.uptime()
   });
@@ -38,8 +42,8 @@ const initializeScheduledJobs = () => {
     console.log('[Scraper Service] Starting monthly data update');
     
     try {
-      // Publish event before starting
-      eventBus.publish('scraper-job-started', {
+      // Broadcast job started event
+      communicator.broadcast('scraper.job.started', {
         type: 'monthly-update',
         timestamp: new Date().toISOString()
       });
@@ -50,35 +54,46 @@ const initializeScheduledJobs = () => {
       
       console.log('[Scraper Service] Completed monthly data update');
       
-      // Publish event after completion
-      eventBus.publish('scraper-job-completed', {
+      // Broadcast job completed event
+      communicator.broadcast('scraper.job.completed', {
         type: 'monthly-update',
         timestamp: new Date().toISOString(),
         status: 'success'
-      });
+      }, { priority: MessagePriority.HIGH });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error(`[Scraper Service] Error during monthly update: ${errorMessage}`);
       
-      // Publish event for error
-      eventBus.publish('scraper-job-error', {
+      // Broadcast error event
+      communicator.broadcast('scraper.job.error', {
         type: 'monthly-update',
         timestamp: new Date().toISOString(),
         error: errorMessage
-      });
+      }, { priority: MessagePriority.HIGH });
     }
   });
   
-  // Listen for dynamic job scheduling events
-  eventBus.subscribe('schedule-scraping-job', async (data) => {
-    console.log(`[Scraper Service] Received job scheduling request: ${JSON.stringify(data)}`);
+  // Set up event handlers for job scheduling
+  setupJobSchedulingHandlers();
+};
+
+// Set up job scheduling handlers
+const setupJobSchedulingHandlers = () => {
+  // Listen for job scheduling requests
+  communicator.onMessage('scraper.schedule.job', async (data) => {
+    console.log(`[Scraper Service] Received job scheduling request:`, data);
     
     try {
-      const { schedule, type } = data;
+      const { schedule, type, requestId, replyTo } = data;
       
       // Validate schedule format
       if (!cron.validate(schedule)) {
         console.error(`[Scraper Service] Invalid cron schedule: ${schedule}`);
+        
+        // Send error response if this was a request
+        if (requestId && replyTo) {
+          communicator.respond(data, null, `Invalid cron schedule: ${schedule}`);
+        }
         return;
       }
       
@@ -98,8 +113,8 @@ const initializeScheduledJobs = () => {
           
           console.log(`[Scraper Service] Completed scheduled job type: ${type}`);
           
-          // Publish event after completion
-          eventBus.publish('scraper-job-completed', {
+          // Broadcast completion event
+          communicator.broadcast('scraper.job.completed', {
             type: `scheduled-${type}`,
             schedule,
             timestamp: new Date().toISOString(),
@@ -109,40 +124,55 @@ const initializeScheduledJobs = () => {
           const errorMessage = error instanceof Error ? error.message : String(error);
           console.error(`[Scraper Service] Error during scheduled job: ${errorMessage}`);
           
-          // Publish event for error
-          eventBus.publish('scraper-job-error', {
+          // Broadcast error event
+          communicator.broadcast('scraper.job.error', {
             type: `scheduled-${type}`,
             schedule,
             timestamp: new Date().toISOString(),
             error: errorMessage
-          });
+          }, { priority: MessagePriority.HIGH });
         }
       });
       
       console.log(`[Scraper Service] Successfully scheduled job with pattern: ${schedule} for type: ${type}`);
       
-      // Publish confirmation event
-      eventBus.publish('scraper-job-scheduled', {
+      // Broadcast job scheduled event
+      communicator.broadcast('scraper.job.scheduled', {
         type,
         schedule,
         timestamp: new Date().toISOString()
       });
+      
+      // Send success response if this was a request
+      if (requestId && replyTo) {
+        communicator.respond(data, {
+          success: true,
+          type,
+          schedule,
+          message: `Successfully scheduled ${type} job with pattern: ${schedule}`
+        });
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error(`[Scraper Service] Error scheduling job: ${errorMessage}`);
+      
+      // Send error response if this was a request
+      if (data.requestId && data.replyTo) {
+        communicator.respond(data, null, errorMessage);
+      }
     }
   });
 };
 
 // Set up event handlers for service registration
-const setupEventHandlers = () => {
-  // Register service with API Gateway when it's ready
-  eventBus.subscribe('api-gateway-ready', () => {
+const setupServiceRegistration = () => {
+  // Set up handler for API Gateway-related messages
+  communicator.onMessage('api-gateway.ready', () => {
     console.log('[Scraper Service] API Gateway is ready, registering service');
     
     // Register with API Gateway
-    eventBus.publish('service-registered', {
-      name: 'scraper-service',
+    communicator.sendToService('api-gateway', 'service.register', {
+      name: SERVICE_NAME,
       host: process.env.SCRAPER_SERVICE_HOST || 'localhost',
       port: Number(PORT),
       healthEndpoint: '/health',
@@ -153,21 +183,55 @@ const setupEventHandlers = () => {
         { path: '/api/scraper/schedule', methods: ['POST'] },
         { path: '/api/scraper/status', methods: ['GET'] }
       ]
-    });
+    }, { priority: MessagePriority.HIGH });
   });
   
-  // Handle service health check requests
-  eventBus.subscribe('health-check', (data) => {
-    if (data.service === 'all' || data.service === 'scraper-service') {
-      console.log('[Scraper Service] Received health check request');
-      
-      // Respond with health status
-      eventBus.publish('health-status', {
-        service: 'scraper-service',
+  // Handle health check requests
+  communicator.onMessage('service.health.check', (data, message) => {
+    console.log('[Scraper Service] Received health check request');
+    
+    // If request came from API Gateway, respond directly
+    if (message.source === 'api-gateway' && data.requestId) {
+      communicator.respond(data, {
+        service: SERVICE_NAME,
         status: 'healthy',
         uptime: process.uptime(),
         timestamp: new Date().toISOString()
       });
+    } 
+    // Otherwise, broadcast health status
+    else {
+      communicator.broadcast('service.health.status', {
+        service: SERVICE_NAME,
+        status: 'healthy',
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+  
+  // Request handlers for scraper operations
+  communicator.onMessage('scraper.run.free-zones', async (data) => {
+    console.log('[Scraper Service] Received request to scrape free zones');
+    
+    try {
+      const result = await scrapeFreeZones();
+      communicator.respond(data, { success: true, result });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      communicator.respond(data, null, errorMessage);
+    }
+  });
+  
+  communicator.onMessage('scraper.run.establishment-guides', async (data) => {
+    console.log('[Scraper Service] Received request to scrape establishment guides');
+    
+    try {
+      const result = await scrapeEstablishmentGuides();
+      communicator.respond(data, { success: true, result });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      communicator.respond(data, null, errorMessage);
     }
   });
 };
@@ -175,8 +239,8 @@ const setupEventHandlers = () => {
 // Start the server
 const startServer = async () => {
   try {
-    // Set up event handlers
-    setupEventHandlers();
+    // Set up service registration
+    setupServiceRegistration();
     
     // Initialize scheduled jobs
     initializeScheduledJobs();
@@ -184,6 +248,12 @@ const startServer = async () => {
     // Start listening
     app.listen(PORT, () => {
       console.log(`[Scraper Service] Server running on port ${PORT}`);
+      
+      // Announce service is ready
+      communicator.broadcast('service.ready', {
+        name: SERVICE_NAME,
+        timestamp: new Date().toISOString()
+      }, { priority: MessagePriority.HIGH });
       
       // Run an initial scrape on startup if needed
       if (process.env.RUN_INITIAL_SCRAPE === 'true') {
@@ -208,11 +278,14 @@ const startServer = async () => {
 process.on('SIGTERM', () => {
   console.log('[Scraper Service] SIGTERM received, shutting down gracefully');
   
-  // Unregister from API Gateway
-  eventBus.publish('service-deregistered', {
-    name: 'scraper-service',
+  // Broadcast service shutdown
+  communicator.broadcast('service.shutdown', {
+    name: SERVICE_NAME,
     timestamp: new Date().toISOString()
-  });
+  }, { priority: MessagePriority.CRITICAL });
+  
+  // Disconnect from message bus
+  communicator.disconnect();
   
   process.exit(0);
 });
@@ -220,11 +293,14 @@ process.on('SIGTERM', () => {
 process.on('SIGINT', () => {
   console.log('[Scraper Service] SIGINT received, shutting down gracefully');
   
-  // Unregister from API Gateway
-  eventBus.publish('service-deregistered', {
-    name: 'scraper-service',
+  // Broadcast service shutdown
+  communicator.broadcast('service.shutdown', {
+    name: SERVICE_NAME,
     timestamp: new Date().toISOString()
-  });
+  }, { priority: MessagePriority.CRITICAL });
+  
+  // Disconnect from message bus
+  communicator.disconnect();
   
   process.exit(0);
 });
