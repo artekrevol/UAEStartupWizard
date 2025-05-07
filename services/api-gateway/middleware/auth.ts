@@ -3,17 +3,19 @@ import jwt from 'jsonwebtoken';
 import { ServiceException, ErrorCode } from '../../../shared/errors';
 
 /**
- * JWT Payload structure
+ * Interface for JWT payload
  */
-interface JwtPayload {
+export interface JwtPayload {
   userId: number;
-  username: string;
+  email: string;
   role: string;
-  iat?: number;
   exp?: number;
+  iat?: number;
 }
 
-// Extend Express Request type to include user information
+/**
+ * Extended Express Request with user property
+ */
 declare global {
   namespace Express {
     interface Request {
@@ -23,162 +25,175 @@ declare global {
 }
 
 /**
- * List of routes that don't require authentication
+ * Get JWT secret from environment variables
  */
-const PUBLIC_ROUTES = [
-  { path: '/api/auth/login', method: 'POST' },
-  { path: '/api/auth/register', method: 'POST' },
-  { path: '/api/auth/forgot-password', method: 'POST' },
-  { path: '/api/auth/reset-password', method: 'POST' },
-  { path: '/health', method: 'GET' },
-  { path: '/api/health', method: 'GET' },
-];
+const getJwtSecret = (): string => {
+  const secret = process.env.JWT_SECRET;
+  
+  if (!secret) {
+    console.error('JWT_SECRET environment variable is not set');
+    throw new ServiceException(
+      ErrorCode.UNAUTHORIZED,
+      'Authentication configuration error',
+      undefined,
+      500
+    );
+  }
+  
+  return secret;
+};
 
 /**
- * Middleware to authenticate JWT tokens
- * Validates token and attaches user info to request object
+ * Authenticate JWT middleware
+ * Verifies JWT token from Authorization header and attaches user to request
  */
 export const authenticateJWT = (req: Request, res: Response, next: NextFunction) => {
-  // Skip authentication for public routes
-  if (isPublicRoute(req.path, req.method)) {
-    return next();
-  }
-
-  const authHeader = req.headers.authorization;
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return next(new ServiceException(
-      ErrorCode.UNAUTHORIZED,
-      'Access denied. No token provided.'
-    ));
-  }
-
-  const token = authHeader.split(' ')[1];
-  
   try {
-    // Get JWT secret from environment
-    const jwtSecret = process.env.JWT_SECRET;
+    // Get authorization header
+    const authHeader = req.headers.authorization;
     
-    if (!jwtSecret) {
-      console.error('JWT_SECRET environment variable not set');
-      return next(new ServiceException(
-        ErrorCode.INTERNAL_ERROR,
-        'Authentication service configuration error'
-      ));
-    }
-    
-    // Verify JWT token
-    const decoded = jwt.verify(token, jwtSecret) as JwtPayload;
-    
-    // Attach user info to request
-    req.user = decoded;
-    
-    next();
-  } catch (error) {
-    if (error instanceof jwt.TokenExpiredError) {
-      return next(new ServiceException(
-        ErrorCode.TOKEN_EXPIRED,
-        'Token expired'
-      ));
-    }
-    
-    if (error instanceof jwt.JsonWebTokenError) {
-      return next(new ServiceException(
-        ErrorCode.INVALID_TOKEN,
-        'Invalid token'
-      ));
-    }
-    
-    return next(new ServiceException(
-      ErrorCode.UNAUTHORIZED,
-      'Failed to authenticate token'
-    ));
-  }
-};
-
-/**
- * Check if a route is public (doesn't require authentication)
- */
-export const isPublicRoute = (path: string, method: string): boolean => {
-  return PUBLIC_ROUTES.some(
-    route => 
-      (route.path === path || (route.path.endsWith('*') && path.startsWith(route.path.slice(0, -1)))) && 
-      (route.method === method || route.method === '*')
-  );
-};
-
-/**
- * Middleware to check if user has admin role
- */
-export const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
-  if (!req.user) {
-    return next(new ServiceException(
-      ErrorCode.UNAUTHORIZED,
-      'Authentication required'
-    ));
-  }
-  
-  if (req.user.role !== 'admin') {
-    return next(new ServiceException(
-      ErrorCode.FORBIDDEN,
-      'Admin privileges required for this operation'
-    ));
-  }
-  
-  next();
-};
-
-/**
- * Middleware to check if user has analyst role or higher
- */
-export const requireAnalyst = (req: Request, res: Response, next: NextFunction) => {
-  if (!req.user) {
-    return next(new ServiceException(
-      ErrorCode.UNAUTHORIZED,
-      'Authentication required'
-    ));
-  }
-  
-  if (req.user.role !== 'admin' && req.user.role !== 'analyst') {
-    return next(new ServiceException(
-      ErrorCode.FORBIDDEN,
-      'Analyst privileges required for this operation'
-    ));
-  }
-  
-  next();
-};
-
-/**
- * Middleware to check if user is accessing their own resources
- * or has admin privileges
- */
-export const requireOwnership = (userIdParam: string = 'userId') => {
-  return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.user) {
-      return next(new ServiceException(
+    if (!authHeader) {
+      throw new ServiceException(
         ErrorCode.UNAUTHORIZED,
-        'Authentication required'
-      ));
+        'Authorization header is missing',
+        undefined,
+        401
+      );
     }
     
-    const paramUserId = parseInt(req.params[userIdParam], 10);
+    // Extract token
+    const token = authHeader.split(' ')[1];
     
-    if (isNaN(paramUserId)) {
-      return next(new ServiceException(
-        ErrorCode.INVALID_INPUT,
-        `Invalid user ID parameter: ${userIdParam}`
-      ));
+    if (!token) {
+      throw new ServiceException(
+        ErrorCode.UNAUTHORIZED,
+        'Bearer token is missing',
+        undefined,
+        401
+      );
     }
     
-    // Allow if user is admin or if they're accessing their own resources
-    if (req.user.role === 'admin' || req.user.userId === paramUserId) {
+    // Verify token
+    try {
+      const payload = jwt.verify(token, getJwtSecret()) as JwtPayload;
+      req.user = payload;
+      next();
+    } catch (error) {
+      if (error.name === 'TokenExpiredError') {
+        throw new ServiceException(
+          ErrorCode.SESSION_EXPIRED,
+          'Your session has expired. Please login again.',
+          undefined,
+          401
+        );
+      } else {
+        throw new ServiceException(
+          ErrorCode.UNAUTHORIZED,
+          'Invalid authentication token',
+          undefined,
+          401
+        );
+      }
+    }
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Optional JWT authentication middleware
+ * Tries to verify JWT token but continues if token is invalid or missing
+ */
+export const optionalAuthenticateJWT = (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Get authorization header
+    const authHeader = req.headers.authorization;
+    
+    // If no header or token, continue
+    if (!authHeader) {
       return next();
     }
     
-    return next(new ServiceException(
-      ErrorCode.FORBIDDEN,
-      'You are not authorized to access this resource'
-    ));
-  };
+    // Extract token
+    const token = authHeader.split(' ')[1];
+    
+    if (!token) {
+      return next();
+    }
+    
+    // Try to verify token
+    try {
+      const payload = jwt.verify(token, getJwtSecret()) as JwtPayload;
+      req.user = payload;
+    } catch (error) {
+      // Continue even if token is invalid
+      // Just don't set the user
+    }
+    
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Require admin role middleware
+ * Must be used after authenticateJWT
+ */
+export const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user) {
+      throw new ServiceException(
+        ErrorCode.UNAUTHORIZED,
+        'Authentication required',
+        undefined,
+        401
+      );
+    }
+    
+    if (req.user.role !== 'admin') {
+      throw new ServiceException(
+        ErrorCode.FORBIDDEN,
+        'Admin role required',
+        undefined,
+        403
+      );
+    }
+    
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Generate JWT token
+ */
+export const generateToken = (payload: Omit<JwtPayload, 'iat' | 'exp'>, expiresIn: string = '24h'): string => {
+  return jwt.sign(payload, getJwtSecret(), { expiresIn });
+};
+
+/**
+ * Validate JWT token
+ */
+export const validateToken = (token: string): JwtPayload => {
+  try {
+    return jwt.verify(token, getJwtSecret()) as JwtPayload;
+  } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      throw new ServiceException(
+        ErrorCode.SESSION_EXPIRED,
+        'Your session has expired. Please login again.',
+        undefined,
+        401
+      );
+    } else {
+      throw new ServiceException(
+        ErrorCode.UNAUTHORIZED,
+        'Invalid authentication token',
+        undefined,
+        401
+      );
+    }
+  }
 };

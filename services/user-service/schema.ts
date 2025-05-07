@@ -1,153 +1,180 @@
-/**
- * User Service Database Schema
- * 
- * Defines the database schema specific to the User Service
- */
-import { pgTable, serial, text, integer, timestamp, jsonb, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, varchar, timestamp, boolean, integer, json, jsonb } from 'drizzle-orm/pg-core';
 import { createInsertSchema } from 'drizzle-zod';
 import { z } from 'zod';
-import { UserRole } from '../../shared/types';
 
-// Users table
+/**
+ * Users table
+ */
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
-  username: text('username').notNull().unique(),
-  email: text('email').notNull().unique(),
-  password: text('password').notNull(),
-  name: text('name'),
-  role: text('role').notNull().default('user'),
-  active: boolean('active').default(true),
+  email: varchar('email', { length: 255 }).notNull().unique(),
+  password: varchar('password', { length: 255 }).notNull(),
+  firstName: varchar('first_name', { length: 100 }),
+  lastName: varchar('last_name', { length: 100 }),
+  role: varchar('role', { length: 50 }).default('user').notNull(),
+  status: varchar('status', { length: 20 }).default('active').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  lastLoginAt: timestamp('last_login_at'),
+  profilePictureUrl: text('profile_picture_url'),
+  company: varchar('company', { length: 255 }),
+  position: varchar('position', { length: 255 }),
+  phone: varchar('phone', { length: 50 }),
+  address: text('address'),
+  newsletterSubscribed: boolean('newsletter_subscribed').default(false),
   preferences: jsonb('preferences').default({}),
-  email_verified: boolean('email_verified').default(false),
-  verification_token: text('verification_token'),
-  reset_token: text('reset_token'),
-  reset_token_expires: timestamp('reset_token_expires'),
-  last_login: timestamp('last_login'),
-  created_at: timestamp('created_at').defaultNow(),
-  updated_at: timestamp('updated_at')
+  resetPasswordToken: text('reset_password_token'),
+  resetPasswordExpires: timestamp('reset_password_expires'),
+  verificationToken: text('verification_token'),
+  verified: boolean('verified').default(false),
+  twoFactorEnabled: boolean('two_factor_enabled').default(false),
+  twoFactorSecret: text('two_factor_secret'),
+  refreshToken: text('refresh_token'),
+  loginAttempts: integer('login_attempts').default(0),
+  lockUntil: timestamp('lock_until'),
 });
 
-// Login attempts table for rate limiting
-export const loginAttempts = pgTable('login_attempts', {
+/**
+ * Sessions table
+ */
+export const sessions = pgTable('sessions', {
   id: serial('id').primaryKey(),
-  email: text('email').notNull(),
-  ip_address: text('ip_address').notNull(),
-  user_agent: text('user_agent'),
-  successful: boolean('successful').default(false),
-  created_at: timestamp('created_at').defaultNow()
+  userId: integer('user_id').notNull(),
+  token: text('token').notNull().unique(),
+  ipAddress: varchar('ip_address', { length: 45 }),
+  userAgent: text('user_agent'),
+  expiresAt: timestamp('expires_at').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  lastActivityAt: timestamp('last_activity_at').defaultNow().notNull(),
+  deviceInfo: jsonb('device_info').default({}),
 });
 
-// User profiles with additional information
+/**
+ * User Profiles table - additional user information
+ */
 export const userProfiles = pgTable('user_profiles', {
   id: serial('id').primaryKey(),
-  user_id: integer('user_id').notNull().references(() => users.id),
-  company_name: text('company_name'),
-  job_title: text('job_title'),
-  industry: text('industry'),
-  company_size: text('company_size'),
-  phone: text('phone'),
-  address: text('address'),
-  city: text('city'),
-  country: text('country'),
+  userId: integer('user_id').notNull().unique(),
   bio: text('bio'),
-  website: text('website'),
-  social_links: jsonb('social_links').default({}),
-  profile_completed: boolean('profile_completed').default(false),
-  created_at: timestamp('created_at').defaultNow(),
-  updated_at: timestamp('updated_at')
+  country: varchar('country', { length: 100 }),
+  language: varchar('language', { length: 50 }).default('en'),
+  timezone: varchar('timezone', { length: 50 }).default('UTC'),
+  industry: varchar('industry', { length: 100 }),
+  companySize: varchar('company_size', { length: 50 }),
+  businessType: varchar('business_type', { length: 100 }),
+  websiteUrl: text('website_url'),
+  socialLinks: jsonb('social_links').default({}),
+  interests: jsonb('interests').default([]),
+  skills: jsonb('skills').default([]),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-// User activity logs
-export const userActivityLogs = pgTable('user_activity_logs', {
+/**
+ * Audit Logs table for tracking user actions
+ */
+export const auditLogs = pgTable('audit_logs', {
   id: serial('id').primaryKey(),
-  user_id: integer('user_id').references(() => users.id),
-  activity_type: text('activity_type').notNull(),
-  description: text('description'),
-  ip_address: text('ip_address'),
-  user_agent: text('user_agent'),
-  metadata: jsonb('metadata').default({}),
-  created_at: timestamp('created_at').defaultNow()
+  userId: integer('user_id'),
+  action: varchar('action', { length: 100 }).notNull(),
+  resourceType: varchar('resource_type', { length: 100 }),
+  resourceId: varchar('resource_id', { length: 100 }),
+  ipAddress: varchar('ip_address', { length: 45 }),
+  userAgent: text('user_agent'),
+  details: jsonb('details').default({}),
+  timestamp: timestamp('timestamp').defaultNow().notNull(),
 });
 
-// User notifications for in-app messaging
-export const userNotifications = pgTable('user_notifications', {
+/**
+ * Notifications table
+ */
+export const notifications = pgTable('notifications', {
   id: serial('id').primaryKey(),
-  user_id: integer('user_id').notNull().references(() => users.id),
-  title: text('title').notNull(),
+  userId: integer('user_id').notNull(),
+  type: varchar('type', { length: 50 }).notNull(),
+  title: varchar('title', { length: 255 }).notNull(),
   message: text('message').notNull(),
-  type: text('type').default('info'),
   read: boolean('read').default(false),
-  action_url: text('action_url'),
-  created_at: timestamp('created_at').defaultNow(),
-  expires_at: timestamp('expires_at')
+  link: text('link'),
+  data: jsonb('data').default({}),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  expiresAt: timestamp('expires_at'),
 });
 
-// User subscription plans
-export const subscriptionPlans = pgTable('subscription_plans', {
-  id: serial('id').primaryKey(),
-  name: text('name').notNull().unique(),
-  description: text('description'),
-  price: integer('price').notNull(),
-  billing_cycle: text('billing_cycle').default('monthly'),
-  features: jsonb('features').default([]),
-  is_active: boolean('is_active').default(true),
-  created_at: timestamp('created_at').defaultNow(),
-  updated_at: timestamp('updated_at')
+// Schema definitions for insert operations
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastLoginAt: true,
+  resetPasswordToken: true,
+  resetPasswordExpires: true,
+  verificationToken: true,
+  refreshToken: true,
+  loginAttempts: true,
+  lockUntil: true
 });
 
-// User subscriptions
-export const userSubscriptions = pgTable('user_subscriptions', {
-  id: serial('id').primaryKey(),
-  user_id: integer('user_id').notNull().references(() => users.id),
-  plan_id: integer('plan_id').notNull().references(() => subscriptionPlans.id),
-  status: text('status').notNull().default('active'),
-  current_period_start: timestamp('current_period_start').notNull(),
-  current_period_end: timestamp('current_period_end').notNull(),
-  cancel_at_period_end: boolean('cancel_at_period_end').default(false),
-  payment_method: text('payment_method'),
-  payment_id: text('payment_id'),
-  created_at: timestamp('created_at').defaultNow(),
-  updated_at: timestamp('updated_at'),
-  cancelled_at: timestamp('cancelled_at')
+export const insertSessionSchema = createInsertSchema(sessions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
 });
 
-// Schemas for validation
-export const insertUserSchema = createInsertSchema(users).omit({ id: true });
-export const insertLoginAttemptSchema = createInsertSchema(loginAttempts).omit({ id: true });
-export const insertUserProfileSchema = createInsertSchema(userProfiles).omit({ id: true });
-export const insertUserActivityLogSchema = createInsertSchema(userActivityLogs).omit({ id: true });
-export const insertUserNotificationSchema = createInsertSchema(userNotifications).omit({ id: true });
-export const insertSubscriptionPlanSchema = createInsertSchema(subscriptionPlans).omit({ id: true });
-export const insertUserSubscriptionSchema = createInsertSchema(userSubscriptions).omit({ id: true });
-
-// Extended schemas with additional validation
-export const userSchema = insertUserSchema.extend({
-  role: z.enum([UserRole.ADMIN, UserRole.ANALYST, UserRole.USER, UserRole.GUEST]),
-  password: z.string().min(8).max(100),
-  email: z.string().email()
+export const insertUserProfileSchema = createInsertSchema(userProfiles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
 });
 
-export const userNotificationSchema = insertUserNotificationSchema.extend({
-  type: z.enum(['info', 'warning', 'success', 'error'])
+export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
+  id: true,
+  timestamp: true
 });
 
-export const userSubscriptionSchema = insertUserSubscriptionSchema.extend({
-  status: z.enum(['active', 'cancelled', 'past_due', 'trialing', 'incomplete'])
+export const insertNotificationSchema = createInsertSchema(notifications).omit({
+  id: true,
+  createdAt: true
 });
 
-// Types for database interactions
+// Custom login schema with validation
+export const loginSchema = z.object({
+  email: z.string().email('Invalid email address'),
+  password: z.string().min(6, 'Password must be at least 6 characters')
+});
+
+// Custom registration schema with validation
+export const registrationSchema = insertUserSchema
+  .pick({
+    email: true,
+    password: true,
+    firstName: true,
+    lastName: true,
+    company: true,
+    position: true,
+    phone: true
+  })
+  .extend({
+    confirmPassword: z.string().min(6, 'Confirm password must be at least 6 characters')
+  })
+  .refine(data => data.password === data.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword']
+  });
+
+// Type definitions
 export type User = typeof users.$inferSelect;
-export type LoginAttempt = typeof loginAttempts.$inferSelect;
+export type Session = typeof sessions.$inferSelect;
 export type UserProfile = typeof userProfiles.$inferSelect;
-export type UserActivityLog = typeof userActivityLogs.$inferSelect;
-export type UserNotification = typeof userNotifications.$inferSelect;
-export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;
-export type UserSubscription = typeof userSubscriptions.$inferSelect;
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type Notification = typeof notifications.$inferSelect;
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
-export type InsertLoginAttempt = z.infer<typeof insertLoginAttemptSchema>;
+export type InsertSession = z.infer<typeof insertSessionSchema>;
 export type InsertUserProfile = z.infer<typeof insertUserProfileSchema>;
-export type InsertUserActivityLog = z.infer<typeof insertUserActivityLogSchema>;
-export type InsertUserNotification = z.infer<typeof insertUserNotificationSchema>;
-export type InsertSubscriptionPlan = z.infer<typeof insertSubscriptionPlanSchema>;
-export type InsertUserSubscription = z.infer<typeof insertUserSubscriptionSchema>;
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+
+export type LoginCredentials = z.infer<typeof loginSchema>;
+export type RegistrationData = z.infer<typeof registrationSchema>;
