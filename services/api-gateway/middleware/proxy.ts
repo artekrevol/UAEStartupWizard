@@ -1,122 +1,90 @@
 import { Request, Response, NextFunction } from 'express';
 import { createProxyMiddleware, Options } from 'http-proxy-middleware';
-import { getServiceRegistry, getServiceForPath } from '../config/serviceRegistry';
-import { ServiceException, ErrorCode } from '../../../shared/errors';
+import { getServiceURL } from './serviceRegistry';
 
 /**
- * Create a proxy middleware that routes requests to the appropriate service
- * @returns Proxy middleware function
+ * Creates a proxy middleware for a specific service
+ * 
+ * @param {string} serviceName - Name of the service to route to
+ * @param {string} pathRewrite - Path prefix to remove when forwarding request
+ * @returns {Function} Proxy middleware
  */
-export const createServiceProxy = () => {
-  // Get service registry
-  const serviceRegistry = getServiceRegistry();
-  
-  // Options for the proxy middleware
-  const options: Options = {
-    target: 'http://localhost:3000', // Default target, will be overridden
+export const createServiceProxy = (
+  serviceName: string, 
+  pathRewrite: string = '/'
+): any => {
+  // Create proxy configuration
+  const proxyOptions: Options = {
+    target: getServiceURL(serviceName),
     changeOrigin: true,
+    // Convert to safe object format for http-proxy-middleware
     pathRewrite: {
-      '^/api': '', // Remove /api prefix when forwarding to services
+      [`^${pathRewrite}`]: '/api',
     },
-    router: (req: Request) => {
-      // Extract the path from the URL
-      const path = req.url.replace(/^\/api/, '');
-      
-      // Determine the target service
-      const serviceName = getServiceForPath(path);
-      
-      if (!serviceName || !serviceRegistry[serviceName]) {
-        throw new ServiceException(
-          ErrorCode.NOT_FOUND,
-          `No service found for path: ${path}`,
-          undefined,
-          404
-        );
+    // Handle target resolution per-request to support dynamic service discovery
+    router: function(req: Request) {
+      return getServiceURL(serviceName);
+    },
+    // Add custom headers for service-to-service communication
+    onProxyReq: (proxyReq, req: Request, res) => {
+      // Attach user information from JWT if authenticated
+      if ((req as any).user) {
+        proxyReq.setHeader('X-User-ID', (req as any).user.userId);
+        proxyReq.setHeader('X-User-Role', (req as any).user.role);
       }
       
-      // Return the URL for the target service
-      return serviceRegistry[serviceName].url;
+      // Add gateway tracking header
+      proxyReq.setHeader('X-Forwarded-By', 'API-Gateway');
+      
+      // Add request timestamp for latency tracking
+      proxyReq.setHeader('X-Request-Time', Date.now().toString());
     },
-    proxyTimeout: 120000, // 2 minutes default timeout
-    timeout: (req: Request) => {
-      // Get the path
-      const path = req.url.replace(/^\/api/, '');
-      
-      // Determine the target service
-      const serviceName = getServiceForPath(path);
-      
-      if (!serviceName || !serviceRegistry[serviceName]) {
-        return 5000; // Default timeout
+    // Override default timeout to be longer for slow operations
+    proxyTimeout: 30000,
+    // Apply custom timeout for each request based on the endpoint
+    timeout: function(req: Request) {
+      // Use longer timeout for batch operations
+      if (req.path.includes('batch') || req.path.includes('import')) {
+        return 120000; // 2 minutes
       }
-      
-      // Return the timeout for the target service
-      return serviceRegistry[serviceName].timeout;
+      return 30000; // 30 seconds
     },
-    onProxyReq: (proxyReq, req, res) => {
-      // Add X-Forwarded headers
-      proxyReq.setHeader('X-Forwarded-For', req.ip);
-      proxyReq.setHeader('X-Forwarded-Proto', req.protocol);
-      proxyReq.setHeader('X-Forwarded-Host', req.hostname);
-      
-      // If there's a user in the request, add it to headers for the target service
-      if (req.user) {
-        proxyReq.setHeader('X-User-ID', req.user.userId.toString());
-        proxyReq.setHeader('X-User-Role', req.user.role);
-        proxyReq.setHeader('X-User-Email', req.user.email);
-      }
-    },
+    // Handle proxy errors
     onError: (err, req, res) => {
-      // Handle proxy errors
-      console.error(`[API Gateway] Proxy error: ${err.message}`);
+      console.error(`[${serviceName}Proxy] Error:`, err);
       
-      // Send an appropriate error response
-      if (!res.headersSent) {
-        if (err.code === 'ECONNREFUSED') {
-          res.status(503).json({
-            status: 'error',
-            code: ErrorCode.API_UNAVAILABLE,
-            message: 'Service is currently unavailable. Please try again later.'
-          });
-        } else if (err.code === 'ETIMEDOUT') {
-          res.status(504).json({
-            status: 'error',
-            code: ErrorCode.API_UNAVAILABLE,
-            message: 'Request timed out. Please try again later.'
-          });
-        } else {
-          res.status(500).json({
-            status: 'error',
-            code: ErrorCode.UNKNOWN_ERROR,
-            message: 'An error occurred while processing your request.'
-          });
-        }
-      }
+      res.status(502).json({
+        status: 'error',
+        message: `${serviceName} service is currently unavailable`,
+        error: process.env.NODE_ENV === 'development' ? err.message : undefined
+      });
     }
   };
   
-  // Create and return the proxy middleware
-  return createProxyMiddleware(options);
+  return createProxyMiddleware(proxyOptions);
 };
 
 /**
- * Check if all services are healthy
- * @returns Promise resolving to a map of service names to health status
+ * Middleware to log requests before they are proxied
  */
-export const checkServiceHealth = async (): Promise<{ [service: string]: boolean }> => {
-  const serviceRegistry = getServiceRegistry();
-  const healthStatus: { [service: string]: boolean } = {};
+export const requestLogger = (req: Request, res: Response, next: NextFunction) => {
+  const startTime = Date.now();
   
-  await Promise.all(
-    Object.entries(serviceRegistry).map(async ([serviceName, config]) => {
-      try {
-        const response = await fetch(`${config.url}${config.healthEndpoint}`);
-        healthStatus[serviceName] = response.ok;
-      } catch (error) {
-        console.error(`[API Gateway] Health check failed for ${serviceName}: ${error.message}`);
-        healthStatus[serviceName] = false;
-      }
-    })
-  );
+  // Log request info
+  console.log(`[API Gateway] ${req.method} ${req.url}`);
   
-  return healthStatus;
+  // Capture response
+  const originalEnd = res.end;
+  res.end = function(chunk: any, ...rest: any[]) {
+    // Calculate request duration
+    const duration = Date.now() - startTime;
+    
+    // Log response info
+    console.log(`[API Gateway] ${req.method} ${req.url} - ${res.statusCode} (${duration}ms)`);
+    
+    // Call the original end method
+    return originalEnd.call(this, chunk, ...rest);
+  };
+  
+  next();
 };

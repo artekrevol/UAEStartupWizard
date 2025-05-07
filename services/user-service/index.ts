@@ -1,81 +1,119 @@
-/**
- * User Service Entry Point
- * 
- * Initializes the User Service with Express and configures all middleware
- */
 import express from 'express';
 import cors from 'cors';
-import { rateLimit } from 'express-rate-limit';
 import helmet from 'helmet';
+import { json, urlencoded } from 'body-parser';
+import { errorHandler, notFoundHandler } from '../../shared/middleware/errorHandler';
 import routes from './routes';
-import { errorHandler } from '../../shared/middleware/error-handler';
-import { db } from './db';
+import { checkConnection } from './db';
 import { eventBus } from '../../shared/event-bus';
 
 // Initialize Express app
 const app = express();
 const PORT = process.env.USER_SERVICE_PORT || 3001;
 
-// Configure middleware
+// Middleware
 app.use(helmet());
 app.use(cors());
-app.use(express.json());
+app.use(json({ limit: '2mb' }));
+app.use(urlencoded({ extended: true, limit: '2mb' }));
 
-// Configure rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  standardHeaders: true,
-  legacyHeaders: false
+// API Routes
+app.use('/api', routes);
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    service: 'user-service',
+    timestamp: new Date().toISOString()
+  });
 });
 
-app.use(limiter);
+// 404 handler
+app.use(notFoundHandler);
 
-// Mount API routes
-app.use('/', routes);
-
-// Error handling middleware
+// Error handler
 app.use(errorHandler);
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`User Service listening on port ${PORT}`);
-  
-  // Subscribe to relevant events
-  setupEventSubscriptions();
+// Set up event listeners
+const setupEventHandlers = () => {
+  // Listen for user-related events from other services
+  eventBus.subscribe('document-viewed', async (data) => {
+    if (data.userId) {
+      console.log(`[UserService] Document ${data.documentId} viewed by user ${data.userId}`);
+      // Could update user stats or create notifications
+    }
+  });
+
+  eventBus.subscribe('freezone-updates', async (data) => {
+    if (data.userIds && data.userIds.length > 0) {
+      console.log(`[UserService] Freezone update notification for ${data.userIds.length} users`);
+      // Could create notifications for users who have shown interest in specific free zones
+    }
+  });
+};
+
+// Start the server
+const startServer = async () => {
+  try {
+    // Check database connection
+    await checkConnection();
+    
+    // Set up event handlers
+    setupEventHandlers();
+    
+    // Register service with API Gateway (via event)
+    eventBus.publish('service-registered', {
+      name: 'user-service',
+      host: process.env.USER_SERVICE_HOST || 'localhost',
+      port: PORT,
+      healthEndpoint: '/health',
+      routes: [
+        { path: '/api/auth', methods: ['GET', 'POST', 'DELETE'] },
+        { path: '/api/users', methods: ['GET', 'POST', 'PATCH', 'DELETE'] },
+        { path: '/api/admin/users', methods: ['GET', 'POST', 'PATCH', 'DELETE'] }
+      ],
+      timestamp: new Date().toISOString()
+    });
+    
+    // Start listening
+    app.listen(PORT, () => {
+      console.log(`[UserService] Server running on port ${PORT}`);
+      
+      // Publish event that User Service is ready
+      eventBus.publish('user-service-ready', {
+        port: PORT,
+        timestamp: new Date().toISOString()
+      });
+    });
+  } catch (error) {
+    console.error('[UserService] Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+// Start the server
+startServer();
+
+// Handle graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('[UserService] SIGTERM received, shutting down gracefully');
+  eventBus.publish('service-deregistered', {
+    name: 'user-service',
+    timestamp: new Date().toISOString()
+  });
+  eventBus.shutdown();
+  process.exit(0);
 });
 
-/**
- * Setup event subscriptions for the User Service
- */
-function setupEventSubscriptions() {
-  // Handle user-related events from other services
-  eventBus.subscribe('document:created', async (data) => {
-    console.log('Received document:created event', data);
-    // Process event if needed
+process.on('SIGINT', () => {
+  console.log('[UserService] SIGINT received, shutting down gracefully');
+  eventBus.publish('service-deregistered', {
+    name: 'user-service',
+    timestamp: new Date().toISOString()
   });
-  
-  eventBus.subscribe('freezone:business-setup-started', async (data) => {
-    console.log('Received freezone:business-setup-started event', data);
-    // Update user profile or activity logs
-  });
-}
-
-/**
- * Graceful shutdown handler
- */
-process.on('SIGTERM', gracefulShutdown);
-process.on('SIGINT', gracefulShutdown);
-
-async function gracefulShutdown() {
-  console.log('Shutting down User Service gracefully...');
-  
-  // Close database connection
-  await db.end();
-  
-  // Close event bus connections if needed
-  // await eventBus.close();
-  
-  console.log('User Service shutdown complete');
+  eventBus.shutdown();
   process.exit(0);
-}
+});
+
+export { app };
