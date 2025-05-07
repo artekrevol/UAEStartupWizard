@@ -1,20 +1,50 @@
 /**
- * Shared Types Library for Microservices
+ * Shared Types
  * 
- * This module provides standardized types across all microservices.
+ * Common type definitions used across microservices
  */
 
 /**
- * User roles
+ * User roles in the system
  */
 export enum UserRole {
-  USER = 'user',
   ADMIN = 'admin',
-  ANALYST = 'analyst'
+  ANALYST = 'analyst',
+  USER = 'user',
+  GUEST = 'guest'
 }
 
 /**
- * Research status
+ * Document types
+ */
+export enum DocumentType {
+  PDF = 'pdf',
+  WORD = 'word',
+  EXCEL = 'excel',
+  TEXT = 'text',
+  IMAGE = 'image',
+  HTML = 'html',
+  OTHER = 'other'
+}
+
+/**
+ * Business activity categories
+ */
+export enum BusinessActivityCategory {
+  TECHNOLOGY = 'technology',
+  FINANCE = 'finance',
+  RETAIL = 'retail',
+  MANUFACTURING = 'manufacturing',
+  SERVICES = 'services',
+  LOGISTICS = 'logistics',
+  MEDIA = 'media',
+  HEALTHCARE = 'healthcare',
+  EDUCATION = 'education',
+  OTHER = 'other'
+}
+
+/**
+ * Research status for web research tasks
  */
 export enum ResearchStatus {
   PENDING = 'pending',
@@ -45,152 +75,58 @@ export enum ScraperTaskStatus {
 }
 
 /**
- * Document types
+ * Event types for inter-service communication
  */
-export enum DocumentType {
-  PDF = 'pdf',
-  WORD = 'word',
-  EXCEL = 'excel',
-  IMAGE = 'image',
-  TEXT = 'text',
-  OTHER = 'other'
+export enum EventType {
+  // User service events
+  USER_CREATED = 'user:created',
+  USER_UPDATED = 'user:updated',
+  USER_DELETED = 'user:deleted',
+  USER_LOGIN = 'user:login',
+  
+  // Document service events
+  DOCUMENT_CREATED = 'document:created',
+  DOCUMENT_UPDATED = 'document:updated',
+  DOCUMENT_DELETED = 'document:deleted',
+  DOCUMENT_PROCESSED = 'document:processed',
+  
+  // Freezone service events
+  FREEZONE_CREATED = 'freezone:created',
+  FREEZONE_UPDATED = 'freezone:updated',
+  FREEZONE_DELETED = 'freezone:deleted',
+  BUSINESS_SETUP_STARTED = 'freezone:business-setup-started',
+  BUSINESS_SETUP_UPDATED = 'freezone:business-setup-updated',
+  BUSINESS_SETUP_COMPLETED = 'freezone:business-setup-completed',
+  
+  // AI research service events
+  RESEARCH_REQUESTED = 'research:requested',
+  RESEARCH_COMPLETED = 'research:completed',
+  RESEARCH_FAILED = 'research:failed',
+  CONVERSATION_CREATED = 'conversation:created',
+  
+  // Scraper service events
+  SCRAPER_TASK_CREATED = 'scraper:task-created',
+  SCRAPER_TASK_COMPLETED = 'scraper:task-completed',
+  SCRAPER_TASK_FAILED = 'scraper:task-failed',
+  
+  // System-wide events
+  SYSTEM_ERROR = 'system:error',
+  SYSTEM_ALERT = 'system:alert'
 }
 
 /**
- * Document category
+ * Generic event message structure
  */
-export enum DocumentCategory {
-  BUSINESS_SETUP = 'business_setup',
-  VISA = 'visa',
-  LEGAL = 'legal',
-  FINANCIAL = 'financial',
-  LICENSING = 'licensing',
-  GENERAL = 'general'
+export interface EventMessage<T = any> {
+  id: string;
+  type: EventType;
+  timestamp: string;
+  producer: string;
+  payload: T;
+  metadata?: Record<string, any>;
 }
 
 /**
- * Business activity category
+ * Event handler function type
  */
-export enum BusinessActivityCategory {
-  TECHNOLOGY = 'technology',
-  FINANCE = 'finance',
-  RETAIL = 'retail',
-  MANUFACTURING = 'manufacturing',
-  SERVICES = 'services',
-  LOGISTICS = 'logistics',
-  MEDIA = 'media',
-  HEALTHCARE = 'healthcare',
-  EDUCATION = 'education',
-  OTHER = 'other'
-}
-
-/**
- * Business setup status
- */
-export enum BusinessSetupStatus {
-  INITIAL = 'initial',
-  IN_PROGRESS = 'in_progress',
-  COMPLETED = 'completed',
-  ON_HOLD = 'on_hold'
-}
-
-/**
- * User type for service communication
- */
-export interface User {
-  id: number;
-  username: string;
-  email: string;
-  role: UserRole;
-  name?: string;
-  createdAt: Date;
-}
-
-/**
- * Document type for service communication
- */
-export interface Document {
-  id: number;
-  title: string;
-  filename: string;
-  mimetype: string;
-  size: number;
-  category: string;
-  subcategory?: string;
-  freeZoneId?: number;
-  userId?: number;
-  createdAt: Date;
-}
-
-/**
- * Free zone type for service communication
- */
-export interface FreeZone {
-  id: number;
-  name: string;
-  description: string;
-  location: string;
-  website: string;
-  benefits: string[];
-  industries: string[];
-  setupCost: {
-    license: number;
-    registration: number;
-    visa: number;
-  };
-  requirements?: {
-    documents: string[];
-    process: string[];
-    timeline: string;
-  };
-}
-
-/**
- * Business activity type for service communication
- */
-export interface BusinessActivity {
-  id: number;
-  name: string;
-  code: string;
-  description: string;
-  category: string;
-  industryGroup: string;
-  permittedFreeZones: number[];
-  approvalRequirements: {
-    approvalTime: string;
-    specialApprovals: boolean;
-    approvingAuthority?: string;
-  };
-}
-
-/**
- * Research topic type for service communication
- */
-export interface ResearchTopic {
-  id: number;
-  topic: string;
-  status: ResearchStatus;
-  userId?: number;
-  results?: string;
-  sources?: string[];
-  error?: string;
-  createdAt: Date;
-  completedAt?: Date;
-}
-
-/**
- * Scraper task type for service communication
- */
-export interface ScraperTask {
-  id: number;
-  url: string;
-  type: ScraperTaskType;
-  status: ScraperTaskStatus;
-  priority: number;
-  freeZoneId?: number;
-  results?: any;
-  error?: string;
-  createdAt: Date;
-  startedAt?: Date;
-  completedAt?: Date;
-}
+export type EventHandler<T = any> = (data: T) => Promise<void>;

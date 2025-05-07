@@ -1,22 +1,19 @@
-/**
- * Authentication Middleware for API Gateway
- * 
- * Handles JWT validation and authorization for protected routes
- */
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { ServiceException, ErrorCode } from '../../../shared/errors';
 
-// Interface for JWT payload
+/**
+ * JWT Payload structure
+ */
 interface JwtPayload {
   userId: number;
-  email: string;
+  username: string;
   role: string;
   iat?: number;
   exp?: number;
 }
 
-// Extend Express Request interface to include user information
+// Extend Express Request type to include user information
 declare global {
   namespace Express {
     interface Request {
@@ -26,87 +23,94 @@ declare global {
 }
 
 /**
- * Middleware to validate JWT tokens and attach user info to request
+ * List of routes that don't require authentication
  */
-export function authenticateJWT(req: Request, res: Response, next: NextFunction) {
-  // Extract token from Authorization header
+const PUBLIC_ROUTES = [
+  { path: '/api/auth/login', method: 'POST' },
+  { path: '/api/auth/register', method: 'POST' },
+  { path: '/api/auth/forgot-password', method: 'POST' },
+  { path: '/api/auth/reset-password', method: 'POST' },
+  { path: '/health', method: 'GET' },
+  { path: '/api/health', method: 'GET' },
+];
+
+/**
+ * Middleware to authenticate JWT tokens
+ * Validates token and attaches user info to request object
+ */
+export const authenticateJWT = (req: Request, res: Response, next: NextFunction) => {
+  // Skip authentication for public routes
+  if (isPublicRoute(req.path, req.method)) {
+    return next();
+  }
+
   const authHeader = req.headers.authorization;
   
-  if (!authHeader) {
-    // No token provided, check if it's a public route
-    if (isPublicRoute(req.path, req.method)) {
-      return next();
-    }
-    
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return next(new ServiceException(
       ErrorCode.UNAUTHORIZED,
-      'Authentication required'
+      'Access denied. No token provided.'
     ));
   }
-  
-  const tokenParts = authHeader.split(' ');
-  
-  if (tokenParts.length !== 2 || tokenParts[0] !== 'Bearer') {
-    return next(new ServiceException(
-      ErrorCode.INVALID_TOKEN,
-      'Invalid token format. Use Bearer {token}'
-    ));
-  }
-  
-  const token = tokenParts[1];
+
+  const token = authHeader.split(' ')[1];
   
   try {
-    // Verify token
-    const jwtSecret = process.env.JWT_SECRET || 'dev-secret';
+    // Get JWT secret from environment
+    const jwtSecret = process.env.JWT_SECRET;
+    
+    if (!jwtSecret) {
+      console.error('JWT_SECRET environment variable not set');
+      return next(new ServiceException(
+        ErrorCode.INTERNAL_ERROR,
+        'Authentication service configuration error'
+      ));
+    }
+    
+    // Verify JWT token
     const decoded = jwt.verify(token, jwtSecret) as JwtPayload;
     
     // Attach user info to request
     req.user = decoded;
     
-    // Add user ID to headers for downstream services
-    req.headers['x-user-id'] = decoded.userId.toString();
-    req.headers['x-user-role'] = decoded.role;
-    
     next();
-    
   } catch (error) {
-    if (error.name === 'TokenExpiredError') {
+    if (error instanceof jwt.TokenExpiredError) {
       return next(new ServiceException(
         ErrorCode.TOKEN_EXPIRED,
-        'Token has expired'
+        'Token expired'
+      ));
+    }
+    
+    if (error instanceof jwt.JsonWebTokenError) {
+      return next(new ServiceException(
+        ErrorCode.INVALID_TOKEN,
+        'Invalid token'
       ));
     }
     
     return next(new ServiceException(
-      ErrorCode.INVALID_TOKEN,
-      'Invalid token'
+      ErrorCode.UNAUTHORIZED,
+      'Failed to authenticate token'
     ));
   }
-}
+};
 
 /**
  * Check if a route is public (doesn't require authentication)
  */
-export function isPublicRoute(path: string, method: string): boolean {
-  const publicRoutes = [
-    { path: '/api/auth/login', method: 'POST' },
-    { path: '/api/auth/register', method: 'POST' },
-    { path: '/api/freezone/public', method: 'GET' },
-    { path: '/api/freezone/public/', method: 'GET' },
-    { path: '/api/health', method: '*' },
-    { path: '/api/docs', method: 'GET' }
-    // Add other public routes as needed
-  ];
-  
-  return publicRoutes.some(route => 
-    path.startsWith(route.path) && (route.method === '*' || route.method === method)
+export const isPublicRoute = (path: string, method: string): boolean => {
+  return PUBLIC_ROUTES.some(
+    route => 
+      (route.path === path || (route.path.endsWith('*') && path.startsWith(route.path.slice(0, -1)))) && 
+      (route.method === method || route.method === '*')
   );
-}
+};
 
 /**
  * Middleware to check if user has admin role
  */
-export function requireAdmin(req: Request, res: Response, next: NextFunction) {
+export const requireAdmin = (req: Request, res: Response, next: NextFunction) => {
   if (!req.user) {
     return next(new ServiceException(
       ErrorCode.UNAUTHORIZED,
@@ -117,17 +121,17 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction) {
   if (req.user.role !== 'admin') {
     return next(new ServiceException(
       ErrorCode.FORBIDDEN,
-      'Admin privileges required'
+      'Admin privileges required for this operation'
     ));
   }
   
   next();
-}
+};
 
 /**
  * Middleware to check if user has analyst role or higher
  */
-export function requireAnalyst(req: Request, res: Response, next: NextFunction) {
+export const requireAnalyst = (req: Request, res: Response, next: NextFunction) => {
   if (!req.user) {
     return next(new ServiceException(
       ErrorCode.UNAUTHORIZED,
@@ -138,18 +142,18 @@ export function requireAnalyst(req: Request, res: Response, next: NextFunction) 
   if (req.user.role !== 'admin' && req.user.role !== 'analyst') {
     return next(new ServiceException(
       ErrorCode.FORBIDDEN,
-      'Analyst privileges required'
+      'Analyst privileges required for this operation'
     ));
   }
   
   next();
-}
+};
 
 /**
  * Middleware to check if user is accessing their own resources
  * or has admin privileges
  */
-export function requireOwnership(userIdParam: string = 'userId') {
+export const requireOwnership = (userIdParam: string = 'userId') => {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.user) {
       return next(new ServiceException(
@@ -158,23 +162,23 @@ export function requireOwnership(userIdParam: string = 'userId') {
       ));
     }
     
-    const resourceUserId = parseInt(req.params[userIdParam]);
+    const paramUserId = parseInt(req.params[userIdParam], 10);
     
-    if (isNaN(resourceUserId)) {
+    if (isNaN(paramUserId)) {
       return next(new ServiceException(
-        ErrorCode.VALIDATION_ERROR,
+        ErrorCode.INVALID_INPUT,
         `Invalid user ID parameter: ${userIdParam}`
       ));
     }
     
-    // Allow if user is admin or the resource owner
-    if (req.user.role === 'admin' || req.user.userId === resourceUserId) {
+    // Allow if user is admin or if they're accessing their own resources
+    if (req.user.role === 'admin' || req.user.userId === paramUserId) {
       return next();
     }
     
     return next(new ServiceException(
       ErrorCode.FORBIDDEN,
-      'You do not have permission to access this resource'
+      'You are not authorized to access this resource'
     ));
   };
-}
+};
