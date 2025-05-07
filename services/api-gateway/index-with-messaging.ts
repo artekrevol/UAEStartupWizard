@@ -4,8 +4,7 @@ import helmet from 'helmet';
 import { json, urlencoded } from 'body-parser';
 import { errorHandler, notFoundHandler } from '../../shared/middleware/errorHandler';
 import routes from './routes';
-import { initServiceRegistry, cleanupInactiveServices, serviceRegistry } from './middleware/serviceRegistry';
-import { registerService, deregisterService } from './routes/health';
+import { serviceRegistry } from './middleware/serviceRegistry-with-communication';
 import { requestLogger } from './middleware/proxy';
 import { globalRateLimiter } from './middleware/rateLimiter';
 import { initializeMessaging, registerGatewayServices, shutdownMessaging } from './messaging';
@@ -64,61 +63,21 @@ app.use(notFoundHandler);
 // Error handler
 app.use(errorHandler);
 
-// Initialize service registry
-initServiceRegistry();
-
 // Setup periodic cleanup of inactive services
-setInterval(cleanupInactiveServices, 5 * 60 * 1000); // Run every 5 minutes
-
-// Set up event listeners
-const setupEventHandlers = () => {
-  // Listen for service registration events
-  eventBus.subscribe('service-registered', (data) => {
-    console.log(`[API Gateway] Service registered: ${JSON.stringify(data)}`);
-    registerService(data.name, data.host, data.port, data.healthEndpoint);
-  });
-
-  // Listen for service deregistration events
-  eventBus.subscribe('service-deregistered', (data) => {
-    console.log(`[API Gateway] Service deregistered: ${JSON.stringify(data)}`);
-    deregisterService(data.name);
-  });
-
-  // Listen for service health change events
-  eventBus.subscribe('service-health-changed', (data) => {
-    console.log(`[API Gateway] Service health changed: ${JSON.stringify(data)}`);
-  });
-  
-  // Listen for API Gateway health check events
-  eventBus.subscribe('health-check', (data) => {
-    console.log(`[API Gateway] Health check received at ${new Date().toISOString()}`);
-    
-    // Publish health status back
-    eventBus.publish('health-status', {
-      service: 'api-gateway',
-      status: 'healthy',
-      uptime: process.uptime(),
-      memory: process.memoryUsage(),
-      timestamp: new Date().toISOString()
-    });
-  });
-};
+setInterval(() => serviceRegistry.cleanupInactiveServices(), 5 * 60 * 1000); // Run every 5 minutes
 
 // Start the server
 const startServer = async () => {
   try {
-    // Set up event handlers
-    setupEventHandlers();
+    // Initialize messaging system
+    initializeMessaging(serviceRegistry);
     
     // Start listening
     app.listen(PORT, () => {
       console.log(`[API Gateway] Server running on port ${PORT}`);
       
-      // Publish event that API Gateway is ready
-      eventBus.publish('api-gateway-ready', {
-        port: PORT,
-        timestamp: new Date().toISOString()
-      });
+      // Announce API Gateway is ready
+      registerGatewayServices();
     });
   } catch (error) {
     console.error('[API Gateway] Failed to start server:', error);
@@ -132,13 +91,13 @@ startServer();
 // Handle graceful shutdown
 process.on('SIGTERM', () => {
   console.log('[API Gateway] SIGTERM received, shutting down gracefully');
-  eventBus.shutdown();
+  shutdownMessaging();
   process.exit(0);
 });
 
 process.on('SIGINT', () => {
   console.log('[API Gateway] SIGINT received, shutting down gracefully');
-  eventBus.shutdown();
+  shutdownMessaging();
   process.exit(0);
 });
 
