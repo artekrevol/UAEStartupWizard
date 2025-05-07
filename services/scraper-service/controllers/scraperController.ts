@@ -1,71 +1,207 @@
 import { Request, Response } from 'express';
 import { scrapeFreeZones, scrapeEstablishmentGuides, scrapeFreeZoneWebsite } from '../utils/scraper';
+import { validateSchedule } from '../utils/validator';
 import { eventBus } from '../../../shared/event-bus';
 
+const scraperJobs: {
+  [key: string]: {
+    id: string;
+    type: string;
+    schedule: string;
+    lastRun: string | null;
+    status: 'scheduled' | 'running' | 'completed' | 'failed';
+    error?: string;
+  }
+} = {};
+
 /**
- * Trigger scraping of free zones
+ * GET /api/scraper/status
+ * Get the status of all scraper jobs and last run information
  */
-export const scrapeFreeZonesController = async (req: Request, res: Response) => {
+export const getStatus = async (req: Request, res: Response) => {
   try {
-    console.log('[ScraperController] Starting free zones scraping');
-    const freeZones = await scrapeFreeZones();
-    
     return res.status(200).json({
       status: 'success',
-      message: 'Free zones scraped successfully',
       data: {
-        count: freeZones.length,
-        freeZones: freeZones.map(zone => ({
-          name: zone.name,
-          description: zone.description ? zone.description.substring(0, 100) + '...' : ''
-        }))
+        activeJobs: Object.values(scraperJobs),
+        isRunning: Object.values(scraperJobs).some(job => job.status === 'running')
       }
     });
   } catch (error) {
-    console.error('[ScraperController] Error in scrapeFreeZonesController:', error);
-    
+    console.error('[Scraper Controller] Error getting status:', error);
     return res.status(500).json({
       status: 'error',
-      message: 'Failed to scrape free zones',
+      message: 'Failed to get scraper status',
       error: error instanceof Error ? error.message : String(error)
     });
   }
 };
 
 /**
- * Trigger scraping of establishment guides
+ * POST /api/scraper/free-zones
+ * Manually trigger scraping of free zones
  */
-export const scrapeEstablishmentGuidesController = async (req: Request, res: Response) => {
+export const runFreeZonesScraping = async (req: Request, res: Response) => {
   try {
-    console.log('[ScraperController] Starting establishment guides scraping');
-    const guides = await scrapeEstablishmentGuides();
+    const jobId = `freezone-${Date.now()}`;
     
-    return res.status(200).json({
+    // Update job status
+    scraperJobs[jobId] = {
+      id: jobId,
+      type: 'free-zones',
+      schedule: 'manual',
+      lastRun: new Date().toISOString(),
+      status: 'running'
+    };
+    
+    // Publish event
+    eventBus.publish('scraper-job-started', {
+      id: jobId,
+      type: 'free-zones',
+      timestamp: new Date().toISOString(),
+      trigger: 'manual'
+    });
+    
+    // Send initial response
+    res.status(202).json({
       status: 'success',
-      message: 'Establishment guides scraped successfully',
+      message: 'Free zones scraping started',
       data: {
-        count: guides.length,
-        guides: guides.map(guide => ({
-          title: guide.title,
-          category: guide.category
-        }))
+        jobId
       }
     });
-  } catch (error) {
-    console.error('[ScraperController] Error in scrapeEstablishmentGuidesController:', error);
     
+    // Run the scraping job
+    try {
+      const result = await scrapeFreeZones();
+      
+      // Update job status
+      scraperJobs[jobId] = {
+        ...scraperJobs[jobId],
+        status: 'completed'
+      };
+      
+      // Publish completion event
+      eventBus.publish('scraper-job-completed', {
+        id: jobId,
+        type: 'free-zones',
+        timestamp: new Date().toISOString(),
+        status: 'success',
+        result
+      });
+    } catch (error) {
+      // Update job status
+      scraperJobs[jobId] = {
+        ...scraperJobs[jobId],
+        status: 'failed',
+        error: error instanceof Error ? error.message : String(error)
+      };
+      
+      // Publish error event
+      eventBus.publish('scraper-job-error', {
+        id: jobId,
+        type: 'free-zones',
+        timestamp: new Date().toISOString(),
+        error: error instanceof Error ? error.message : String(error)
+      });
+      
+      console.error(`[Scraper Controller] Free zones scraping failed: ${error}`);
+    }
+  } catch (error) {
+    console.error('[Scraper Controller] Error starting free zones scraping:', error);
     return res.status(500).json({
       status: 'error',
-      message: 'Failed to scrape establishment guides',
+      message: 'Failed to start free zones scraping',
       error: error instanceof Error ? error.message : String(error)
     });
   }
 };
 
 /**
- * Trigger scraping of a specific free zone website
+ * POST /api/scraper/establishment-guides
+ * Manually trigger scraping of establishment guides
  */
-export const scrapeFreeZoneWebsiteController = async (req: Request, res: Response) => {
+export const runEstablishmentGuidesScraping = async (req: Request, res: Response) => {
+  try {
+    const jobId = `guides-${Date.now()}`;
+    
+    // Update job status
+    scraperJobs[jobId] = {
+      id: jobId,
+      type: 'establishment-guides',
+      schedule: 'manual',
+      lastRun: new Date().toISOString(),
+      status: 'running'
+    };
+    
+    // Publish event
+    eventBus.publish('scraper-job-started', {
+      id: jobId,
+      type: 'establishment-guides',
+      timestamp: new Date().toISOString(),
+      trigger: 'manual'
+    });
+    
+    // Send initial response
+    res.status(202).json({
+      status: 'success',
+      message: 'Establishment guides scraping started',
+      data: {
+        jobId
+      }
+    });
+    
+    // Run the scraping job
+    try {
+      const result = await scrapeEstablishmentGuides();
+      
+      // Update job status
+      scraperJobs[jobId] = {
+        ...scraperJobs[jobId],
+        status: 'completed'
+      };
+      
+      // Publish completion event
+      eventBus.publish('scraper-job-completed', {
+        id: jobId,
+        type: 'establishment-guides',
+        timestamp: new Date().toISOString(),
+        status: 'success',
+        result
+      });
+    } catch (error) {
+      // Update job status
+      scraperJobs[jobId] = {
+        ...scraperJobs[jobId],
+        status: 'failed',
+        error: error instanceof Error ? error.message : String(error)
+      };
+      
+      // Publish error event
+      eventBus.publish('scraper-job-error', {
+        id: jobId,
+        type: 'establishment-guides',
+        timestamp: new Date().toISOString(),
+        error: error instanceof Error ? error.message : String(error)
+      });
+      
+      console.error(`[Scraper Controller] Establishment guides scraping failed: ${error}`);
+    }
+  } catch (error) {
+    console.error('[Scraper Controller] Error starting establishment guides scraping:', error);
+    return res.status(500).json({
+      status: 'error',
+      message: 'Failed to start establishment guides scraping',
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+};
+
+/**
+ * POST /api/scraper/free-zone-website
+ * Scrape a specific free zone website
+ */
+export const runFreeZoneWebsiteScraping = async (req: Request, res: Response) => {
   try {
     const { url, freeZoneId } = req.body;
     
@@ -76,76 +212,147 @@ export const scrapeFreeZoneWebsiteController = async (req: Request, res: Respons
       });
     }
     
-    if (!freeZoneId) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Free zone ID is required'
-      });
-    }
+    const jobId = `website-${Date.now()}`;
     
-    console.log(`[ScraperController] Starting website scraping for free zone ID ${freeZoneId}: ${url}`);
-    const result = await scrapeFreeZoneWebsite(url, freeZoneId);
+    // Update job status
+    scraperJobs[jobId] = {
+      id: jobId,
+      type: 'free-zone-website',
+      schedule: 'manual',
+      lastRun: new Date().toISOString(),
+      status: 'running'
+    };
     
-    if (!result.success) {
-      return res.status(500).json({
-        status: 'error',
-        message: 'Failed to scrape free zone website',
-        data: null
-      });
-    }
-    
-    return res.status(200).json({
-      status: 'success',
-      message: 'Free zone website scraped successfully',
-      data: result.data
+    // Publish event
+    eventBus.publish('scraper-job-started', {
+      id: jobId,
+      type: 'free-zone-website',
+      timestamp: new Date().toISOString(),
+      trigger: 'manual',
+      url,
+      freeZoneId
     });
-  } catch (error) {
-    console.error('[ScraperController] Error in scrapeFreeZoneWebsiteController:', error);
     
+    // Send initial response
+    res.status(202).json({
+      status: 'success',
+      message: `Website scraping started for ${url}`,
+      data: {
+        jobId
+      }
+    });
+    
+    // Run the scraping job
+    try {
+      const result = await scrapeFreeZoneWebsite(url, freeZoneId);
+      
+      // Update job status
+      scraperJobs[jobId] = {
+        ...scraperJobs[jobId],
+        status: 'completed'
+      };
+      
+      // Publish completion event
+      eventBus.publish('scraper-job-completed', {
+        id: jobId,
+        type: 'free-zone-website',
+        timestamp: new Date().toISOString(),
+        status: 'success',
+        url,
+        freeZoneId,
+        result
+      });
+    } catch (error) {
+      // Update job status
+      scraperJobs[jobId] = {
+        ...scraperJobs[jobId],
+        status: 'failed',
+        error: error instanceof Error ? error.message : String(error)
+      };
+      
+      // Publish error event
+      eventBus.publish('scraper-job-error', {
+        id: jobId,
+        type: 'free-zone-website',
+        timestamp: new Date().toISOString(),
+        url,
+        freeZoneId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      
+      console.error(`[Scraper Controller] Website scraping failed for ${url}: ${error}`);
+    }
+  } catch (error) {
+    console.error('[Scraper Controller] Error starting website scraping:', error);
     return res.status(500).json({
       status: 'error',
-      message: 'Failed to scrape free zone website',
+      message: 'Failed to start website scraping',
       error: error instanceof Error ? error.message : String(error)
     });
   }
 };
 
 /**
- * Schedule a recurring scraping job
+ * POST /api/scraper/schedule
+ * Schedule a scraping job to run at a specific cron interval
  */
-export const scheduleScrapingJobController = async (req: Request, res: Response) => {
+export const scheduleScrapingJob = async (req: Request, res: Response) => {
   try {
     const { schedule, type } = req.body;
     
-    if (!schedule) {
+    if (!schedule || !type) {
       return res.status(400).json({
         status: 'error',
-        message: 'Schedule is required (cron format)'
+        message: 'Schedule and type are required'
       });
     }
     
-    if (!type || !['free-zones', 'establishment-guides', 'all'].includes(type)) {
+    // Validate schedule
+    if (!validateSchedule(schedule)) {
       return res.status(400).json({
         status: 'error',
-        message: 'Valid type is required (free-zones, establishment-guides, or all)'
+        message: 'Invalid cron schedule format'
       });
     }
     
-    // Publish event to schedule scraping job
-    eventBus.publish('schedule-scraping-job', {
-      schedule,
+    // Validate type
+    if (!['free-zones', 'establishment-guides', 'all'].includes(type)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid type, must be one of: free-zones, establishment-guides, all'
+      });
+    }
+    
+    const jobId = `scheduled-${type}-${Date.now()}`;
+    
+    // Update job status
+    scraperJobs[jobId] = {
+      id: jobId,
       type,
-      requestedBy: req.user?.userId || 'system',
+      schedule,
+      lastRun: null,
+      status: 'scheduled'
+    };
+    
+    // Publish event to schedule the job
+    eventBus.publish('schedule-scraping-job', {
+      id: jobId,
+      type,
+      schedule,
       timestamp: new Date().toISOString()
     });
     
     return res.status(200).json({
       status: 'success',
-      message: `Scraping job scheduled with pattern: ${schedule} for type: ${type}`
+      message: `Successfully scheduled ${type} scraping with pattern: ${schedule}`,
+      data: {
+        jobId,
+        type,
+        schedule
+      }
     });
   } catch (error) {
-    console.error('[ScraperController] Error in scheduleScrapingJobController:', error);
-    
+    console.error('[Scraper Controller] Error scheduling scraping job:', error);
     return res.status(500).json({
       status: 'error',
       message: 'Failed to schedule scraping job',
@@ -154,29 +361,10 @@ export const scheduleScrapingJobController = async (req: Request, res: Response)
   }
 };
 
-/**
- * Get the status of running scraper jobs
- */
-export const getScraperStatusController = async (req: Request, res: Response) => {
-  try {
-    // For now, we'll just return basic status info
-    // In a real implementation, we'd track active jobs in a database
-    
-    return res.status(200).json({
-      status: 'success',
-      data: {
-        status: 'operational', 
-        activeJobs: 0,
-        lastRun: new Date().toISOString()
-      }
-    });
-  } catch (error) {
-    console.error('[ScraperController] Error in getScraperStatusController:', error);
-    
-    return res.status(500).json({
-      status: 'error',
-      message: 'Failed to get scraper status',
-      error: error instanceof Error ? error.message : String(error)
-    });
-  }
+export default {
+  getStatus,
+  runFreeZonesScraping,
+  runEstablishmentGuidesScraping,
+  runFreeZoneWebsiteScraping,
+  scheduleScrapingJob
 };

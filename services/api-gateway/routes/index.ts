@@ -4,6 +4,7 @@ import userRoutes from './user';
 import freezoneRoutes from './freezone';
 import documentRoutes from './document';
 import adminRoutes from './admin';
+import scraperRoutes from './scraper';
 import { router as healthRoutes } from './health';
 
 const router = express.Router();
@@ -22,6 +23,9 @@ router.use('/freezones', freezoneRoutes);
 
 // Document routes
 router.use('/documents', documentRoutes);
+
+// Scraper routes
+router.use('/scraper', scraperRoutes);
 
 // Admin routes
 router.use('/admin', adminRoutes);
