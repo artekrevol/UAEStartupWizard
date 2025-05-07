@@ -1,333 +1,233 @@
 /**
  * Service Communicator
  * 
- * A simplified interface for service-to-service communication
- * that handles common communication patterns and provides
- * a more friendly API for microservices.
+ * A simplified API for microservices to communicate with each other using the message bus.
+ * This module provides service-oriented abstractions over the raw message bus.
  */
 
-import { createMessageBus, Message, MessagePriority, MessageStatus } from './message-bus';
+import { createMessageBus, MessageBus, MessageHandler, MessageOptions, MessagePriority } from './message-bus';
 
-export {
-  Message,
-  MessagePriority,
-  MessageStatus
+// Global registry of message bus instances by service name
+const messageBusRegistry: Map<string, MessageBus> = new Map();
+
+// Default options for different message types
+const DEFAULT_OPTIONS: Record<string, MessageOptions> = {
+  'service.register': { priority: MessagePriority.HIGH },
+  'service.health': { priority: MessagePriority.HIGH },
+  'system.alert': { priority: MessagePriority.CRITICAL },
+  'default': { priority: MessagePriority.NORMAL }
 };
 
-export class ServiceCommunicator {
-  private messageBus;
-  private serviceName: string;
-  private subscriberIds: string[] = [];
-  private messageHandlers: Map<string, (data: any, message: Message) => Promise<void> | void> = new Map();
-  private isConnected: boolean = false;
+/**
+ * Service Communicator interface
+ */
+export interface ServiceCommunicator {
+  // Basic operations
+  sendToService<T = any>(destination: string, topic: string, data: T, options?: MessageOptions): string;
+  broadcast<T = any>(topic: string, data: T, options?: MessageOptions): string;
+  onMessage<T = any>(topic: string, handler: (data: T, message: any) => void | Promise<void>): () => void;
   
-  /**
-   * Create a new ServiceCommunicator instance for a specific service
-   */
+  // Request-response pattern
+  request<TRequest = any, TResponse = any>(
+    destination: string, 
+    topic: string, 
+    data: TRequest, 
+    options?: MessageOptions
+  ): Promise<TResponse>;
+  respond<TResponse = any>(requestData: any, responseData: TResponse): void;
+  
+  // Service operations
+  registerWithGateway(serviceInfo: ServiceInfo): Promise<RegistrationResponse>;
+  checkServiceHealth(serviceName: string): Promise<HealthStatus>;
+  broadcastServiceStatus(status: 'up' | 'down' | 'degraded', details?: any): void;
+  
+  // Internal operations
+  getMessageBus(): MessageBus;
+  shutdown(): void;
+}
+
+/**
+ * Service information for registration
+ */
+export interface ServiceInfo {
+  name: string;
+  host: string;
+  port: number;
+  healthEndpoint?: string;
+  routes?: Array<{ path: string; methods: string[] }>;
+  version?: string;
+  capabilities?: string[];
+}
+
+/**
+ * Registration response
+ */
+export interface RegistrationResponse {
+  success: boolean;
+  message: string;
+  timestamp: string;
+  services?: string[];
+}
+
+/**
+ * Health status response
+ */
+export interface HealthStatus {
+  service: string;
+  status: 'healthy' | 'unhealthy' | 'degraded';
+  uptime: number;
+  timestamp: string;
+  details?: any;
+}
+
+/**
+ * Implementation of the Service Communicator
+ */
+class ServiceCommunicatorImpl implements ServiceCommunicator {
+  private serviceName: string;
+  private messageBus: MessageBus;
+  
   constructor(serviceName: string) {
     this.serviceName = serviceName;
-    this.messageBus = createMessageBus(serviceName);
     
-    // Listen for service discovery messages
-    this.setupServiceDiscovery();
-    
-    console.log(`[ServiceCommunicator] Created communicator for service: ${serviceName}`);
-  }
-  
-  /**
-   * Initialize communication with other services
-   */
-  public connect(): void {
-    if (this.isConnected) {
-      console.log(`[ServiceCommunicator:${this.serviceName}] Already connected`);
-      return;
+    // Get or create a message bus for this service
+    if (!messageBusRegistry.has(serviceName)) {
+      messageBusRegistry.set(serviceName, createMessageBus(serviceName));
     }
     
-    // Subscribe to direct messages for this service
-    const directSubscriberId = this.messageBus.subscribe(
-      `service.${this.serviceName}`,
-      this.handleMessage.bind(this)
-    );
-    this.subscriberIds.push(directSubscriberId);
-    
-    // Subscribe to broadcast messages
-    const broadcastSubscriberId = this.messageBus.subscribe(
-      'broadcast.*',
-      this.handleMessage.bind(this)
-    );
-    this.subscriberIds.push(broadcastSubscriberId);
-    
-    this.isConnected = true;
-    
-    // Announce this service's availability
-    this.messageBus.publish('service.discovery', {
-      action: 'register',
-      serviceName: this.serviceName,
-      timestamp: new Date().toISOString()
-    });
-    
-    console.log(`[ServiceCommunicator:${this.serviceName}] Connected and listening for messages`);
+    this.messageBus = messageBusRegistry.get(serviceName)!;
   }
-  
-  /**
-   * Disconnect and cleanup
-   */
-  public disconnect(): void {
-    if (!this.isConnected) {
-      return;
-    }
-    
-    // Unsubscribe from all topics
-    for (const subscriberId of this.subscriberIds) {
-      this.messageBus.unsubscribe(subscriberId);
-    }
-    this.subscriberIds = [];
-    
-    // Announce service is going offline
-    this.messageBus.publish('service.discovery', {
-      action: 'unregister',
-      serviceName: this.serviceName,
-      timestamp: new Date().toISOString()
-    });
-    
-    this.isConnected = false;
-    
-    console.log(`[ServiceCommunicator:${this.serviceName}] Disconnected`);
-  }
-  
-  /**
-   * Register a handler for a specific message type
-   */
-  public onMessage(
-    messageType: string,
-    handler: (data: any, message: Message) => Promise<void> | void
-  ): void {
-    this.messageHandlers.set(messageType, handler);
-    console.log(`[ServiceCommunicator:${this.serviceName}] Registered handler for message type: ${messageType}`);
-  }
-  
+
   /**
    * Send a message to a specific service
    */
-  public sendToService(
-    targetService: string,
-    messageType: string,
-    data: any,
-    options: { priority?: MessagePriority } = {}
-  ): string {
-    if (!this.isConnected) {
-      throw new Error(`Cannot send message: ${this.serviceName} is not connected`);
-    }
-    
-    const topic = `service.${targetService}`;
-    const messageId = this.messageBus.publish(topic, {
-      type: messageType,
-      data,
-      timestamp: new Date().toISOString()
-    }, {
-      target: targetService,
-      priority: options.priority || MessagePriority.NORMAL
-    });
-    
-    return messageId;
+  public sendToService<T = any>(destination: string, topic: string, data: T, options?: MessageOptions): string {
+    const fullTopic = `${destination}.${topic}`;
+    return this.messageBus.publish(fullTopic, data, this.mergeOptions(topic, options));
   }
-  
+
   /**
-   * Send a message to all services (broadcast)
+   * Broadcast a message to all services
    */
-  public broadcast(
-    messageType: string,
-    data: any,
-    options: { priority?: MessagePriority } = {}
-  ): string {
-    if (!this.isConnected) {
-      throw new Error(`Cannot broadcast message: ${this.serviceName} is not connected`);
-    }
-    
-    const topic = `broadcast.${messageType}`;
-    const messageId = this.messageBus.publish(topic, {
-      type: messageType,
-      data,
-      timestamp: new Date().toISOString()
-    }, {
-      priority: options.priority || MessagePriority.NORMAL
-    });
-    
-    return messageId;
-  }
-  
-  /**
-   * Send a message and wait for a response (request-response pattern)
-   */
-  public async request(
-    targetService: string,
-    messageType: string,
-    data: any,
-    options: { 
-      priority?: MessagePriority,
-      timeoutMs?: number
-    } = {}
-  ): Promise<any> {
-    if (!this.isConnected) {
-      throw new Error(`Cannot send request: ${this.serviceName} is not connected`);
-    }
-    
-    const requestId = `req-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-    const responsePromise = new Promise<any>((resolve, reject) => {
-      // Create a response handler
-      const responseHandler = (responseData: any, message: Message) => {
-        if (responseData.requestId === requestId) {
-          // Remove temporary handler after getting response
-          this.messageHandlers.delete(`response.${requestId}`);
-          
-          if (responseData.error) {
-            reject(new Error(responseData.error));
-          } else {
-            resolve(responseData.data);
-          }
-        }
-      };
-      
-      // Register temporary handler for this request
-      this.onMessage(`response.${requestId}`, responseHandler);
-      
-      // Set timeout
-      const timeoutMs = options.timeoutMs || 30000; // Default 30 seconds
-      setTimeout(() => {
-        // Check if handler still exists (response not received)
-        if (this.messageHandlers.has(`response.${requestId}`)) {
-          this.messageHandlers.delete(`response.${requestId}`);
-          reject(new Error(`Request to ${targetService} timed out after ${timeoutMs}ms`));
-        }
-      }, timeoutMs);
-    });
-    
-    // Send the request
-    this.sendToService(targetService, messageType, {
+  public broadcast<T = any>(topic: string, data: T, options?: MessageOptions): string {
+    return this.messageBus.broadcast(topic, {
       ...data,
-      requestId,
-      replyTo: this.serviceName
-    }, {
-      priority: options.priority || MessagePriority.HIGH
-    });
-    
-    return responsePromise;
+      _sender: this.serviceName,
+      _timestamp: new Date().toISOString()
+    }, this.mergeOptions(topic, options));
   }
-  
+
   /**
-   * Send a response to a request
+   * Listen for messages on a specific topic
    */
-  public respond(
-    requestData: any,
-    responseData: any,
-    error?: string
-  ): void {
-    if (!this.isConnected) {
-      throw new Error(`Cannot send response: ${this.serviceName} is not connected`);
-    }
+  public onMessage<T = any>(topic: string, handler: (data: T, message: any) => void | Promise<void>): () => void {
+    // Try to handle both scoped and non-scoped topics
+    const unsubscribeFull = this.messageBus.subscribe(`${this.serviceName}.${topic}`, handler as MessageHandler);
+    const unsubscribeSimple = this.messageBus.subscribe(topic, handler as MessageHandler);
     
-    const { requestId, replyTo } = requestData;
-    
-    if (!requestId || !replyTo) {
-      throw new Error('Cannot respond: Invalid request data (missing requestId or replyTo)');
-    }
-    
-    this.sendToService(replyTo, `response.${requestId}`, {
-      requestId,
-      data: responseData,
-      error,
-      timestamp: new Date().toISOString()
-    }, {
-      priority: MessagePriority.HIGH
-    });
+    // Return a function that unsubscribes from both
+    return () => {
+      unsubscribeFull();
+      unsubscribeSimple();
+    };
   }
-  
+
   /**
-   * Get status of a sent message
+   * Send a request and wait for a response
    */
-  public getMessageStatus(messageId: string): MessageStatus | undefined {
-    return this.messageBus.getMessageStatus(messageId);
+  public request<TRequest = any, TResponse = any>(
+    destination: string, 
+    topic: string, 
+    data: TRequest, 
+    options?: MessageOptions
+  ): Promise<TResponse> {
+    return this.messageBus.request(destination, topic, data, this.mergeOptions(topic, options));
   }
-  
+
   /**
-   * Handle incoming messages
+   * Respond to a request
    */
-  private handleMessage(message: Message): void {
-    const payload = message.data;
-    
-    if (!payload || typeof payload !== 'object' || !payload.type) {
-      console.warn(`[ServiceCommunicator:${this.serviceName}] Received malformed message:`, message);
-      return;
-    }
-    
-    const messageType = payload.type;
-    const handler = this.messageHandlers.get(messageType);
-    
-    if (handler) {
-      try {
-        handler(payload.data, message);
-      } catch (error) {
-        console.error(`[ServiceCommunicator:${this.serviceName}] Error handling message ${messageType}:`, error);
-      }
-    } else {
-      console.debug(`[ServiceCommunicator:${this.serviceName}] No handler for message type: ${messageType}`);
-    }
+  public respond<TResponse = any>(requestData: any, responseData: TResponse): void {
+    this.messageBus.respond(requestData, responseData);
   }
-  
+
   /**
-   * Setup service discovery
+   * Register this service with the API Gateway
    */
-  private setupServiceDiscovery(): void {
-    const discoverySubscriberId = this.messageBus.subscribe('service.discovery', (message: Message) => {
-      const data = message.data;
+  public registerWithGateway(serviceInfo: ServiceInfo): Promise<RegistrationResponse> {
+    return new Promise((resolve, reject) => {
+      // Set up listener for registration response
+      const responseTopic = `service.${this.serviceName}.registered`;
+      const unsubscribe = this.messageBus.subscribe(responseTopic, (data: RegistrationResponse) => {
+        unsubscribe();
+        resolve(data);
+      });
       
-      if (data.action === 'register' && data.serviceName !== this.serviceName) {
-        // A new service has come online
-        console.log(`[ServiceCommunicator:${this.serviceName}] Discovered service: ${data.serviceName}`);
-        
-        // If we're already connected, announce ourselves to the new service
-        if (this.isConnected) {
-          this.messageBus.publish('service.discovery', {
-            action: 'register',
-            serviceName: this.serviceName,
-            timestamp: new Date().toISOString()
-          });
-        }
-      }
+      // Set up timeout
+      const timeoutId = setTimeout(() => {
+        unsubscribe();
+        reject(new Error(`Registration with API Gateway timed out after 5000ms`));
+      }, 5000);
+      
+      // Send registration message
+      this.sendToService('api-gateway', 'service.register', {
+        ...serviceInfo,
+        timestamp: new Date().toISOString()
+      }, { priority: MessagePriority.HIGH });
     });
-    
-    this.subscriberIds.push(discoverySubscriberId);
+  }
+
+  /**
+   * Check the health of another service
+   */
+  public checkServiceHealth(serviceName: string): Promise<HealthStatus> {
+    return this.request(serviceName, 'service.health.check', {
+      requesterId: this.serviceName,
+      timestamp: new Date().toISOString()
+    }, { priority: MessagePriority.HIGH });
+  }
+
+  /**
+   * Broadcast the status of this service
+   */
+  public broadcastServiceStatus(status: 'up' | 'down' | 'degraded', details?: any): void {
+    this.broadcast('service.status', {
+      service: this.serviceName,
+      status,
+      timestamp: new Date().toISOString(),
+      details
+    }, { priority: MessagePriority.HIGH });
+  }
+
+  /**
+   * Get the underlying message bus
+   */
+  public getMessageBus(): MessageBus {
+    return this.messageBus;
+  }
+
+  /**
+   * Shutdown the communicator
+   */
+  public shutdown(): void {
+    this.messageBus.shutdown();
+  }
+
+  /**
+   * Merge default options with provided options based on topic
+   */
+  private mergeOptions(topic: string, options?: MessageOptions): MessageOptions {
+    const defaultOpts = DEFAULT_OPTIONS[topic] || DEFAULT_OPTIONS.default;
+    return { ...defaultOpts, ...options };
   }
 }
-
-// Create a default instance for the module
-let defaultInstance: ServiceCommunicator | null = null;
 
 /**
- * Get a ServiceCommunicator instance
+ * Factory function to get a service communicator
  */
-export function getCommunicator(serviceName?: string): ServiceCommunicator {
-  if (!serviceName && !defaultInstance) {
-    throw new Error('No default ServiceCommunicator available. Please provide a serviceName.');
-  }
-  
-  if (serviceName) {
-    return new ServiceCommunicator(serviceName);
-  }
-  
-  return defaultInstance!;
+export function getCommunicator(serviceName: string): ServiceCommunicator {
+  return new ServiceCommunicatorImpl(serviceName);
 }
 
-/**
- * Create and initialize a default ServiceCommunicator
- */
-export function initCommunication(serviceName: string): ServiceCommunicator {
-  if (defaultInstance) {
-    defaultInstance.disconnect();
-  }
-  
-  defaultInstance = new ServiceCommunicator(serviceName);
-  defaultInstance.connect();
-  
-  return defaultInstance;
-}
+// Re-export MessagePriority enum for convenience
+export { MessagePriority };
