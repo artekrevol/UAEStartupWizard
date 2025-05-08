@@ -115,7 +115,7 @@ Always provide detailed, accurate responses based on the above context. If the i
     guideIds?: number[],
     userBusinessContext?: any
   ) {
-    console.log(`[AiService] Processing business assistant query: ${query}`);
+    logger.info(`Processing business assistant query: ${query}`);
     
     try {
       // Retrieve free zone data
@@ -253,7 +253,7 @@ Always respond with JSON in the following format:
         const jsonResponse = JSON.parse(content);
         return jsonResponse;
       } catch (parseError) {
-        console.error("Error parsing OpenAI response as JSON:", parseError);
+        logger.error(`Error parsing OpenAI response as JSON: ${parseError.message}`);
         // Fallback for non-JSON responses
         return {
           answer: content,
@@ -261,7 +261,7 @@ Always respond with JSON in the following format:
         };
       }
     } catch (error) {
-      console.error(`[AiService] Error in business assistant query:`, error);
+      logger.error(`Error in business assistant query: ${error.message}`);
       throw new Error(`Failed to process business assistant query: ${error.message}`);
     }
   }
@@ -275,7 +275,7 @@ Always respond with JSON in the following format:
       // For this example, we'll try to query a mock storage or return null
       return null;
     } catch (error) {
-      console.error(`[AiService] Error getting user business context:`, error);
+      logger.error(`Error getting user business context: ${error.message}`);
       return null;
     }
   }
@@ -314,7 +314,7 @@ Always respond with JSON in the following format:
         }
       };
     } catch (error) {
-      console.error(`[AiService] Error in quick test query:`, error);
+      logger.error(`Error in quick test query: ${error.message}`);
       throw new Error(`Failed to process quick test query: ${error.message}`);
     }
   }
@@ -323,17 +323,17 @@ Always respond with JSON in the following format:
    * Initialize assistant memory
    */
   async initializeAssistantMemory() {
-    console.log(`[AiService] Initializing assistant memory`);
+    logger.info(`Initializing assistant memory`);
     
     try {
       // Get free zone data
-      const freeZonesData = await db.select().from(freeZones);
+      const freeZonesData = await getDb().select().from(freeZones);
       
       // Get activity data
-      const activitiesData = await db.select().from(businessActivities);
+      const activitiesData = await getDb().select().from(businessActivities);
       
       // Get document data
-      const documentsData = await db.select().from(documents).limit(100);
+      const documentsData = await getDb().select().from(documents).limit(100);
       
       return {
         freeZones: freeZonesData.length,
@@ -341,7 +341,7 @@ Always respond with JSON in the following format:
         documents: documentsData.length
       };
     } catch (error) {
-      console.error(`[AiService] Error initializing assistant memory:`, error);
+      logger.error(`Error initializing assistant memory: ${error.message}`);
       throw new Error(`Failed to initialize assistant memory: ${error.message}`);
     }
   }
@@ -350,7 +350,7 @@ Always respond with JSON in the following format:
    * Update assistant memory
    */
   async updateAssistantMemory(data: any) {
-    console.log(`[AiService] Updating assistant memory`);
+    logger.info(`Updating assistant memory`);
     
     try {
       // In a real implementation, this would update the assistant's memory
@@ -359,7 +359,7 @@ Always respond with JSON in the following format:
         timestamp: new Date().toISOString()
       };
     } catch (error) {
-      console.error(`[AiService] Error updating assistant memory:`, error);
+      logger.error(`Error updating assistant memory: ${error.message}`);
       throw new Error(`Failed to update assistant memory: ${error.message}`);
     }
   }
@@ -369,12 +369,12 @@ Always respond with JSON in the following format:
    */
   private async getFreeZoneContext() {
     try {
-      return await db
+      return await getDb()
         .select()
         .from(freeZones)
         .limit(20);
     } catch (error) {
-      console.error(`[AiService] Error getting free zone context:`, error);
+      logger.error(`Error getting free zone context: ${error.message}`);
       return [];
     }
   }
@@ -384,7 +384,7 @@ Always respond with JSON in the following format:
    */
   private async getDocumentContext() {
     try {
-      return await db
+      return await getDb()
         .select()
         .from(documents)
         .where(
@@ -396,7 +396,7 @@ Always respond with JSON in the following format:
         )
         .limit(20);
     } catch (error) {
-      console.error(`[AiService] Error getting document context:`, error);
+      logger.error(`Error getting document context: ${error.message}`);
       return [];
     }
   }
