@@ -68,12 +68,9 @@ app.use((req, res, next) => {
   // Initialize the MOEC data scraper
   initializeScraper();
   
-  // Create screenshots directory for Playwright if it doesn't exist
+  // Screenshots directory is now created during build phase
   const screenshotsDir = path.join(process.cwd(), 'screenshots');
-  if (!fs.existsSync(screenshotsDir)) {
-    fs.mkdirSync(screenshotsDir, { recursive: true });
-    log(`Created screenshots directory at ${screenshotsDir}`);
-  }
+  log(`Using screenshots directory at ${screenshotsDir}`);
 
   // Import the scraper scheduler on application start
   try {
