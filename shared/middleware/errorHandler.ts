@@ -1,46 +1,49 @@
 /**
  * Error Handler Middleware
  * 
- * Provides consistent error handling across all microservices
+ * Provides centralized error handling for the application
  */
 import { Request, Response, NextFunction } from 'express';
 import { ApiError } from '../errors/ApiError';
-import { ZodError } from 'zod';
-import { fromZodError } from 'zod-validation-error';
-import { config } from '../config';
+
+/**
+ * Handle 404 Not Found errors
+ */
+export const notFoundHandler = (req: Request, res: Response, next: NextFunction) => {
+  const error = new ApiError('Resource not found', 'NOT_FOUND', 404);
+  next(error);
+};
 
 /**
  * Global error handler middleware
  */
-export const errorHandler = (
-  err: Error,
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  console.error(`[ErrorHandler] ${err.message}`, err);
+export const errorHandler = (err: Error, req: Request, res: Response, next: NextFunction) => {
+  console.error(`[${new Date().toISOString()}] Error:`, {
+    message: err.message,
+    stack: err.stack,
+    path: req.path,
+    method: req.method,
+    ip: req.ip,
+  });
 
-  // Handle ApiError instances
+  // Handle known API errors
   if (err instanceof ApiError) {
     return res.status(err.statusCode).json({
       success: false,
       error: {
         message: err.message,
-        code: err.errorCode,
-        details: err.details,
+        code: err.code,
       },
     });
   }
 
-  // Handle Zod validation errors
-  if (err instanceof ZodError) {
-    const validationError = fromZodError(err);
+  // Handle validation errors
+  if (err.name === 'ValidationError') {
     return res.status(400).json({
       success: false,
       error: {
-        message: 'Validation error',
+        message: err.message,
         code: 'VALIDATION_ERROR',
-        details: validationError.details,
       },
     });
   }
@@ -66,41 +69,25 @@ export const errorHandler = (
     });
   }
 
-  // Handle generic errors
-  const statusCode = 500;
-  const message = config.isProduction
-    ? 'Internal server error'
-    : err.message || 'Internal server error';
+  // Database errors
+  if (err.name === 'SequelizeError' || err.name === 'SequelizeDatabaseError') {
+    return res.status(500).json({
+      success: false,
+      error: {
+        message: 'Database error',
+        code: 'DATABASE_ERROR',
+      },
+    });
+  }
 
-  res.status(statusCode).json({
+  // Default to 500 Internal Server Error for unhandled exceptions
+  return res.status(500).json({
     success: false,
     error: {
-      message,
-      stack: config.isProduction ? undefined : err.stack,
+      message: process.env.NODE_ENV === 'production' 
+        ? 'Internal server error' 
+        : err.message || 'Internal server error',
+      code: 'INTERNAL_SERVER_ERROR',
     },
   });
-};
-
-/**
- * Handle 404 - Not Found errors
- */
-export const notFoundHandler = (req: Request, res: Response) => {
-  res.status(404).json({
-    success: false,
-    error: {
-      message: `Not found - ${req.originalUrl}`,
-      code: 'NOT_FOUND',
-    },
-  });
-};
-
-/**
- * Async handler to simplify try/catch in controllers
- */
-export const asyncHandler = (fn: Function) => (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  Promise.resolve(fn(req, res, next)).catch(next);
 };
