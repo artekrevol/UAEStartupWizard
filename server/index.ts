@@ -76,8 +76,11 @@ app.use((req, res, next) => {
     initializeScraper();
   }
   
-  // Screenshots directory is now created during build phase
+  // Create screenshots directory if it doesn't exist
   const screenshotsDir = path.join(process.cwd(), 'screenshots');
+  if (!fs.existsSync(screenshotsDir)) {
+    fs.mkdirSync(screenshotsDir, { recursive: true });
+  }
   log(`Using screenshots directory at ${screenshotsDir}`);
 
   // Import the scraper scheduler on application start
