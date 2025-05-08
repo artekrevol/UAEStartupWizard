@@ -287,7 +287,7 @@ const MOEC_BASE_URL = "https://www.moec.gov.ae";
 const FREE_ZONES_URL = `${MOEC_BASE_URL}/en/free-zones`;
 const ESTABLISHING_COMPANIES_URL = `${MOEC_BASE_URL}/en/establishing-companies`;
 
-// Configure axios with robust SSL settings - now with legacy renegotiation enabled
+// Configure axios with robust SSL settings - now with legacy renegotiation explicitly enabled
 const axiosInstance = axios.create({
   httpsAgent: new https.Agent({
     rejectUnauthorized: false,
@@ -295,8 +295,9 @@ const axiosInstance = axios.create({
     maxVersion: "TLSv1.3",
     ciphers: "ALL", // Allow all ciphers for maximum compatibility
     honorCipherOrder: false, // Let server choose preferred cipher
-    secureOptions: constants.SSL_OP_NO_SSLv3 | constants.SSL_OP_NO_SSLv2, // No renegotiation restriction
-    // Force legacy renegotiation to be enabled
+    // Use SSL_OP_LEGACY_SERVER_CONNECT to explicitly allow legacy server connections
+    secureOptions: constants.SSL_OP_LEGACY_SERVER_CONNECT,
+    // Additional options that might help
     ALPNProtocols: ['http/1.1']
   }),
   timeout: 45000, // 45 seconds timeout
@@ -325,11 +326,11 @@ const makeDirectHttpsRequest = (url: string): Promise<string> => {
     // Process URL
     const urlObj = new URL(url);
     
-    // Create a super permissive custom agent
+    // Create a super permissive custom agent with explicit legacy server support
     const customAgent = new https.Agent({
       rejectUnauthorized: false,
-      // Don't explicitly set secureProtocol as it's incompatible with min/max version
-      secureOptions: 0, // No restrictions
+      // Use SSL_OP_LEGACY_SERVER_CONNECT to explicitly allow legacy server connections
+      secureOptions: constants.SSL_OP_LEGACY_SERVER_CONNECT,
       ciphers: 'ALL', // All ciphers allowed
       honorCipherOrder: false,
       minVersion: 'TLSv1', // Minimum TLS version
@@ -428,7 +429,8 @@ async function fetchPage(url: string): Promise<string | null> {
           maxVersion: "TLSv1.2", // Cap at TLS 1.2 for better compatibility
           minVersion: "TLSv1", // Support very old TLS
           ciphers: "ALL", // Allow all ciphers
-          secureOptions: 0, // Allow everything including legacy renegotiation
+          // Use SSL_OP_LEGACY_SERVER_CONNECT to explicitly allow legacy server connections
+          secureOptions: constants.SSL_OP_LEGACY_SERVER_CONNECT,
           // Additional options to try to work around renegotiation issues
           ALPNProtocols: ['http/1.1', 'http/1.0'],
           ecdhCurve: 'auto' // Use auto curve selection
