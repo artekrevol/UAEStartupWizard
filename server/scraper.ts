@@ -8,6 +8,85 @@ import { log } from "./vite";
 import https from "https";
 import { constants } from "crypto";
 import { execSync } from "child_process";
+import fs from "fs";
+import path from "path";
+
+// Cache directory for storing fetched data
+const CACHE_DIR = path.join(process.cwd(), 'cache');
+
+// Ensure cache directory exists
+try {
+  if (!fs.existsSync(CACHE_DIR)) {
+    fs.mkdirSync(CACHE_DIR, { recursive: true });
+    log(`Created cache directory at ${CACHE_DIR}`, "scraper");
+  }
+} catch (err) {
+  const errorMessage = err instanceof Error ? err.message : String(err);
+  log(`Error creating cache directory: ${errorMessage}`, "scraper");
+}
+
+/**
+ * Save data to cache for future use
+ * @param key Unique identifier for the cached data
+ * @param data HTML content to cache
+ * @returns True if caching was successful
+ */
+function saveCachedData(key: string, data: string): boolean {
+  try {
+    const cachePath = path.join(CACHE_DIR, `${key}.html`);
+    const metaData = {
+      timestamp: new Date().toISOString(),
+      source: key,
+      size: data.length
+    };
+    
+    // Save the data and metadata
+    fs.writeFileSync(cachePath, data);
+    fs.writeFileSync(path.join(CACHE_DIR, `${key}.meta.json`), JSON.stringify(metaData, null, 2));
+    
+    log(`Cached data for ${key} (${data.length} bytes)`, "scraper");
+    return true;
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    log(`Error caching data for ${key}: ${errorMessage}`, "scraper");
+    return false;
+  }
+}
+
+/**
+ * Load cached data
+ * @param key Unique identifier for the cached data
+ * @returns Cached HTML content or null if not found/expired
+ */
+function loadCachedData(key: string): string | null {
+  try {
+    const cachePath = path.join(CACHE_DIR, `${key}.html`);
+    const metaPath = path.join(CACHE_DIR, `${key}.meta.json`);
+    
+    if (!fs.existsSync(cachePath) || !fs.existsSync(metaPath)) {
+      return null;
+    }
+    
+    // Check cache expiration (24 hours)
+    const metaData = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
+    const cacheTime = new Date(metaData.timestamp).getTime();
+    const now = new Date().getTime();
+    const cacheDuration = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+    
+    if (now - cacheTime > cacheDuration) {
+      log(`Cache expired for ${key}`, "scraper");
+      return null;
+    }
+    
+    const data = fs.readFileSync(cachePath, 'utf-8');
+    log(`Loaded cached data for ${key} (${data.length} bytes, age: ${Math.round((now - cacheTime) / (60 * 60 * 1000))} hours)`, "scraper");
+    return data;
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    log(`Error loading cached data for ${key}: ${errorMessage}`, "scraper");
+    return null;
+  }
+}
 
 // Try to use a different approach for the MOEC website by using curl when we absolutely need to bypass TLS issues
 function execCurlRequest(url: string): string | null {
@@ -403,13 +482,41 @@ async function fetchPage(url: string): Promise<string | null> {
         log(`Failed with curl approach: ${curlErrorMessage}`, "scraper");
       }
       
-      // Last resort - create a mock based on the URL for development purposes
-      log(`Using mock data for ${url} due to connectivity issues`, "scraper");
+      // Last resort - use cached data or mock data if nothing else works
       if (url.includes("free-zones")) {
-        return mockFreeZonesData();
+        // Try to load cached data first
+        const cachedData = loadCachedData('free-zones');
+        if (cachedData) {
+          log(`Using cached data for ${url}`, "scraper");
+          return cachedData;
+        }
+        
+        // Fall back to mock data
+        log(`Using mock data for ${url} due to connectivity issues`, "scraper");
+        const mockData = mockFreeZonesData();
+        
+        // Try to cache the mock data for future use
+        saveCachedData('free-zones', mockData);
+        
+        return mockData;
       } else if (url.includes("establishing-companies")) {
-        return mockEstablishmentData();
+        // Try to load cached data first
+        const cachedData = loadCachedData('establishing-companies');
+        if (cachedData) {
+          log(`Using cached data for ${url}`, "scraper");
+          return cachedData;
+        }
+        
+        // Fall back to mock data
+        log(`Using mock data for ${url} due to connectivity issues`, "scraper");
+        const mockData = mockEstablishmentData();
+        
+        // Try to cache the mock data for future use
+        saveCachedData('establishing-companies', mockData);
+        
+        return mockData;
       }
+      
       return null;
     }
   }
