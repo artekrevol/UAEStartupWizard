@@ -9,8 +9,8 @@ import OpenAI from 'openai';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { getDb } from '../db';
-import { documents, freeZones, conversations } from '../../../shared/schema';
-import { eq, and, like, or, sql } from 'drizzle-orm';
+import { documents, freeZones, conversations, messages } from '../../../shared/schema';
+import { eq, and, like, or } from 'drizzle-orm';
 import { getCommunicator } from '../../../shared/communication/service-communicator';
 
 export class WebResearchService {
@@ -113,8 +113,8 @@ ${context}
 Always provide helpful, accurate answers based on this context. If you don't know something or 
 it's not in the context, say so clearly rather than making up information.`
         },
-        ...conversationHistory.map((msg: any) => ({
-          role: msg.role,
+        ...conversationHistory.map((msg) => ({
+          role: msg.role as "user" | "assistant" | "system",
           content: msg.content
         })),
         {
@@ -495,11 +495,17 @@ ${context}`
    */
   private async createConversation(userId: number, topic: string) {
     try {
+      // Store the topic in metadata as there's no direct topic field
+      const metadata = { topic };
+      const summary = `Research on: ${topic}`;
+      
       const [result] = await getDb()
         .insert(conversations)
         .values({
           userId,
-          topic,
+          summary,
+          isActive: true,
+          metadata,
           createdAt: new Date(),
           updatedAt: new Date()
         })
@@ -517,16 +523,21 @@ ${context}`
    */
   private async getConversationHistory(conversationId: number) {
     try {
+      interface Message {
+        role: string;
+        content: string;
+      }
+      
       const messages = await getDb()
         .select({
-          role: sql`role`,
-          content: sql`content`
+          role: messages.role,
+          content: messages.content
         })
-        .from(sql`conversation_messages`)
-        .where(sql`conversation_id = ${conversationId}`)
-        .orderBy(sql`created_at asc`);
+        .from(messages)
+        .where(eq(messages.conversationId, conversationId))
+        .orderBy(messages.createdAt);
       
-      return messages;
+      return messages as Message[];
     } catch (error) {
       console.error('[WebResearchService] Error getting conversation history:', error);
       return [];
@@ -538,10 +549,14 @@ ${context}`
    */
   private async saveToConversationHistory(conversationId: number, role: string, content: string) {
     try {
-      await getDb().execute(
-        sql`INSERT INTO conversation_messages (conversation_id, role, content, created_at) 
-            VALUES (${conversationId}, ${role}, ${content}, ${new Date()})`
-      );
+      await getDb()
+        .insert(messages)
+        .values({
+          conversationId,
+          role,
+          content,
+          createdAt: new Date()
+        });
       return true;
     } catch (error) {
       console.error('[WebResearchService] Error saving to conversation history:', error);
