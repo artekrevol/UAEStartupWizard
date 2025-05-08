@@ -1,234 +1,297 @@
 /**
- * Authentication Controller
+ * Auth Controller
  * 
- * Handles user authentication and registration
+ * Handles authentication operations like login, registration, password reset, etc.
  */
 import { Request, Response } from 'express';
-import jwt from 'jsonwebtoken';
-import bcrypt from 'bcrypt';
-import { v4 as uuidv4 } from 'uuid';
 import { UserRepository } from '../repositories/userRepository';
+import { 
+  UserCredentialsSchema, 
+  UserRegistrationSchema,
+  UserErrorCode
+} from '../schema';
 import { asyncHandler } from '../../../shared/middleware/errorHandler';
-import {
-  ServiceException,
-  ErrorCode,
-  ValidationException,
-  NotFoundException
-} from '../../../shared/errors';
-import { config } from '../../../shared/config';
-import { logger } from '../../../shared/logger';
+import { ServiceException, ErrorCode, ValidationException } from '../../../shared/errors';
 import { eventBus } from '../../../shared/event-bus';
+import bcrypt from 'bcrypt';
+import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
+import { config } from '../../../shared/config';
+import { v4 as uuidv4 } from 'uuid';
 
 // Initialize repository
 const userRepo = new UserRepository();
+
+// JWT secret
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_EXPIRES_IN = '24h';
 
 export class AuthController {
   /**
    * User login
    */
   login = asyncHandler(async (req: Request, res: Response) => {
-    const { email, password } = req.body;
+    // Validate request
+    const credentials = UserCredentialsSchema.parse(req.body);
     
-    if (!email || !password) {
-      throw new ValidationException('Email and password are required');
-    }
-    
-    // Find user by email
-    const user = await userRepo.getUserByEmail(email);
+    // Get user
+    const user = await userRepo.getUserByEmail(credentials.email);
     
     if (!user) {
       throw new ServiceException(
-        ErrorCode.INVALID_CREDENTIALS,
+        UserErrorCode.INVALID_CREDENTIALS,
         'Invalid email or password'
       );
     }
     
     // Check if account is locked
-    if (user.lockUntil && user.lockUntil > new Date()) {
+    if (user.lockUntil && new Date(user.lockUntil) > new Date()) {
       throw new ServiceException(
-        ErrorCode.ACCOUNT_LOCKED,
-        'Account is temporarily locked. Please try again later.'
+        UserErrorCode.ACCOUNT_LOCKED,
+        'Account is temporarily locked. Try again later'
       );
     }
     
-    // Verify password
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    // Check password
+    const isPasswordValid = await bcrypt.compare(credentials.password, user.password);
     
     if (!isPasswordValid) {
       // Increment login attempts
-      await userRepo.incrementLoginAttempts(email);
+      await userRepo.updateUser(user.id, {
+        loginAttempts: (user.loginAttempts || 0) + 1,
+        lockUntil: (user.loginAttempts || 0) >= 4 ? new Date(Date.now() + 30 * 60000) : null // Lock for 30 minutes after 5 attempts
+      });
       
       throw new ServiceException(
-        ErrorCode.INVALID_CREDENTIALS,
+        UserErrorCode.INVALID_CREDENTIALS,
         'Invalid email or password'
       );
     }
     
     // Update login info
-    await userRepo.updateLoginInfo(user.id, req.ip, req.headers['user-agent']);
+    await userRepo.updateUser(user.id, {
+      lastLogin: new Date(),
+      lastActive: new Date(),
+      loginAttempts: 0,
+      lockUntil: null
+    });
     
-    // Generate JWT token
+    // Generate JWT
     const token = jwt.sign(
-      {
+      { 
         userId: user.id,
         email: user.email,
         role: user.role
       },
-      config.userService.jwtSecret,
-      { expiresIn: config.userService.jwtExpiresIn }
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES_IN }
     );
     
     // Create session
-    const session = await userRepo.createSession({
+    const sessionId = uuidv4();
+    await userRepo.createUserSession({
+      id: sessionId,
       userId: user.id,
       token,
       ipAddress: req.ip,
-      userAgent: req.headers['user-agent'] as string,
+      userAgent: req.headers['user-agent'],
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
-      deviceInfo: {}
+      createdAt: new Date(),
+      updatedAt: new Date()
     });
     
-    // Publish user logged in event
-    eventBus.publish('user-logged-in', {
+    // Publish login event
+    eventBus.publish('user-login', {
       userId: user.id,
       timestamp: new Date().toISOString()
     });
     
-    // Return user info and token
+    // Log the action
+    await userRepo.createAuditLog({
+      userId: user.id,
+      action: 'LOGIN',
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+      timestamp: new Date()
+    });
+    
+    // Return user data and token
     res.json({
       status: 'success',
       data: {
+        token,
+        sessionId,
         user: {
           id: user.id,
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
-          role: user.role
-        },
-        token
+          role: user.role,
+          status: user.status
+        }
       }
     });
   });
-  
+
   /**
    * User registration
    */
   register = asyncHandler(async (req: Request, res: Response) => {
-    const { email, password, firstName, lastName } = req.body;
-    
-    if (!email || !password) {
-      throw new ValidationException('Email and password are required');
-    }
+    // Validate request
+    const userData = UserRegistrationSchema.parse(req.body);
     
     // Check if user already exists
-    const existingUser = await userRepo.getUserByEmail(email);
+    const existingUser = await userRepo.getUserByEmail(userData.email);
     
     if (existingUser) {
       throw new ServiceException(
-        ErrorCode.USER_ALREADY_EXISTS,
-        'A user with this email already exists'
+        UserErrorCode.EMAIL_ALREADY_EXISTS,
+        'Email is already registered'
       );
     }
     
     // Hash password
     const hashedPassword = await bcrypt.hash(
-      password,
+      userData.password,
       config.userService.saltRounds
     );
     
+    // Generate verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    
     // Create user
     const user = await userRepo.createUser({
-      email,
+      ...userData,
       password: hashedPassword,
-      firstName,
-      lastName,
-      role: 'user',
-      status: 'active',
-      verificationToken: uuidv4()
+      verificationToken,
+      status: 'pending',
+      verified: false,
+      createdAt: new Date(),
+      updatedAt: new Date()
     });
     
-    // Initialize user profile
-    await userRepo.createUserProfile({
-      userId: user.id
-    });
-    
-    // Generate JWT token
+    // Generate JWT
     const token = jwt.sign(
-      {
+      { 
         userId: user.id,
         email: user.email,
         role: user.role
       },
-      config.userService.jwtSecret,
-      { expiresIn: config.userService.jwtExpiresIn }
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES_IN }
     );
     
     // Create session
-    await userRepo.createSession({
+    const sessionId = uuidv4();
+    await userRepo.createUserSession({
+      id: sessionId,
       userId: user.id,
       token,
       ipAddress: req.ip,
-      userAgent: req.headers['user-agent'] as string,
+      userAgent: req.headers['user-agent'],
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
-      deviceInfo: {}
+      createdAt: new Date(),
+      updatedAt: new Date()
     });
     
-    // Publish user registered event
+    // Publish registration event
     eventBus.publish('user-registered', {
       userId: user.id,
       timestamp: new Date().toISOString()
     });
     
-    // In a real app, we would send a verification email here
-    logger.info(`Verification link would be sent to ${email} with token ${user.verificationToken}`);
+    // Log the action
+    await userRepo.createAuditLog({
+      userId: user.id,
+      action: 'REGISTERED',
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+      timestamp: new Date()
+    });
     
-    // Return user info and token
+    // Send welcome notification
+    await userRepo.createNotification({
+      userId: user.id,
+      title: 'Welcome to UAE Business Setup',
+      message: 'Thank you for registering! Please verify your email to get started.',
+      type: 'welcome',
+      createdAt: new Date()
+    });
+    
+    // In a real implementation, we would send a verification email here
+    // sendVerificationEmail(user.email, verificationToken);
+    
+    // Return user data and token
     res.status(201).json({
       status: 'success',
       data: {
+        token,
+        sessionId,
         user: {
           id: user.id,
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
-          role: user.role
-        },
-        token
+          role: user.role,
+          status: user.status,
+          verified: user.verified
+        }
       }
     });
   });
-  
+
   /**
    * User logout
    */
   logout = asyncHandler(async (req: Request, res: Response) => {
-    // Get token from Authorization header
+    // Get token from authorization header
     const authHeader = req.headers.authorization;
     
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.split(' ')[1];
-      
-      // Find session by token
-      const session = await userRepo.getSessionByToken(token);
-      
-      // Delete session if found
-      if (session) {
-        await userRepo.deleteSession(session.id);
-        
-        // Publish user logged out event
-        eventBus.publish('user-logged-out', {
-          userId: session.userId,
-          timestamp: new Date().toISOString()
-        });
-      }
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(200).json({
+        status: 'success',
+        message: 'Logged out successfully'
+      });
     }
     
-    res.json({
+    const token = authHeader.split(' ')[1];
+    
+    try {
+      // Verify and decode token
+      const decoded = jwt.verify(token, JWT_SECRET) as { userId: number };
+      
+      // Find session by token
+      const session = await userRepo.getUserSessions(decoded.userId);
+      
+      if (session && session.length > 0) {
+        // Delete session
+        await userRepo.deleteUserSession(session[0].id, decoded.userId);
+        
+        // Publish logout event
+        eventBus.publish('user-logout', {
+          userId: decoded.userId,
+          timestamp: new Date().toISOString()
+        });
+        
+        // Log the action
+        await userRepo.createAuditLog({
+          userId: decoded.userId,
+          action: 'LOGOUT',
+          ipAddress: req.ip,
+          userAgent: req.headers['user-agent'],
+          timestamp: new Date()
+        });
+      }
+    } catch (error) {
+      // Token invalid or expired, that's fine for logout
+    }
+    
+    res.status(200).json({
       status: 'success',
       message: 'Logged out successfully'
     });
   });
-  
+
   /**
    * Verify email
    */
@@ -240,31 +303,50 @@ export class AuthController {
     }
     
     // Find user by verification token
-    const users = await userRepo.getAllUsers(1, 0, 'id', 'asc', {
-      verificationToken: token
-    });
+    const user = await userRepo.getUserByVerificationToken(token);
     
-    if (!users.length) {
-      throw new ServiceException(
-        ErrorCode.INVALID_TOKEN,
-        'Invalid or expired verification token'
-      );
+    if (!user) {
+      throw new ValidationException('Invalid or expired verification token');
     }
     
-    const user = users[0];
-    
-    // Update user as verified
+    // Update user
     await userRepo.updateUser(user.id, {
       verified: true,
-      verificationToken: null
+      status: 'active',
+      verificationToken: null,
+      updatedAt: new Date()
+    });
+    
+    // Publish event
+    eventBus.publish('user-verified', {
+      userId: user.id,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Log the action
+    await userRepo.createAuditLog({
+      userId: user.id,
+      action: 'EMAIL_VERIFIED',
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+      timestamp: new Date()
+    });
+    
+    // Send notification
+    await userRepo.createNotification({
+      userId: user.id,
+      title: 'Email Verified',
+      message: 'Your email has been successfully verified. You now have full access to all features.',
+      type: 'account',
+      createdAt: new Date()
     });
     
     res.json({
       status: 'success',
-      message: 'Email verified successfully. You can now log in.'
+      message: 'Email verified successfully'
     });
   });
-  
+
   /**
    * Request password reset
    */
@@ -278,59 +360,68 @@ export class AuthController {
     // Find user by email
     const user = await userRepo.getUserByEmail(email);
     
-    if (user) {
-      // Generate reset token
-      const resetToken = uuidv4();
-      const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-      
-      // Update user with reset token
-      await userRepo.updateUser(user.id, {
-        resetPasswordToken: resetToken,
-        resetPasswordExpires: resetExpires
+    if (!user) {
+      // We don't want to reveal if the email exists for security reasons
+      return res.json({
+        status: 'success',
+        message: 'Password reset instructions have been sent to your email if it exists in our system'
       });
-      
-      // In a real app, we would send a reset email here
-      logger.info(`Password reset link would be sent to ${email} with token ${resetToken}`);
     }
     
-    // Always return success to prevent email enumeration
+    // Generate password reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    
+    // Update user
+    await userRepo.updateUser(user.id, {
+      passwordResetToken: resetToken,
+      passwordResetExpires: resetExpires,
+      updatedAt: new Date()
+    });
+    
+    // Log the action
+    await userRepo.createAuditLog({
+      userId: user.id,
+      action: 'PASSWORD_RESET_REQUESTED',
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+      timestamp: new Date()
+    });
+    
+    // In a real implementation, we would send a password reset email here
+    // sendPasswordResetEmail(user.email, resetToken);
+    
     res.json({
       status: 'success',
-      message: 'If an account with that email exists, a password reset link has been sent.'
+      message: 'Password reset instructions have been sent to your email if it exists in our system'
     });
   });
-  
+
   /**
-   * Reset password with token
+   * Reset password
    */
   resetPassword = asyncHandler(async (req: Request, res: Response) => {
     const { token } = req.params;
     const { password } = req.body;
     
     if (!token || !password) {
-      throw new ValidationException('Token and new password are required');
+      throw new ValidationException('Reset token and new password are required');
+    }
+    
+    if (password.length < 8) {
+      throw new ValidationException('Password must be at least 8 characters long');
     }
     
     // Find user by reset token
-    const users = await userRepo.getAllUsers(1, 0, 'id', 'asc', {
-      resetPasswordToken: token
-    });
+    const user = await userRepo.getUserByResetToken(token);
     
-    if (!users.length) {
-      throw new ServiceException(
-        ErrorCode.INVALID_TOKEN,
-        'Invalid or expired reset token'
-      );
+    if (!user) {
+      throw new ValidationException('Invalid or expired reset token');
     }
     
-    const user = users[0];
-    
     // Check if token is expired
-    if (user.resetPasswordExpires && user.resetPasswordExpires < new Date()) {
-      throw new ServiceException(
-        ErrorCode.TOKEN_EXPIRED,
-        'Reset token has expired'
-      );
+    if (!user.passwordResetExpires || new Date(user.passwordResetExpires) < new Date()) {
+      throw new ValidationException('Reset token has expired');
     }
     
     // Hash new password
@@ -339,38 +430,45 @@ export class AuthController {
       config.userService.saltRounds
     );
     
-    // Update user with new password
+    // Update user
     await userRepo.updateUser(user.id, {
       password: hashedPassword,
-      resetPasswordToken: null,
-      resetPasswordExpires: null
+      passwordResetToken: null,
+      passwordResetExpires: null,
+      updatedAt: new Date()
     });
-    
-    // Delete all sessions for the user
-    await userRepo.deleteUserSessions(user.id);
     
     // Log the action
     await userRepo.createAuditLog({
       userId: user.id,
       action: 'PASSWORD_RESET',
       ipAddress: req.ip,
-      userAgent: req.headers['user-agent']
+      userAgent: req.headers['user-agent'],
+      timestamp: new Date()
+    });
+    
+    // Send notification
+    await userRepo.createNotification({
+      userId: user.id,
+      title: 'Password Reset',
+      message: 'Your password has been successfully reset. If you did not perform this action, please contact support immediately.',
+      type: 'security',
+      createdAt: new Date()
     });
     
     res.json({
       status: 'success',
-      message: 'Password reset successfully. Please login with your new password.'
+      message: 'Password has been reset successfully'
     });
   });
-  
+
   /**
-   * Get all active sessions for a user
+   * Get user sessions
    */
   getSessions = asyncHandler(async (req: Request, res: Response) => {
-    // Get user ID from authenticated user
     const userId = req.user.userId;
     
-    // Get all sessions
+    // Get sessions
     const sessions = await userRepo.getUserSessions(userId);
     
     res.json({
@@ -378,33 +476,46 @@ export class AuthController {
       data: sessions
     });
   });
-  
+
   /**
-   * Revoke a session
+   * Revoke session
    */
   revokeSession = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user.userId;
     const { sessionId } = req.params;
     
     if (!sessionId) {
       throw new ValidationException('Session ID is required');
     }
     
-    // Get user ID from authenticated user
-    const userId = req.user.userId;
+    // Get current session token
+    const authHeader = req.headers.authorization;
     
-    // Find session - using repository methods instead of direct db access
-    const allSessions = await userRepo.getUserSessions(userId);
-    const session = allSessions.find(s => s.id === parseInt(sessionId, 10));
-    
-    if (!session) {
-      throw new ServiceException(
-        ErrorCode.NOT_FOUND,
-        'Session not found or does not belong to you'
-      );
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      const sessions = await userRepo.getUserSessions(userId);
+      
+      // If trying to revoke current session, logout
+      const isCurrentSession = sessions.some(s => s.id === sessionId && s.token === token);
+      
+      if (isCurrentSession) {
+        await userRepo.deleteUserSession(sessionId, userId);
+        
+        // Publish logout event
+        eventBus.publish('user-logout', {
+          userId,
+          timestamp: new Date().toISOString()
+        });
+        
+        return res.json({
+          status: 'success',
+          message: 'Your current session has been revoked. You will be logged out.'
+        });
+      }
     }
     
-    // Delete session
-    await userRepo.deleteSession(session.id);
+    // Revoke the session
+    await userRepo.deleteUserSession(sessionId, userId);
     
     // Log the action
     await userRepo.createAuditLog({
@@ -413,77 +524,77 @@ export class AuthController {
       resourceType: 'session',
       resourceId: sessionId,
       ipAddress: req.ip,
-      userAgent: req.headers['user-agent']
+      userAgent: req.headers['user-agent'],
+      timestamp: new Date()
     });
     
     res.json({
       status: 'success',
-      message: 'Session revoked successfully'
+      message: 'Session has been revoked successfully'
     });
   });
-  
+
   /**
-   * Revoke all sessions except current one
+   * Revoke all sessions
    */
   revokeAllSessions = asyncHandler(async (req: Request, res: Response) => {
-    // Get user ID from authenticated user
     const userId = req.user.userId;
     
-    // Get current session token
-    const authHeader = req.headers.authorization;
-    let currentSessionId: number | undefined;
-    
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.split(' ')[1];
-      const session = await userRepo.getSessionByToken(token);
-      if (session) {
-        currentSessionId = session.id;
-      }
-    }
-    
-    // Delete all sessions except current one
-    await userRepo.deleteUserSessions(userId, currentSessionId);
+    // Delete all sessions
+    await userRepo.deleteAllUserSessions(userId);
     
     // Log the action
     await userRepo.createAuditLog({
       userId,
       action: 'ALL_SESSIONS_REVOKED',
       ipAddress: req.ip,
-      userAgent: req.headers['user-agent']
+      userAgent: req.headers['user-agent'],
+      timestamp: new Date()
+    });
+    
+    // Publish logout event
+    eventBus.publish('user-logout', {
+      userId,
+      timestamp: new Date().toISOString()
     });
     
     res.json({
       status: 'success',
-      message: 'All other sessions revoked successfully'
+      message: 'All sessions have been revoked. You will be logged out.'
     });
   });
-  
+
   /**
-   * Change password (authenticated)
+   * Change password
    */
   changePassword = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user.userId;
     const { currentPassword, newPassword } = req.body;
     
     if (!currentPassword || !newPassword) {
       throw new ValidationException('Current password and new password are required');
     }
     
-    // Get user ID from authenticated user
-    const userId = req.user.userId;
+    if (newPassword.length < 8) {
+      throw new ValidationException('New password must be at least 8 characters long');
+    }
     
     // Get user
     const user = await userRepo.getUser(userId);
     
     if (!user) {
-      throw new NotFoundException('User', userId);
+      throw new ServiceException(
+        UserErrorCode.INVALID_CREDENTIALS,
+        'Invalid credentials'
+      );
     }
     
-    // Verify current password
+    // Check current password
     const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
     
     if (!isPasswordValid) {
       throw new ServiceException(
-        ErrorCode.INVALID_CREDENTIALS,
+        UserErrorCode.INVALID_CREDENTIALS,
         'Current password is incorrect'
       );
     }
@@ -494,7 +605,7 @@ export class AuthController {
       config.userService.saltRounds
     );
     
-    // Update user with new password
+    // Update user
     await userRepo.updateUser(userId, {
       password: hashedPassword,
       updatedAt: new Date()
@@ -505,12 +616,22 @@ export class AuthController {
       userId,
       action: 'PASSWORD_CHANGED',
       ipAddress: req.ip,
-      userAgent: req.headers['user-agent']
+      userAgent: req.headers['user-agent'],
+      timestamp: new Date()
+    });
+    
+    // Send notification
+    await userRepo.createNotification({
+      userId,
+      title: 'Password Changed',
+      message: 'Your password has been successfully changed. If you did not perform this action, please contact support immediately.',
+      type: 'security',
+      createdAt: new Date()
     });
     
     res.json({
       status: 'success',
-      message: 'Password changed successfully'
+      message: 'Password has been changed successfully'
     });
   });
 }

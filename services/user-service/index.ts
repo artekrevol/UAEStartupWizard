@@ -1,102 +1,204 @@
+/**
+ * User Service
+ * 
+ * Microservice for user management, authentication, and authorization
+ */
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import { config } from '../../shared/config';
-import { logger } from '../../shared/logger';
+import { json, urlencoded } from 'body-parser';
+import routes from './routes';
 import { errorHandler } from '../../shared/middleware/errorHandler';
-import { notFoundHandler } from '../../shared/middleware/notFoundHandler';
-import { ServiceRegistry } from '../../shared/service-registry';
+import { config } from '../../shared/config';
 import { eventBus } from '../../shared/event-bus';
-import { DocumentEventHandler } from './events/documentEventHandler';
-import { runMigration } from './migrations/initial';
-import userRoutes from './routes';
+import { ServiceRegistry } from '../../shared/service-registry';
+import { runMigrations } from './migrations/initial';
 
 // Initialize Express app
 const app = express();
+const PORT = config.userService.port;
+const HOST = config.userService.host;
 
-// Apply middleware
-app.use(helmet());
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Initialize service registry
+const serviceRegistry = new ServiceRegistry({
+  serviceName: 'user-service',
+  hostname: HOST,
+  port: PORT,
+  healthEndpoint: '/health'
+});
 
-// Apply routes
-app.use('/api/users', userRoutes);
+// Security middleware
+app.use(helmet({
+  contentSecurityPolicy: false, // Disable for internal service
+  hidePoweredBy: true,
+  xssFilter: true,
+  noSniff: true
+}));
 
-// Apply error handling middleware
-app.use(notFoundHandler);
+// CORS configuration
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? [config.frontendUrl] 
+    : '*',
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  maxAge: 86400 // 24 hours
+}));
+
+// Body parsing middleware
+app.use(json({ limit: '1mb' }));
+app.use(urlencoded({ extended: true, limit: '1mb' }));
+
+// API Routes
+app.use('/api', routes);
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    service: 'user-service',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Error handler
 app.use(errorHandler);
 
-// Initialize document event handler to listen for document events
-const documentEventHandler = new DocumentEventHandler(eventBus);
-
-// Initialize the service registry client
-const serviceRegistry = new ServiceRegistry(
-  'user-service',
-  config.userService.port,
-  config.serviceRegistry.host,
-  config.serviceRegistry.port
-);
-
-// Service endpoints for registration
-const serviceEndpoints = [
-  { path: '/api/users', methods: ['GET', 'POST'] },
-  { path: '/api/users/:id', methods: ['GET', 'PATCH', 'DELETE'] },
-  { path: '/api/users/:id/documents', methods: ['GET'] },
-  { path: '/api/auth/login', methods: ['POST'] },
-  { path: '/api/auth/register', methods: ['POST'] },
-  { path: '/api/auth/verify', methods: ['POST'] },
-  { path: '/api/auth/refresh', methods: ['POST'] },
-  { path: '/api/profile', methods: ['GET', 'PATCH'] }
-];
-
-// Run database migration
-runMigration()
-  .then(() => {
-    logger.info('Database migration completed successfully', {
-      service: 'user-service'
+// Start the server
+const startServer = async () => {
+  try {
+    // Run migrations if needed
+    if (process.env.RUN_MIGRATIONS === 'true') {
+      await runMigrations();
+    }
+    
+    // Start listening
+    app.listen(PORT, HOST, () => {
+      console.log(`[UserService] Server running at http://${HOST}:${PORT}`);
+      
+      // Register with service registry
+      serviceRegistry.register();
+      
+      // Set up health check interval
+      setInterval(() => {
+        serviceRegistry.sendHeartbeat();
+      }, config.serviceRegistry.heartbeatIntervalMs);
+      
+      // Publish event that service is ready
+      eventBus.publish('service-ready', {
+        service: 'user-service',
+        host: HOST,
+        port: PORT,
+        timestamp: new Date().toISOString()
+      });
     });
     
-    // Start server
-    const PORT = config.userService.port || 3001;
-    app.listen(PORT, () => {
-      logger.info(`[UserService] Server running on port ${PORT}`);
-      
-      // Register with the service registry after server is running
-      serviceRegistry.register()
-        .then(() => {
-          logger.info('Successfully registered with service registry', {
-            service: 'user-service'
-          });
-        })
-        .catch(err => {
-          logger.error('Failed to register with service registry', {
-            service: 'user-service',
-            error: err.message
-          });
-        });
-    });
-  })
-  .catch(error => {
-    logger.error('Failed to run database migration', {
-      service: 'user-service',
-      error: error.message
-    });
+    // Set up event listeners
+    setupEventListeners();
+  } catch (error) {
+    console.error('[UserService] Failed to start server:', error);
     process.exit(1);
+  }
+};
+
+// Set up event listeners
+const setupEventListeners = () => {
+  // Listen for health check events
+  eventBus.subscribe('health-check', (data) => {
+    // Publish health status
+    eventBus.publish('health-status', {
+      service: 'user-service',
+      status: 'healthy',
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString()
+    });
   });
+  
+  // Listen for user-related events from other services
+  eventBus.subscribe('document-created', handleDocumentEvent);
+  eventBus.subscribe('document-updated', handleDocumentEvent);
+  eventBus.subscribe('document-deleted', handleDocumentEvent);
+  
+  // Listen for free zone related events
+  eventBus.subscribe('freezone-update', handleFreeZoneEvent);
+};
 
-// Handle shutdown
-process.on('SIGINT', () => {
-  logger.info('[UserService] Shutting down gracefully');
-  serviceRegistry.deregister('user-service');
-  process.exit(0);
-});
+// Handle document events (for notifications)
+const handleDocumentEvent = async (data: any) => {
+  try {
+    // If the document is associated with a user, create a notification
+    if (data.userId) {
+      const userRepository = (await import('./repositories/userRepository')).UserRepository;
+      const repo = new userRepository();
+      
+      await repo.createNotification({
+        userId: data.userId,
+        title: `Document ${data.action}`,
+        message: `Your document "${data.title}" has been ${data.action}.`,
+        type: 'document',
+        createdAt: new Date()
+      });
+    }
+  } catch (error) {
+    console.error(`[UserService] Error handling document event:`, error);
+  }
+};
 
+// Handle free zone events (for notifications)
+const handleFreeZoneEvent = async (data: any) => {
+  try {
+    // If there's an update to a free zone a user is watching, create a notification
+    if (data.watcherUserIds && data.watcherUserIds.length > 0) {
+      const userRepository = (await import('./repositories/userRepository')).UserRepository;
+      const repo = new userRepository();
+      
+      for (const userId of data.watcherUserIds) {
+        await repo.createNotification({
+          userId,
+          title: `Free Zone Update: ${data.freeZoneName}`,
+          message: `There has been an update to ${data.freeZoneName}: ${data.updateType}`,
+          type: 'freezone',
+          createdAt: new Date()
+        });
+      }
+    }
+  } catch (error) {
+    console.error(`[UserService] Error handling free zone event:`, error);
+  }
+};
+
+// Handle graceful shutdown
 process.on('SIGTERM', () => {
-  logger.info('[UserService] Shutting down gracefully');
-  serviceRegistry.deregister('user-service');
+  console.log('[UserService] SIGTERM received, shutting down gracefully');
+  
+  // Deregister from service registry
+  serviceRegistry.deregister();
+  
+  // Publish shutdown event
+  eventBus.publish('service-shutdown', {
+    service: 'user-service',
+    timestamp: new Date().toISOString()
+  });
+  
   process.exit(0);
 });
 
-// Export instance for testing
-export { app };
+process.on('SIGINT', () => {
+  console.log('[UserService] SIGINT received, shutting down gracefully');
+  
+  // Deregister from service registry
+  serviceRegistry.deregister();
+  
+  // Publish shutdown event
+  eventBus.publish('service-shutdown', {
+    service: 'user-service',
+    timestamp: new Date().toISOString()
+  });
+  
+  process.exit(0);
+});
+
+// Start the server
+startServer();

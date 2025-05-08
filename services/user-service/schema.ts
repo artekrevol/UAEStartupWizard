@@ -3,8 +3,8 @@
  * 
  * Contains Drizzle ORM schema definitions for user management microservice
  */
-import { pgTable, serial, text, integer, timestamp, boolean, json, varchar, uuid } from 'drizzle-orm/pg-core';
-import { createInsertSchema } from 'drizzle-zod';
+import { pgTable, serial, text, varchar, timestamp, boolean, integer, json, jsonb } from 'drizzle-orm/pg-core';
+import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { z } from 'zod';
 
 /**
@@ -25,7 +25,7 @@ export const users = pgTable('users', {
   phone: varchar('phone', { length: 50 }),
   address: text('address'),
   newsletterSubscribed: boolean('newsletter_subscribed').default(false),
-  preferences: json('preferences').default({}),
+  preferences: jsonb('preferences').default({}),
   verified: boolean('verified').default(false),
   verificationToken: text('verification_token'),
   passwordResetToken: text('password_reset_token'),
@@ -45,20 +45,22 @@ export const users = pgTable('users', {
  */
 export const userProfiles = pgTable('user_profiles', {
   id: serial('id').primaryKey(),
-  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }).unique(),
+  userId: integer('user_id').notNull().unique().references(() => users.id, { 
+    onDelete: 'cascade' 
+  }),
   bio: text('bio'),
   country: varchar('country', { length: 100 }),
   language: varchar('language', { length: 50 }).default('en'),
   timezone: varchar('timezone', { length: 50 }).default('UTC'),
   websiteUrl: text('website_url'),
-  socialLinks: json('social_links').default({}),
-  skills: json('skills').default([]),
-  interests: json('interests').default([]),
+  socialLinks: jsonb('social_links').default({}),
+  skills: jsonb('skills').default([]),
+  interests: jsonb('interests').default([]),
   industry: varchar('industry', { length: 100 }),
-  experience: json('experience').default([]),
-  education: json('education').default([]),
-  settings: json('settings').default({}),
-  metadata: json('metadata').default({}),
+  experience: jsonb('experience').default([]),
+  education: jsonb('education').default([]),
+  settings: jsonb('settings').default({}),
+  metadata: jsonb('metadata').default({}),
   createdAt: timestamp('created_at').notNull(),
   updatedAt: timestamp('updated_at').notNull()
 });
@@ -68,11 +70,13 @@ export const userProfiles = pgTable('user_profiles', {
  */
 export const userSessions = pgTable('user_sessions', {
   id: varchar('id', { length: 255 }).primaryKey(),
-  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  userId: integer('user_id').notNull().references(() => users.id, { 
+    onDelete: 'cascade' 
+  }),
   token: text('token').notNull(),
   ipAddress: varchar('ip_address', { length: 50 }),
   userAgent: text('user_agent'),
-  location: json('location').default({}),
+  location: jsonb('location').default({}),
   device: varchar('device', { length: 100 }),
   browser: varchar('browser', { length: 100 }),
   expiresAt: timestamp('expires_at').notNull(),
@@ -86,11 +90,13 @@ export const userSessions = pgTable('user_sessions', {
  */
 export const auditLogs = pgTable('audit_logs', {
   id: serial('id').primaryKey(),
-  userId: integer('user_id').references(() => users.id, { onDelete: 'set null' }),
+  userId: integer('user_id').references(() => users.id, { 
+    onDelete: 'set null' 
+  }),
   action: varchar('action', { length: 100 }).notNull(),
   resourceType: varchar('resource_type', { length: 100 }),
   resourceId: varchar('resource_id', { length: 255 }),
-  details: json('details').default({}),
+  details: jsonb('details').default({}),
   ipAddress: varchar('ip_address', { length: 50 }),
   userAgent: text('user_agent'),
   timestamp: timestamp('timestamp').notNull()
@@ -101,17 +107,19 @@ export const auditLogs = pgTable('audit_logs', {
  */
 export const userNotifications = pgTable('user_notifications', {
   id: serial('id').primaryKey(),
-  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  userId: integer('user_id').notNull().references(() => users.id, { 
+    onDelete: 'cascade' 
+  }),
   title: varchar('title', { length: 255 }).notNull(),
   message: text('message').notNull(),
   type: varchar('type', { length: 50 }).notNull(),
   read: boolean('read').default(false),
   actionUrl: text('action_url'),
-  metadata: json('metadata').default({}),
+  metadata: jsonb('metadata').default({}),
   createdAt: timestamp('created_at').notNull()
 });
 
-// Define types
+// Type definitions
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type UserProfile = typeof userProfiles.$inferSelect;
@@ -123,12 +131,12 @@ export type InsertAuditLog = typeof auditLogs.$inferInsert;
 export type UserNotification = typeof userNotifications.$inferSelect;
 export type InsertUserNotification = typeof userNotifications.$inferInsert;
 
-// Create validation schemas using Zod
+// Zod schemas for validation
 export const insertUserSchema = createInsertSchema(users, {
-  email: (schema) => schema.email.email(),
-  password: (schema) => schema.password.min(8),
-  role: (schema) => schema.role.default('user'),
-  status: (schema) => schema.status.default('active')
+  email: (schema) => schema.email.email('Invalid email format'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  role: z.enum(['user', 'admin', 'superadmin']),
+  status: z.enum(['active', 'inactive', 'pending', 'suspended', 'deleted'])
 });
 
 export const insertUserProfileSchema = createInsertSchema(userProfiles);
@@ -136,19 +144,20 @@ export const insertUserSessionSchema = createInsertSchema(userSessions);
 export const insertAuditLogSchema = createInsertSchema(auditLogs);
 export const insertUserNotificationSchema = createInsertSchema(userNotifications);
 
-// Export custom types and validation schemas
+// Additional schemas for specific operations
+export const UserSelectSchema = createSelectSchema(users);
 export const UserUpdateSchema = insertUserSchema.partial().omit({ id: true });
 export const UserCredentialsSchema = insertUserSchema.pick({ email: true, password: true });
 export const UserRegistrationSchema = insertUserSchema.pick({
   email: true,
   password: true,
   firstName: true,
-  lastName: true
+  lastName: true,
+  username: true
 });
-
 export const UserProfileUpdateSchema = insertUserProfileSchema.partial().omit({ id: true, userId: true });
 
-// Define extra error codes
+// Error codes for user service
 export enum UserErrorCode {
   INVALID_CREDENTIALS = 'INVALID_CREDENTIALS',
   ACCOUNT_LOCKED = 'ACCOUNT_LOCKED',
