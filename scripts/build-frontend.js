@@ -17,15 +17,10 @@ async function buildFrontend() {
     // Get root directory
     const rootDir = resolve(__dirname, '..');
     
-    // Build frontend using Vite
+    // Build frontend using production Vite config
     await build({
       root: resolve(rootDir, 'client'),
-      build: {
-        outDir: resolve(rootDir, 'dist', 'client'),
-        emptyOutDir: true,
-        sourcemap: false,
-        minify: true,
-      },
+      configFile: resolve(rootDir, 'client', 'vite.config.production.js'),
       logLevel: 'info',
     });
     

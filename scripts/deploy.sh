@@ -21,6 +21,10 @@ USE_MEMORY_CACHE=true
 NODE_ENV=production
 EOL
 
+# 4. Fix TypeScript compatibility issues
+echo "🔧 Applying TypeScript compatibility fixes..."
+cp shared/middleware/performance-fixed.ts shared/middleware/performance.ts
+
 # 4. Skip Playwright installation
 echo "⚙️ Setting npm config to skip optional dependencies..."
 export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
