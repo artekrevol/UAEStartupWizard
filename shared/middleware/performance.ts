@@ -41,7 +41,11 @@ export function performanceMonitor(customOptions: PerformanceOptions = {}) {
     const originalEnd = res.end;
     
     // Override response end method to calculate duration
-    res.end = function(chunk?: any, encoding?: BufferEncoding): Response {
+    // Save the original end function with proper type casting
+    const oldEnd = res.end;
+    
+    // Cast the end method
+    res.end = function(this: Response, chunk?: any, encoding?: BufferEncoding, callback?: () => void): Response {
       // Calculate duration
       const hrDuration = process.hrtime(startTime);
       const durationMs = hrDuration[0] * 1000 + hrDuration[1] / 1000000;
@@ -85,8 +89,8 @@ export function performanceMonitor(customOptions: PerformanceOptions = {}) {
         logMethod(message, logData);
       }
       
-      // Call original end method
-      return originalEnd.apply(this, arguments as any);
+      // Call original end method with proper parameters
+      return originalEnd.call(this, chunk, encoding, callback);
     };
     
     next();

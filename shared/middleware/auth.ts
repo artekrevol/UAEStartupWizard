@@ -8,6 +8,21 @@ import { config } from '../config';
 import { AuthException, ErrorCode } from '../errors';
 import { logger } from '../logger';
 
+// Add type declaration for jsonwebtoken to fix TypeScript errors
+declare module 'jsonwebtoken' {
+  export function verify(
+    token: string,
+    secretOrPublicKey: string,
+    callback?: (err: any, decoded: any) => void
+  ): any;
+  
+  export function sign(
+    payload: string | object | Buffer,
+    secretOrPrivateKey: string,
+    options?: jwt.SignOptions
+  ): string;
+}
+
 // Extend Express Request type to include user info
 declare global {
   namespace Express {
@@ -76,9 +91,9 @@ export const authenticateJWT = (
       
       next();
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.warn('[Auth] Authentication failed', {
-      error: error.message,
+      error: error.message || 'Unknown error',
       path: req.path
     });
     next(error);
