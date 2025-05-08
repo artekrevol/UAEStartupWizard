@@ -56,6 +56,41 @@ const setupEventHandlers = () => {
   // Additional event handlers would be added here
 };
 
+// Register with service registry
+const registerWithServiceRegistry = () => {
+  console.log('[DocumentService] Registering with service registry...');
+  
+  const host = process.env.DOCUMENT_SERVICE_HOST || 'localhost';
+  const port = parseInt(process.env.DOCUMENT_SERVICE_PORT || '3002', 10);
+  
+  eventBus.publish('service-registered', {
+    name: 'document-service',
+    host,
+    port,
+    healthEndpoint: '/health',
+    routes: [
+      { path: '/api/documents', methods: ['GET', 'POST', 'PUT', 'DELETE'] },
+      { path: '/api/user-documents', methods: ['GET', 'POST', 'PUT', 'DELETE'] },
+      { path: '/api/documents/stats', methods: ['GET'] },
+      { path: '/api/documents/stats/subcategories', methods: ['GET'] },
+      { path: '/api/documents/search', methods: ['POST'] },
+      { path: '/api/documents/process-dmcc', methods: ['GET'] },
+      { path: '/api/public/documents/process-dmcc', methods: ['GET'] }
+    ]
+  });
+  
+  console.log(`[DocumentService] Registered with service registry on ${host}:${port}`);
+  
+  // Setup heartbeat to keep service active in registry
+  setInterval(() => {
+    eventBus.publish('service-heartbeat', {
+      name: 'document-service',
+      status: 'active',
+      timestamp: new Date().toISOString()
+    });
+  }, 30000); // Send heartbeat every 30 seconds
+};
+
 // Start the server
 const startServer = async () => {
   try {
@@ -68,6 +103,9 @@ const startServer = async () => {
     // Start listening
     app.listen(PORT, () => {
       console.log(`[DocumentService] Server running on port ${PORT}`);
+      
+      // Register with service registry after server is started
+      registerWithServiceRegistry();
     });
   } catch (error) {
     console.error('[DocumentService] Failed to start server:', error);

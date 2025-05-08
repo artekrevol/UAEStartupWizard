@@ -65,4 +65,17 @@ router.delete('/category/:categoryId', authenticate, documentRateLimiter, docume
 router.post('/upload', authenticate, documentRateLimiter, documentServiceProxy);
 router.post('/batch-upload', authenticate, documentRateLimiter, documentServiceProxy);
 
+// Document statistics routes
+router.get('/stats', authenticate, documentRateLimiter, documentServiceProxy);
+router.get('/stats/subcategories', authenticate, documentRateLimiter, documentServiceProxy);
+
+// Document processing routes
+router.get('/process-dmcc', authenticate, documentRateLimiter, documentServiceProxy);
+router.get('/public/process-dmcc', documentRateLimiter, documentServiceProxy);
+
+// User documents routes
+router.get('/user-documents/:id', authenticate, documentRateLimiter, documentServiceProxy);
+router.get('/user-documents/user/:userId', authenticate, documentRateLimiter, documentServiceProxy);
+router.post('/user-documents', authenticate, documentRateLimiter, documentServiceProxy);
+
 export default router;

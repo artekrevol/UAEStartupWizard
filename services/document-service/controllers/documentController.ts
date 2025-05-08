@@ -455,8 +455,7 @@ export class DocumentController {
         failedAt: new Date().toISOString()
       });
       
-      throw new ServiceException(
-        ErrorCode.INTERNAL_SERVER_ERROR,
+      throw new InternalServerError(
         'Failed to process DMCC documents',
         { originalError: error.message }
       );
