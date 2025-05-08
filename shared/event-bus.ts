@@ -110,6 +110,15 @@ class EventBus {
   listEvents(): string[] {
     return Array.from(this.subscribers.keys());
   }
+
+  /**
+   * Shutdown the event bus
+   * Cleans up all subscriptions and resources
+   */
+  shutdown(): void {
+    logger.info('Shutting down event bus');
+    this.subscribers.clear();
+  }
 }
 
 // Singleton instance

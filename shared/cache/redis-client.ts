@@ -1,67 +1,84 @@
 /**
- * Redis Client Singleton
+ * Redis Client
  * 
- * This module provides a Redis client instance that can be reused across the application.
- * It handles connection management and provides a simple interface for caching operations.
+ * This module provides a Redis client for caching data.
+ * It handles connection, error handling, and provides utility methods
+ * for interacting with Redis.
  */
 
 import Redis from 'ioredis';
 import { config } from '../config';
 
-// Create Redis client instance
-const redisClient = new Redis({
-  host: config.redis?.host || 'localhost',
-  port: config.redis?.port || 6379,
-  password: config.redis?.password,
-  retryStrategy: (times) => {
-    // Retry with exponential backoff
-    const delay = Math.min(times * 50, 2000);
-    return delay;
-  }
-});
+// Default TTL (1 hour)
+const DEFAULT_TTL = config.redis?.defaultTtl || 3600;
 
-// Log redis connection events
-redisClient.on('connect', () => {
-  console.log('[Redis] Connected to Redis server');
-});
+// Create Redis client
+let redisClient: Redis | null = null;
+let redisReady = false;
 
-redisClient.on('error', (err) => {
-  console.error('[Redis] Error connecting to Redis:', err);
-});
-
-redisClient.on('reconnecting', () => {
-  console.log('[Redis] Reconnecting to Redis server');
-});
-
-/**
- * Set a value in Redis cache with optional expiration
- * @param key Cache key
- * @param value Value to cache (will be JSON stringified)
- * @param expirationSeconds Time to live in seconds
- */
-export async function setCacheValue(key: string, value: any, expirationSeconds?: number): Promise<void> {
-  try {
-    const stringValue = JSON.stringify(value);
-    
-    if (expirationSeconds) {
-      await redisClient.setex(key, expirationSeconds, stringValue);
-    } else {
-      await redisClient.set(key, stringValue);
-    }
-  } catch (error) {
-    console.error(`[Redis] Error setting cache for key ${key}:`, error);
-    // Fail gracefully, don't break the application if cache fails
-  }
+try {
+  redisClient = new Redis({
+    host: config.redis?.host,
+    port: config.redis?.port,
+    password: config.redis?.password,
+    retryStrategy: (times) => {
+      // Exponential backoff with max 30 seconds
+      const delay = Math.min(times * 1000, 30000);
+      return delay;
+    },
+    maxRetriesPerRequest: 3,
+  });
+  
+  redisClient.on('connect', () => {
+    console.log('[Redis] Connected successfully');
+    redisReady = true;
+  });
+  
+  redisClient.on('error', (err) => {
+    console.error('[Redis] Error connecting:', err);
+    redisReady = false;
+  });
+  
+  redisClient.on('ready', () => {
+    console.log('[Redis] Ready to accept commands');
+    redisReady = true;
+  });
+  
+  redisClient.on('reconnecting', () => {
+    console.log('[Redis] Reconnecting...');
+    redisReady = false;
+  });
+  
+  redisClient.on('end', () => {
+    console.log('[Redis] Connection closed');
+    redisReady = false;
+  });
+} catch (error) {
+  console.error('[Redis] Failed to initialize Redis client:', error);
+  redisClient = null;
+  redisReady = false;
 }
 
 /**
- * Get a value from Redis cache
- * @param key Cache key
- * @returns The parsed cached value or null if not found
+ * Check if Redis client is ready to accept commands
+ * @returns Boolean indicating if Redis is connected and ready
+ */
+export function isRedisReady(): boolean {
+  return redisReady && redisClient !== null;
+}
+
+/**
+ * Get a value from Redis
+ * @param key Redis key
+ * @returns The cached value or null if not found
  */
 export async function getCacheValue<T>(key: string): Promise<T | null> {
+  if (!isRedisReady()) {
+    return null;
+  }
+  
   try {
-    const value = await redisClient.get(key);
+    const value = await redisClient!.get(key);
     
     if (!value) {
       return null;
@@ -75,12 +92,38 @@ export async function getCacheValue<T>(key: string): Promise<T | null> {
 }
 
 /**
- * Delete a value from Redis cache
- * @param key Cache key
+ * Set a value in Redis with optional expiration
+ * @param key Redis key
+ * @param value Value to cache
+ * @param expirationSeconds Time to live in seconds
+ */
+export async function setCacheValue(key: string, value: any, expirationSeconds: number = DEFAULT_TTL): Promise<void> {
+  if (!isRedisReady()) {
+    return;
+  }
+  
+  try {
+    // Serialize value to JSON string
+    const serializedValue = JSON.stringify(value);
+    
+    // Set with expiration
+    await redisClient!.set(key, serializedValue, 'EX', expirationSeconds);
+  } catch (error) {
+    console.error(`[Redis] Error setting cache for key ${key}:`, error);
+  }
+}
+
+/**
+ * Delete a value from Redis
+ * @param key Redis key
  */
 export async function deleteCacheValue(key: string): Promise<void> {
+  if (!isRedisReady()) {
+    return;
+  }
+  
   try {
-    await redisClient.del(key);
+    await redisClient!.del(key);
   } catch (error) {
     console.error(`[Redis] Error deleting cache for key ${key}:`, error);
   }
@@ -91,11 +134,26 @@ export async function deleteCacheValue(key: string): Promise<void> {
  * @param prefix Key prefix to match
  */
 export async function clearCacheByPrefix(prefix: string): Promise<void> {
+  if (!isRedisReady()) {
+    return;
+  }
+  
   try {
-    const keys = await redisClient.keys(`${prefix}*`);
+    // Use SCAN to find keys with prefix
+    const pattern = `${prefix}*`;
+    let cursor = '0';
+    let keys: string[] = [];
+    
+    do {
+      // SCAN returns [nextCursor, keysFound]
+      const reply = await redisClient!.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+      cursor = reply[0];
+      keys = keys.concat(reply[1]);
+    } while (cursor !== '0');
     
     if (keys.length > 0) {
-      await redisClient.del(...keys);
+      // Delete found keys
+      await redisClient!.del(...keys);
       console.log(`[Redis] Cleared ${keys.length} keys with prefix ${prefix}`);
     }
   } catch (error) {
@@ -104,23 +162,27 @@ export async function clearCacheByPrefix(prefix: string): Promise<void> {
 }
 
 /**
- * Check if Redis is connected and ready
- * @returns Boolean indicating if Redis is ready
- */
-export function isRedisReady(): boolean {
-  return redisClient.status === 'ready';
-}
-
-/**
- * Gracefully close Redis connection
+ * Shutdown Redis connection
  */
 export async function closeRedisConnection(): Promise<void> {
-  try {
-    await redisClient.quit();
-    console.log('[Redis] Connection closed gracefully');
-  } catch (error) {
-    console.error('[Redis] Error closing Redis connection:', error);
+  if (redisClient) {
+    try {
+      await redisClient.quit();
+      console.log('[Redis] Connection closed gracefully');
+    } catch (error) {
+      console.error('[Redis] Error closing connection:', error);
+    } finally {
+      redisClient = null;
+      redisReady = false;
+    }
   }
 }
 
-export default redisClient;
+// Clean shutdown handling
+process.on('SIGTERM', async () => {
+  await closeRedisConnection();
+});
+
+process.on('SIGINT', async () => {
+  await closeRedisConnection();
+});

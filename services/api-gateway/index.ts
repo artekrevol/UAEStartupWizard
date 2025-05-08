@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { json, urlencoded } from 'body-parser';
+import compression from 'compression';
 import { errorHandler, notFoundHandler } from '../../shared/middleware/errorHandler';
 import routes from './routes';
 import { initServiceRegistry, cleanupInactiveServices, serviceRegistry } from './middleware/serviceRegistry';
@@ -10,10 +11,26 @@ import { globalRateLimiter } from './middleware/rateLimiter';
 import { initializeMessaging, registerGatewayServices, shutdownMessaging } from './messaging';
 import { eventBus } from '../../shared/event-bus';
 import { applySecurity, preventOpenRedirect } from '../../shared/middleware/security';
+import { setCacheHeaders } from '../../shared/middleware/cache-middleware';
 
 // Initialize Express app
 const app = express();
 const PORT = process.env.API_GATEWAY_PORT || 3000;
+
+// Apply compression middleware
+app.use(compression({
+  // Compression filter: don't compress responses with Content-Type 'image/*' or 'video/*'
+  filter: (req, res) => {
+    const contentType = res.getHeader('Content-Type') as string || '';
+    if (contentType.match(/image\/.*|video\/.*/)) {
+      return false;
+    }
+    // Use default compression filter for everything else
+    return compression.filter(req, res);
+  },
+  // Compression level (0-9, where 0 = no compression, 9 = max compression)
+  level: 6
+}));
 
 // Apply comprehensive security middleware
 applySecurity(app);
@@ -45,6 +62,35 @@ app.use(requestLogger);
 
 // Global rate limiting
 app.use(globalRateLimiter);
+
+// Add cache control headers for static assets and GET requests
+app.use((req, res, next) => {
+  const path = req.path;
+  
+  // Cache static assets aggressively
+  if (path.match(/\.(css|js|svg|png|jpg|jpeg|gif|ico|woff|woff2|ttf|eot)$/)) {
+    // Long-term caching for static assets (7 days)
+    return setCacheHeaders(7 * 24 * 60 * 60)(req, res, next);
+  }
+  
+  // Cache API GET requests that don't need to be fresh
+  if (req.method === 'GET') {
+    // Different caching strategies based on endpoint
+    if (path.match(/\/api\/(free-zones|industry-groups|activities)/)) {
+      // Medium-term caching for reference data (1 hour)
+      return setCacheHeaders(60 * 60, { mustRevalidate: true })(req, res, next);
+    }
+    
+    if (path.match(/\/api\/documents/)) {
+      // Short-term caching for documents (5 minutes)
+      return setCacheHeaders(5 * 60, { private: true })(req, res, next);
+    }
+  }
+  
+  // Don't cache other requests
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  next();
+});
 
 // API Routes
 app.use('/api', routes);
