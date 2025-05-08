@@ -21,7 +21,7 @@ const forceHTTPOnly = process.env.SCRAPER_HTTP_ONLY_MODE === 'true';
 const config = {
   // Force HTTP-only mode in production or when explicitly set
   httpOnlyMode: isProduction || forceHTTPOnly,
-  
+
   // Base URLs
   baseURLs: {
     dmcc: 'https://www.dmcc.ae',
@@ -29,28 +29,22 @@ const config = {
     ajmanFreeZone: 'https://www.afz.ae',
     moec: 'https://www.moec.gov.ae',
   },
-  
+
   // File system paths
   paths: {
-    dmccDocs: resolve(__dirname, '..', 'dmcc_docs'),
-    saifZoneDocs: resolve(__dirname, '..', 'saif_zone_docs'),
-    freezoneDocs: resolve(__dirname, '..', 'freezone_docs'),
     screenshots: resolve(__dirname, '..', 'screenshots'),
+    downloads: resolve(__dirname, '..', 'downloads') // Added downloads path from edited config
+    // dmccDocs: resolve(__dirname, '..', 'dmcc_docs'),  //Removed as not in edited
+    // saifZoneDocs: resolve(__dirname, '..', 'saif_zone_docs'), //Removed as not in edited
+    // freezoneDocs: resolve(__dirname, '..', 'freezone_docs'),  //Removed as not in edited
+
   },
-  
-  // Browser configuration - only used in non-HTTP-only mode
-  browser: {
-    headless: true,
-    slowMo: 50,
-    timeout: 30000,
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-  },
-  
+
   // HTTP request configuration
   http: {
     timeout: 30000,
     retries: 3,
-    retryDelay: 1000,
+    retryDelay: 2000, // Updated retryDelay from edited config
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
@@ -60,25 +54,26 @@ const config = {
       'Cache-Control': 'max-age=0',
     },
   },
-  
+
+
   // Operation modes
   modes: {
     downloadDocuments: true,
     extractMetadata: true,
     saveScreenshots: false,
   },
-  
+
   // Rate limiting to avoid being blocked
   rateLimit: {
     requestsPerMinute: 20,
     concurrentRequests: 2,
     delayBetweenRequests: 3000,
   },
-  
+
   // Mock data for use when connection fails or in tests
   mockDataEnabled: true,
   mockDataPath: resolve(__dirname, 'mock_data'),
-  
+
   // Create necessary directories
   ensureDirectoriesExist() {
     const dirs = Object.values(this.paths);
@@ -88,7 +83,7 @@ const config = {
         console.log(`Created directory: ${dir}`);
       }
     });
-    
+
     if (this.mockDataEnabled && !fs.existsSync(this.mockDataPath)) {
       fs.mkdirSync(this.mockDataPath, { recursive: true });
     }

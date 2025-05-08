@@ -68,8 +68,13 @@ app.use((req, res, next) => {
 (async () => {
   const server = await registerRoutes(app);
 
-  // Initialize the MOEC data scraper
-  initializeScraper();
+  // Initialize the MOEC data scraper - only start in HTTP-only mode for production
+  if (app.get("env") === "production") {
+    log("Starting scraper in HTTP-only mode");
+    initializeScraper({ httpOnly: true });
+  } else {
+    initializeScraper();
+  }
   
   // Screenshots directory is now created during build phase
   const screenshotsDir = path.join(process.cwd(), 'screenshots');
