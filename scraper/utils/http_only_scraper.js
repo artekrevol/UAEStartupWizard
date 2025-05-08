@@ -47,7 +47,7 @@ const createFallbackAxiosInstance = () => {
       maxVersion: "TLSv1.3",
       minVersion: "TLSv1",
       ciphers: "ALL",
-      secureOptions: require('constants').SSL_OP_NO_RENEGOTIATION
+      secureOptions: constants.SSL_OP_NO_RENEGOTIATION
     }),
     timeout: 60000, // Longer timeout
     headers: {
@@ -59,6 +59,53 @@ const createFallbackAxiosInstance = () => {
     validateStatus: function (status) {
       return status >= 200 && status < 500; // Accept all non-server errors
     }
+  });
+};
+
+// Direct HTTPS request (final fallback method)
+const makeDirectHttpsRequest = (url, logger) => {
+  return new Promise((resolve, reject) => {
+    logger.log(`Making direct HTTPS request to ${url}`);
+    
+    const urlObj = new URL(url);
+    const options = {
+      hostname: urlObj.hostname,
+      port: urlObj.port || 443,
+      path: urlObj.pathname + urlObj.search,
+      method: 'GET',
+      rejectUnauthorized: false,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; AS; rv:11.0) like Gecko',
+        'Accept': '*/*',
+        'Accept-Language': 'en',
+        'Connection': 'close'
+      },
+      timeout: 90000 // 90 seconds timeout
+    };
+    
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+      res.on('end', () => {
+        logger.log(`Successfully received direct HTTPS response from ${url}`);
+        resolve(data);
+      });
+    });
+    
+    req.on('error', (error) => {
+      logger.log(`Error in direct HTTPS request: ${error.message}`);
+      reject(error);
+    });
+    
+    req.on('timeout', () => {
+      logger.log(`Direct HTTPS request timed out`);
+      req.destroy();
+      reject(new Error('Request timed out'));
+    });
+    
+    req.end();
   });
 };
 
@@ -94,6 +141,20 @@ class HttpOnlyScraper {
       } catch (retryError) {
         const retryErrorMessage = retryError instanceof Error ? retryError.message : String(retryError);
         this.logger.log(`Failed with fallback approach: ${retryErrorMessage}`);
+        
+        // Try with direct HTTPS request as last resort
+        try {
+          this.logger.log(`Making last attempt with direct HTTPS request to ${url}`);
+          const html = await makeDirectHttpsRequest(url, this.logger);
+          if (html) {
+            this.logger.log(`Successfully fetched ${url} with direct HTTPS request`);
+            return html;
+          }
+        } catch (directError) {
+          const directErrorMessage = directError instanceof Error ? directError.message : String(directError);
+          this.logger.log(`Failed with direct HTTPS request: ${directErrorMessage}`);
+        }
+        
         return null;
       }
     }
@@ -150,6 +211,22 @@ class HttpOnlyScraper {
       } catch (retryError) {
         const retryErrorMessage = retryError instanceof Error ? retryError.message : String(retryError);
         this.logger.log(`Failed to download with fallback approach: ${retryErrorMessage}`);
+        
+        // Try with direct HTTPS request as last resort for downloading
+        try {
+          this.logger.log(`Making last attempt with direct HTTPS request to download ${url}`);
+          const data = await makeDirectHttpsRequest(url, this.logger);
+          if (data) {
+            // For non-binary data, we save as-is (text/html)
+            fs.writeFileSync(outputPath, data);
+            this.logger.log(`Successfully downloaded file with direct HTTPS request`);
+            return true;
+          }
+        } catch (directError) {
+          const directErrorMessage = directError instanceof Error ? directError.message : String(directError);
+          this.logger.log(`Failed with direct HTTPS download: ${directErrorMessage}`);
+        }
+        
         return false;
       }
     }
