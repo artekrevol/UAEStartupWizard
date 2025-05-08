@@ -1,257 +1,221 @@
 /**
  * User Repository
  * 
- * Handles all database operations related to users
+ * Handles database operations for user-related entities
  */
-import { eq, and, isNull, sql, desc, asc, count, like } from 'drizzle-orm';
+import { eq, and, sql, desc, isNull, gt, lt, like, inArray, or } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import pool from '../db';
 import { 
-  users, 
-  userProfiles, 
-  userSessions, 
-  userNotifications, 
-  auditLogs,
-  User,
-  InsertUser,
-  UserProfile,
-  InsertUserProfile,
-  UserSession,
-  InsertUserSession,
-  UserNotification,
-  InsertUserNotification,
-  AuditLog,
-  InsertAuditLog
+  users, userProfiles, userSessions, userNotifications, auditLogs,
+  type User, type InsertUser, type UserProfile, type InsertUserProfile,
+  type UserSession, type InsertUserSession, type UserNotification, 
+  type InsertUserNotification, type AuditLog, type InsertAuditLog
 } from '../schema';
-import { PgDatabase } from 'drizzle-orm/pg-core';
-import { NotFoundError } from '../../../shared/errors/ApiError';
-import { createId } from '@paralleldrive/cuid2';
+
+// Initialize Drizzle ORM with the database pool
+const db = drizzle(pool);
 
 export class UserRepository {
-  constructor(private db: PgDatabase) {}
-
   // User operations
-  async getUserById(id: number): Promise<User | undefined> {
-    const result = await this.db.select().from(users).where(eq(users.id, id)).limit(1);
+  async findUserById(id: number): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
     return result[0];
   }
 
-  async getUserByEmail(email: string): Promise<User | undefined> {
-    const result = await this.db.select().from(users).where(eq(users.email, email)).limit(1);
+  async findUserByUsername(username: string): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.username, username)).limit(1);
     return result[0];
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    const result = await this.db.select().from(users).where(eq(users.username, username)).limit(1);
+  async findUserByEmail(email: string): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
     return result[0];
   }
 
-  async getUserByVerificationToken(token: string): Promise<User | undefined> {
-    const result = await this.db
-      .select()
+  async findUserByVerificationToken(token: string): Promise<User | undefined> {
+    const result = await db.select()
       .from(users)
       .where(eq(users.verificationToken, token))
       .limit(1);
     return result[0];
   }
 
-  async getUserByPasswordResetToken(token: string): Promise<User | undefined> {
-    const result = await this.db
-      .select()
+  async findUserByPasswordResetToken(token: string): Promise<User | undefined> {
+    const result = await db.select()
       .from(users)
       .where(
         and(
           eq(users.passwordResetToken, token),
-          sql`${users.passwordResetExpires} > NOW()`
+          gt(users.passwordResetExpires, new Date())
         )
       )
       .limit(1);
     return result[0];
   }
 
-  async createUser(userData: InsertUser): Promise<User> {
-    const [user] = await this.db.insert(users).values(userData).returning();
-    return user;
+  async createUser(data: InsertUser): Promise<User> {
+    const result = await db.insert(users).values(data).returning();
+    return result[0];
   }
 
-  async updateUser(id: number, userData: Partial<InsertUser>): Promise<User | undefined> {
-    const [updatedUser] = await this.db
-      .update(users)
-      .set({
-        ...userData,
-        updatedAt: new Date(),
-      })
+  async updateUser(id: number, data: Partial<InsertUser>): Promise<User | undefined> {
+    // Add updated timestamp
+    const updateData = {
+      ...data,
+      updatedAt: new Date()
+    };
+    
+    const result = await db.update(users)
+      .set(updateData)
       .where(eq(users.id, id))
       .returning();
-    return updatedUser;
+    
+    return result[0];
   }
 
   async deleteUser(id: number): Promise<User | undefined> {
-    const [deletedUser] = await this.db
-      .delete(users)
+    const result = await db.delete(users)
       .where(eq(users.id, id))
       .returning();
-    return deletedUser;
-  }
-
-  async searchUsers(query: string, limit: number = 10, offset: number = 0): Promise<User[]> {
-    return this.db
-      .select()
-      .from(users)
-      .where(
-        sql`(
-          ${users.username} ILIKE ${`%${query}%`} OR 
-          ${users.email} ILIKE ${`%${query}%`} OR 
-          ${users.firstName} ILIKE ${`%${query}%`} OR 
-          ${users.lastName} ILIKE ${`%${query}%`}
-        )`
-      )
-      .limit(limit)
-      .offset(offset);
+    
+    return result[0];
   }
 
   async listUsers(
-    limit: number = 10,
-    offset: number = 0,
-    sortBy: keyof User = 'createdAt',
-    sortOrder: 'asc' | 'desc' = 'desc',
-    filters: Partial<User> = {}
-  ): Promise<User[]> {
-    let query = this.db.select().from(users);
-
-    // Apply filters
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        // @ts-ignore - Dynamic key access
-        query = query.where(eq(users[key as keyof typeof users], value));
-      }
-    });
-
-    // Apply sorting
-    if (sortOrder === 'asc') {
-      // @ts-ignore - Dynamic key access
-      query = query.orderBy(asc(users[sortBy as keyof typeof users]));
-    } else {
-      // @ts-ignore - Dynamic key access
-      query = query.orderBy(desc(users[sortBy as keyof typeof users]));
+    limit: number = 10, 
+    offset: number = 0, 
+    search?: string,
+    role?: string,
+    status?: string
+  ): Promise<{ users: User[], total: number }> {
+    // Build where conditions dynamically
+    let conditions = [];
+    
+    if (search) {
+      conditions.push(
+        or(
+          like(users.username, `%${search}%`),
+          like(users.email, `%${search}%`),
+          like(users.firstName, `%${search}%`),
+          like(users.lastName, `%${search}%`)
+        )
+      );
     }
-
-    return query.limit(limit).offset(offset);
-  }
-
-  async countUsers(filters: Partial<User> = {}): Promise<number> {
-    let query = this.db.select({ count: count() }).from(users);
-
-    // Apply filters
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        // @ts-ignore - Dynamic key access
-        query = query.where(eq(users[key as keyof typeof users], value));
-      }
-    });
-
-    const result = await query;
-    return result[0]?.count || 0;
+    
+    if (role) {
+      conditions.push(eq(users.role, role));
+    }
+    
+    if (status) {
+      conditions.push(eq(users.status, status));
+    }
+    
+    // Query users with conditions
+    let whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    
+    const usersResult = whereClause
+      ? await db.select().from(users).where(whereClause).limit(limit).offset(offset).orderBy(desc(users.createdAt))
+      : await db.select().from(users).limit(limit).offset(offset).orderBy(desc(users.createdAt));
+    
+    // Count total users matching conditions
+    const countResult = await db.select({ count: sql<number>`count(*)` }).from(users);
+    const total = countResult[0]?.count || 0;
+    
+    return { users: usersResult, total };
   }
 
   // User Profile operations
-  async getUserProfile(userId: number): Promise<UserProfile | undefined> {
-    const result = await this.db
-      .select()
+  async findProfileByUserId(userId: number): Promise<UserProfile | undefined> {
+    const result = await db.select()
       .from(userProfiles)
       .where(eq(userProfiles.userId, userId))
       .limit(1);
+    
     return result[0];
   }
 
-  async upsertUserProfile(profileData: InsertUserProfile): Promise<UserProfile | undefined> {
-    // Check if profile exists
-    const existingProfile = await this.getUserProfile(profileData.userId);
+  async createProfile(data: InsertUserProfile): Promise<UserProfile> {
+    const result = await db.insert(userProfiles)
+      .values(data)
+      .returning();
+    
+    return result[0];
+  }
 
-    if (!existingProfile) {
-      // Create new profile
-      const [profile] = await this.db
-        .insert(userProfiles)
-        .values(profileData)
-        .returning();
-      return profile;
-    } else {
-      // Update existing profile
-      const [updatedProfile] = await this.db
-        .update(userProfiles)
-        .set({
-          ...profileData,
-          updatedAt: new Date(),
-        })
-        .where(eq(userProfiles.userId, profileData.userId))
-        .returning();
-      return updatedProfile;
-    }
+  async updateProfile(userId: number, data: Partial<InsertUserProfile>): Promise<UserProfile | undefined> {
+    // Add updated timestamp
+    const updateData = {
+      ...data,
+      updatedAt: new Date()
+    };
+    
+    const result = await db.update(userProfiles)
+      .set(updateData)
+      .where(eq(userProfiles.userId, userId))
+      .returning();
+    
+    return result[0];
   }
 
   // User Session operations
-  async createSession(sessionData: InsertUserSession): Promise<UserSession> {
-    const [session] = await this.db
-      .insert(userSessions)
-      .values(sessionData)
-      .returning();
-    return session;
-  }
-
-  async getSessionById(id: number): Promise<UserSession | undefined> {
-    const result = await this.db
-      .select()
-      .from(userSessions)
-      .where(eq(userSessions.id, id))
-      .limit(1);
-    return result[0];
-  }
-
-  async getSessionByToken(token: string): Promise<UserSession | undefined> {
-    const result = await this.db
-      .select()
+  async findSessionByToken(token: string): Promise<UserSession | undefined> {
+    const result = await db.select()
       .from(userSessions)
       .where(
         and(
           eq(userSessions.token, token),
           eq(userSessions.isRevoked, false),
-          sql`${userSessions.expiresAt} > NOW()`
+          gt(userSessions.expiresAt, new Date())
         )
       )
       .limit(1);
+    
     return result[0];
   }
 
-  async getUserSessions(userId: number): Promise<UserSession[]> {
-    return this.db
-      .select()
+  async findSessionsByUserId(userId: number): Promise<UserSession[]> {
+    return await db.select()
       .from(userSessions)
       .where(eq(userSessions.userId, userId))
       .orderBy(desc(userSessions.lastActivityAt));
   }
 
-  async updateSessionActivity(id: number): Promise<void> {
-    await this.db
-      .update(userSessions)
-      .set({ lastActivityAt: new Date() })
-      .where(eq(userSessions.id, id));
+  async createSession(data: InsertUserSession): Promise<UserSession> {
+    const result = await db.insert(userSessions)
+      .values(data)
+      .returning();
+    
+    return result[0];
   }
 
-  async revokeSession(id: number): Promise<UserSession | undefined> {
-    const [session] = await this.db
-      .update(userSessions)
-      .set({ isRevoked: true })
+  async updateSession(id: number, data: Partial<InsertUserSession>): Promise<UserSession | undefined> {
+    const result = await db.update(userSessions)
+      .set(data)
       .where(eq(userSessions.id, id))
       .returning();
-    return session;
+    
+    return result[0];
   }
 
-  async deleteUserSessions(
-    userId: number,
-    exceptSessionId?: number
-  ): Promise<number> {
-    let query = this.db.delete(userSessions).where(eq(userSessions.userId, userId));
+  async revokeSession(token: string): Promise<UserSession | undefined> {
+    const result = await db.update(userSessions)
+      .set({ 
+        isRevoked: true,
+        lastActivityAt: new Date()
+      })
+      .where(eq(userSessions.token, token))
+      .returning();
     
-    if (exceptSessionId) {
-      query = query.where(sql`${userSessions.id} != ${exceptSessionId}`);
+    return result[0];
+  }
+
+  async deleteUserSessions(userId: number, exceptToken?: string): Promise<number> {
+    let query = db.delete(userSessions).where(eq(userSessions.userId, userId));
+    
+    // If exceptToken is provided, don't delete that session
+    if (exceptToken) {
+      query = query.where(sql`token != ${exceptToken}`);
     }
     
     const result = await query;
@@ -259,64 +223,77 @@ export class UserRepository {
   }
 
   async cleanupExpiredSessions(): Promise<number> {
-    const result = await this.db
-      .delete(userSessions)
-      .where(sql`${userSessions.expiresAt} < NOW()`);
+    const result = await db.delete(userSessions)
+      .where(
+        or(
+          lt(userSessions.expiresAt, new Date()),
+          eq(userSessions.isRevoked, true)
+        )
+      );
+    
     return result.rowCount || 0;
   }
 
   // Notification operations
-  async createNotification(
-    notificationData: InsertUserNotification
-  ): Promise<UserNotification> {
-    const [notification] = await this.db
-      .insert(userNotifications)
-      .values(notificationData)
-      .returning();
-    return notification;
-  }
-
-  async getUserNotifications(
-    userId: number,
-    limit: number = 20,
-    offset: number = 0,
-    onlyUnread: boolean = false
-  ): Promise<UserNotification[]> {
-    let query = this.db
-      .select()
+  async findNotificationById(id: number): Promise<UserNotification | undefined> {
+    const result = await db.select()
       .from(userNotifications)
-      .where(eq(userNotifications.userId, userId));
-
-    if (onlyUnread) {
-      query = query.where(eq(userNotifications.isRead, false));
-    }
-
-    return query
-      .orderBy(desc(userNotifications.createdAt))
-      .limit(limit)
-      .offset(offset);
+      .where(eq(userNotifications.id, id))
+      .limit(1);
+    
+    return result[0];
   }
 
-  async markNotificationAsRead(
-    id: number,
-    userId: number
-  ): Promise<UserNotification | undefined> {
-    const [notification] = await this.db
-      .update(userNotifications)
-      .set({ isRead: true })
-      .where(
-        and(
-          eq(userNotifications.id, id),
-          eq(userNotifications.userId, userId)
-        )
-      )
+  async findNotificationsByUserId(
+    userId: number, 
+    limit: number = 10, 
+    offset: number = 0,
+    unreadOnly: boolean = false
+  ): Promise<{ notifications: UserNotification[], total: number }> {
+    let conditions = [eq(userNotifications.userId, userId)];
+    
+    if (unreadOnly) {
+      conditions.push(eq(userNotifications.isRead, false));
+    }
+    
+    const whereClause = and(...conditions);
+    
+    const notificationsResult = await db.select()
+      .from(userNotifications)
+      .where(whereClause)
+      .limit(limit)
+      .offset(offset)
+      .orderBy(desc(userNotifications.createdAt));
+    
+    // Count total notifications matching conditions
+    const countResult = await db.select({ count: sql<number>`count(*)` })
+      .from(userNotifications)
+      .where(whereClause);
+    
+    const total = countResult[0]?.count || 0;
+    
+    return { notifications: notificationsResult, total };
+  }
+
+  async createNotification(data: InsertUserNotification): Promise<UserNotification> {
+    const result = await db.insert(userNotifications)
+      .values(data)
       .returning();
-    return notification;
+    
+    return result[0];
+  }
+
+  async markNotificationAsRead(id: number): Promise<UserNotification | undefined> {
+    const result = await db.update(userNotifications)
+      .set({ isRead: true })
+      .where(eq(userNotifications.id, id))
+      .returning();
+    
+    return result[0];
   }
 
   async markAllNotificationsAsRead(userId: number): Promise<number> {
-    const result = await this.db
-      .update(userNotifications)
+    const result = await db.update(userNotifications)
       .set({ isRead: true })
       .where(
         and(
@@ -324,76 +301,84 @@ export class UserRepository {
           eq(userNotifications.isRead, false)
         )
       );
+    
     return result.rowCount || 0;
   }
 
-  async deleteNotification(
-    id: number,
-    userId: number
-  ): Promise<UserNotification | undefined> {
-    const [notification] = await this.db
-      .delete(userNotifications)
-      .where(
-        and(
-          eq(userNotifications.id, id),
-          eq(userNotifications.userId, userId)
-        )
-      )
+  async deleteNotification(id: number): Promise<UserNotification | undefined> {
+    const result = await db.delete(userNotifications)
+      .where(eq(userNotifications.id, id))
       .returning();
-    return notification;
+    
+    return result[0];
   }
 
-  async countUnreadNotifications(userId: number): Promise<number> {
-    const result = await this.db
-      .select({ count: count() })
-      .from(userNotifications)
-      .where(
-        and(
-          eq(userNotifications.userId, userId),
-          eq(userNotifications.isRead, false)
-        )
-      );
-    return result[0]?.count || 0;
+  async deleteNotificationsByUserId(userId: number): Promise<number> {
+    const result = await db.delete(userNotifications)
+      .where(eq(userNotifications.userId, userId));
+    
+    return result.rowCount || 0;
   }
 
   // Audit log operations
-  async createAuditLog(logData: InsertAuditLog): Promise<AuditLog> {
-    const [log] = await this.db.insert(auditLogs).values(logData).returning();
-    return log;
+  async createAuditLog(data: InsertAuditLog): Promise<AuditLog> {
+    const result = await db.insert(auditLogs)
+      .values(data)
+      .returning();
+    
+    return result[0];
   }
 
-  async getAuditLogs(
-    filters: Partial<AuditLog> = {},
-    limit: number = 50,
-    offset: number = 0
-  ): Promise<AuditLog[]> {
-    let query = this.db.select().from(auditLogs);
-
-    // Apply filters
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        // @ts-ignore - Dynamic key access
-        query = query.where(eq(auditLogs[key as keyof typeof auditLogs], value));
-      }
-    });
-
-    return query
-      .orderBy(desc(auditLogs.timestamp))
-      .limit(limit)
-      .offset(offset);
-  }
-
-  async getUserAuditLogs(
-    userId: number,
-    limit: number = 20,
-    offset: number = 0
-  ): Promise<AuditLog[]> {
-    return this.db
-      .select()
-      .from(auditLogs)
-      .where(eq(auditLogs.userId, userId))
-      .orderBy(desc(auditLogs.timestamp))
-      .limit(limit)
-      .offset(offset);
+  async findAuditLogs(
+    limit: number = 50, 
+    offset: number = 0,
+    userId?: number,
+    action?: string,
+    resourceType?: string,
+    startDate?: Date,
+    endDate?: Date
+  ): Promise<{ logs: AuditLog[], total: number }> {
+    // Build where conditions dynamically
+    let conditions = [];
+    
+    if (userId) {
+      conditions.push(eq(auditLogs.userId, userId));
+    }
+    
+    if (action) {
+      conditions.push(eq(auditLogs.action, action));
+    }
+    
+    if (resourceType) {
+      conditions.push(eq(auditLogs.resourceType, resourceType));
+    }
+    
+    if (startDate) {
+      conditions.push(gt(auditLogs.timestamp, startDate));
+    }
+    
+    if (endDate) {
+      conditions.push(lt(auditLogs.timestamp, endDate));
+    }
+    
+    // Query logs with conditions
+    let whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    
+    const logsResult = whereClause
+      ? await db.select().from(auditLogs).where(whereClause).limit(limit).offset(offset).orderBy(desc(auditLogs.timestamp))
+      : await db.select().from(auditLogs).limit(limit).offset(offset).orderBy(desc(auditLogs.timestamp));
+    
+    // Count total logs matching conditions
+    const countQuery = whereClause
+      ? db.select({ count: sql<number>`count(*)` }).from(auditLogs).where(whereClause)
+      : db.select({ count: sql<number>`count(*)` }).from(auditLogs);
+    
+    const countResult = await countQuery;
+    const total = countResult[0]?.count || 0;
+    
+    return { logs: logsResult, total };
   }
 }
+
+// Export a singleton instance
+export default new UserRepository();
