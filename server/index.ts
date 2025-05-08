@@ -2,6 +2,9 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializeScraper } from "./scraper";
+
+// Force HTTP-only mode in production
+process.env.SCRAPER_HTTP_ONLY_MODE = 'true';
 import { apiRateLimiter } from "./middleware/rate-limiter";
 import path from "path";
 import fs from "fs";
