@@ -12,7 +12,8 @@ import { initializeMessaging, registerGatewayServices, shutdownMessaging } from 
 import { eventBus } from '../../shared/event-bus';
 import { applySecurity, preventOpenRedirect } from '../../shared/middleware/security';
 import { setCacheHeaders } from '../../shared/middleware/cache-middleware';
-import { performanceMonitor } from '../../shared/middleware/performance';
+// Import fixed performance monitoring middleware for deployment compatibility
+import { performanceMonitor } from '../../shared/middleware/performance-fixed';
 
 // Initialize Express app
 const app = express();

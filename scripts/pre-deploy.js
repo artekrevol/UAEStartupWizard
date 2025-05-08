@@ -9,13 +9,18 @@
  * 2. Create necessary fallbacks for environment variables in production
  */
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 console.log('🚀 Running pre-deployment configuration...');
 
 // Modify the scraper configuration to use HTTP-only mode
 try {
+  // Get current directory
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  
   // Create or update a config file for HTTP-only mode
   const configPath = path.join(__dirname, '..', 'scraper', 'config.js');
   const configContent = `/**
