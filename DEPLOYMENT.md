@@ -11,13 +11,19 @@ Before deploying, ensure you have:
    node scripts/pre-deploy.js
    ```
 
-2. Set up the required environment variables in your Replit Secrets panel:
+2. Verify the HTTP-only mode is working with:
+   ```
+   node test-http-only-mode.js
+   ```
+   You should see "Success: No browser-based scrapers available in HTTP-only mode" in the output.
+
+3. Set up the required environment variables in your Replit Secrets panel:
    - `JWT_SECRET`: Secret key for JWT authentication
    - `DATABASE_URL`: PostgreSQL database connection string
    - `REDIS_URL`: Redis connection string (optional, will use memory cache fallback if not provided)
    - `SERVICE_AUTH_KEY`: Secret key for service-to-service authentication
 
-3. Enabled "Always On" in your project settings to keep microservices running continuously
+4. Enable "Always On" in your project settings to keep microservices running continuously
 
 ## Deployment Process
 
@@ -72,6 +78,7 @@ If you encounter deployment issues:
 2. Verify all required secrets are set in the Replit Secrets panel
 3. Ensure "Always On" is enabled to maintain persistent connections
 4. Check that HTTP-only mode is properly configured for scrapers
+5. If experiencing TypeScript errors, confirm the API Gateway is using the fixed performance middleware
 
 ### 8. Maintenance
 
