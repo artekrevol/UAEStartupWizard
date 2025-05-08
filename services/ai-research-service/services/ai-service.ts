@@ -6,7 +6,8 @@
 
 import OpenAI from 'openai';
 import axios from 'axios';
-import { db } from '../../../server/db';
+import { getDb } from '../db';
+import { logger } from '../utils/logger';
 import { freeZones, documents, businessActivities, conversations } from '../../../shared/schema';
 import { eq, and, like, or, sql } from 'drizzle-orm';
 import { getCommunicator } from '../../../shared/communication/service-communicator';
@@ -31,7 +32,7 @@ export class AiService {
    * Perform research on a given topic
    */
   async performResearch(topic: string, userId?: number) {
-    console.log(`[AiService] Performing research on topic: ${topic}`);
+    logger.info(`Performing research on topic: ${topic}`);
     
     try {
       // Create research record
@@ -121,13 +122,13 @@ Always provide detailed, accurate responses based on the above context. If the i
       let freeZoneData;
       if (freeZoneIds && Array.isArray(freeZoneIds) && freeZoneIds.length > 0) {
         // If specific free zone IDs are provided, retrieve only those
-        freeZoneData = await db
+        freeZoneData = await getDb()
           .select()
           .from(freeZones)
           .where(sql`${freeZones.id} IN (${freeZoneIds.join(',')})`);
       } else {
         // Otherwise, get all free zones to provide context
-        freeZoneData = await db
+        freeZoneData = await getDb()
           .select()
           .from(freeZones);
       }
@@ -136,7 +137,7 @@ Always provide detailed, accurate responses based on the above context. If the i
       let documentData;
       if (guideIds && Array.isArray(guideIds) && guideIds.length > 0) {
         // If specific guide IDs are provided, retrieve only those
-        documentData = await db
+        documentData = await getDb()
           .select()
           .from(documents)
           .where(sql`${documents.id} IN (${guideIds.join(',')})`);
@@ -153,14 +154,14 @@ Always provide detailed, accurate responses based on the above context. If the i
             )
           );
           
-          documentData = await db
+          documentData = await getDb()
             .select()
             .from(documents)
             .where(and(...likeConditions))
             .limit(10);
         } else {
           // If no relevant search terms, get basic setup guides
-          documentData = await db
+          documentData = await getDb()
             .select()
             .from(documents)
             .where(
