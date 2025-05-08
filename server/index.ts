@@ -6,6 +6,9 @@ import { initializeScraper } from "./scraper";
 // Force HTTP-only mode in production
 process.env.SCRAPER_HTTP_ONLY_MODE = 'true';
 import { apiRateLimiter } from "./middleware/rate-limiter";
+
+// Export app for production entry point
+export { app };
 import path from "path";
 import fs from "fs";
 import { exec } from "child_process";
