@@ -1,119 +1,77 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import { json, urlencoded } from 'body-parser';
-import { errorHandler, notFoundHandler } from '../../shared/middleware/errorHandler';
-import routes from './routes';
-import { checkConnection } from './db';
+import { config } from '../../shared/config';
+import { logger } from '../../shared/logger';
+import { errorHandler } from '../../shared/middleware/errorHandler';
+import { notFoundHandler } from '../../shared/middleware/notFoundHandler';
+import { ServiceRegistry } from '../../shared/service-registry';
 import { eventBus } from '../../shared/event-bus';
+import { DocumentEventHandler } from './events/documentEventHandler';
+import userRoutes from './routes';
 
 // Initialize Express app
 const app = express();
-const PORT = process.env.USER_SERVICE_PORT || 3001;
 
-// Middleware
+// Apply middleware
 app.use(helmet());
 app.use(cors());
-app.use(json({ limit: '2mb' }));
-app.use(urlencoded({ extended: true, limit: '2mb' }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// API Routes
-app.use('/api', routes);
+// Apply routes
+app.use('/api/users', userRoutes);
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    service: 'user-service',
-    timestamp: new Date().toISOString()
-  });
-});
-
-// 404 handler
+// Apply error handling middleware
 app.use(notFoundHandler);
-
-// Error handler
 app.use(errorHandler);
 
-// Set up event listeners
-const setupEventHandlers = () => {
-  // Listen for user-related events from other services
-  eventBus.subscribe('document-viewed', async (data) => {
-    if (data.userId) {
-      console.log(`[UserService] Document ${data.documentId} viewed by user ${data.userId}`);
-      // Could update user stats or create notifications
-    }
-  });
+// Initialize document event handler to listen for document events
+const documentEventHandler = new DocumentEventHandler(eventBus);
 
-  eventBus.subscribe('freezone-updates', async (data) => {
-    if (data.userIds && data.userIds.length > 0) {
-      console.log(`[UserService] Freezone update notification for ${data.userIds.length} users`);
-      // Could create notifications for users who have shown interest in specific free zones
-    }
-  });
-};
-
-// Start the server
-const startServer = async () => {
-  try {
-    // Check database connection
-    await checkConnection();
-    
-    // Set up event handlers
-    setupEventHandlers();
-    
-    // Register service with API Gateway (via event)
-    eventBus.publish('service-registered', {
-      name: 'user-service',
-      host: process.env.USER_SERVICE_HOST || 'localhost',
-      port: PORT,
-      healthEndpoint: '/health',
-      routes: [
-        { path: '/api/auth', methods: ['GET', 'POST', 'DELETE'] },
-        { path: '/api/users', methods: ['GET', 'POST', 'PATCH', 'DELETE'] },
-        { path: '/api/admin/users', methods: ['GET', 'POST', 'PATCH', 'DELETE'] }
-      ],
-      timestamp: new Date().toISOString()
-    });
-    
-    // Start listening
-    app.listen(PORT, () => {
-      console.log(`[UserService] Server running on port ${PORT}`);
-      
-      // Publish event that User Service is ready
-      eventBus.publish('user-service-ready', {
-        port: PORT,
-        timestamp: new Date().toISOString()
-      });
-    });
-  } catch (error) {
-    console.error('[UserService] Failed to start server:', error);
-    process.exit(1);
-  }
-};
-
-// Start the server
-startServer();
-
-// Handle graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('[UserService] SIGTERM received, shutting down gracefully');
-  eventBus.publish('service-deregistered', {
-    name: 'user-service',
-    timestamp: new Date().toISOString()
-  });
-  eventBus.shutdown();
-  process.exit(0);
+// Register service with service registry
+const serviceRegistry = new ServiceRegistry();
+serviceRegistry.register('user-service', {
+  name: 'user-service',
+  baseUrl: `http://localhost:${config.userService.port}`,
+  routes: [
+    { path: '/api/users', methods: ['GET', 'POST'] },
+    { path: '/api/users/:id', methods: ['GET', 'PATCH', 'DELETE'] },
+    { path: '/api/users/:id/documents', methods: ['GET'] },
+    { path: '/api/auth/login', methods: ['POST'] },
+    { path: '/api/auth/register', methods: ['POST'] },
+    { path: '/api/auth/verify', methods: ['POST'] },
+    { path: '/api/auth/refresh', methods: ['POST'] },
+    { path: '/api/profile', methods: ['GET', 'PATCH'] }
+  ],
+  status: 'healthy',
+  version: '1.0.0'
 });
 
+// Start heartbeat to update service status
+const HEARTBEAT_INTERVAL = 30000; // 30 seconds
+setInterval(() => {
+  serviceRegistry.updateStatus('user-service', 'healthy');
+}, HEARTBEAT_INTERVAL);
+
+// Start server
+const PORT = config.userService.port || 3001;
+app.listen(PORT, () => {
+  logger.info(`[UserService] Server running on port ${PORT}`);
+});
+
+// Handle shutdown
 process.on('SIGINT', () => {
-  console.log('[UserService] SIGINT received, shutting down gracefully');
-  eventBus.publish('service-deregistered', {
-    name: 'user-service',
-    timestamp: new Date().toISOString()
-  });
-  eventBus.shutdown();
+  logger.info('[UserService] Shutting down gracefully');
+  serviceRegistry.deregister('user-service');
   process.exit(0);
 });
 
+process.on('SIGTERM', () => {
+  logger.info('[UserService] Shutting down gracefully');
+  serviceRegistry.deregister('user-service');
+  process.exit(0);
+});
+
+// Export instance for testing
 export { app };

@@ -1,64 +1,104 @@
-import express from 'express';
-import { AuthController } from './controllers/authController';
-import { UserController } from './controllers/userController';
-import { authenticate } from '../../shared/middleware/auth';
-import { rateLimiter } from '../../services/api-gateway/middleware/rateLimiter';
+import express, { Request, Response } from 'express';
+import { asyncHandler } from '../../shared/middleware/errorHandler';
+import { authenticateJWT } from '../../shared/middleware/auth';
+import { ServiceException, ErrorCode } from '../../shared/errors';
 
 const router = express.Router();
 
-// Initialize controllers
-const authController = new AuthController();
-const userController = new UserController();
+/**
+ * Get all users
+ * GET /api/users
+ */
+router.get('/', authenticateJWT, asyncHandler(async (req: Request, res: Response) => {
+  // This is a placeholder implementation
+  // In a real service, we would fetch users from a database
+  res.json({
+    status: 'success',
+    data: [
+      { id: 1, username: 'admin', email: 'admin@example.com', role: 'admin' },
+      { id: 2, username: 'user1', email: 'user1@example.com', role: 'user' }
+    ]
+  });
+}));
 
 /**
- * Authentication Routes
+ * Get user by ID
+ * GET /api/users/:id
  */
-// Apply stricter rate limiting to auth endpoints
-const authRateLimiter = rateLimiter({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // 10 requests per windowMs
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: 'Too many authentication attempts, please try again later.'
-});
-
-// Public authentication routes
-router.post('/auth/register', authRateLimiter, authController.register);
-router.post('/auth/login', authRateLimiter, authController.login);
-router.post('/auth/logout', authController.logout);
-router.post('/auth/refresh-token', authRateLimiter, authController.refreshToken);
-router.get('/auth/verify-email/:token', authController.verifyEmail);
-router.post('/auth/forgot-password', authRateLimiter, authController.forgotPassword);
-router.post('/auth/reset-password/:token', authRateLimiter, authController.resetPassword);
-
-// Protected authentication routes
-router.get('/auth/sessions', authenticate, authController.getSessions);
-router.delete('/auth/sessions/:sessionId', authenticate, authController.revokeSession);
-router.delete('/auth/sessions', authenticate, authController.revokeAllSessions);
-router.post('/auth/change-password', authenticate, authRateLimiter, authController.changePassword);
+router.get('/:id', authenticateJWT, asyncHandler(async (req: Request, res: Response) => {
+  const userId = parseInt(req.params.id, 10);
+  
+  if (isNaN(userId)) {
+    throw new ServiceException(
+      ErrorCode.VALIDATION_ERROR,
+      'Invalid user ID'
+    );
+  }
+  
+  // This is a placeholder implementation
+  // In a real service, we would fetch the user from a database
+  if (userId === 1) {
+    res.json({
+      status: 'success',
+      data: { id: 1, username: 'admin', email: 'admin@example.com', role: 'admin' }
+    });
+  } else if (userId === 2) {
+    res.json({
+      status: 'success',
+      data: { id: 2, username: 'user1', email: 'user1@example.com', role: 'user' }
+    });
+  } else {
+    throw new ServiceException(
+      ErrorCode.NOT_FOUND,
+      `User with ID ${userId} not found`
+    );
+  }
+}));
 
 /**
- * User Routes
+ * Get user documents
+ * GET /api/users/:id/documents
  */
-// All user routes are protected
-router.get('/users/me', authenticate, userController.getCurrentUser);
-router.patch('/users/me/profile', authenticate, userController.updateProfile);
-router.patch('/users/me/account', authenticate, userController.updateAccount);
-router.patch('/users/me/preferences', authenticate, userController.updatePreferences);
-router.post('/users/me/newsletter', authenticate, userController.toggleNewsletter);
+router.get('/:id/documents', authenticateJWT, asyncHandler(async (req: Request, res: Response) => {
+  const userId = parseInt(req.params.id, 10);
+  
+  if (isNaN(userId)) {
+    throw new ServiceException(
+      ErrorCode.VALIDATION_ERROR,
+      'Invalid user ID'
+    );
+  }
+  
+  // This would normally call the document service via an API call or message
+  // For demonstration, we're just returning placeholder data
+  res.json({
+    status: 'success',
+    data: [
+      { id: 101, title: 'User License Agreement', userId, uploadedAt: new Date().toISOString() },
+      { id: 102, title: 'Trade License', userId, uploadedAt: new Date().toISOString() }
+    ]
+  });
+}));
 
-// Notification routes
-router.get('/users/me/notifications', authenticate, userController.getNotifications);
-router.patch('/users/me/notifications/:notificationId/read', authenticate, userController.markNotificationRead);
-router.patch('/users/me/notifications/read-all', authenticate, userController.markAllNotificationsRead);
-
-// Audit log routes
-router.get('/users/me/audit-logs', authenticate, userController.getAuditLogs);
-
-// Admin routes
-router.get('/admin/users', authenticate, userController.getAllUsers);
-router.get('/admin/users/:userId', authenticate, userController.getUserById);
-router.patch('/admin/users/:userId/status', authenticate, userController.updateUserStatus);
-router.delete('/admin/users/:userId', authenticate, userController.deleteUser);
+/**
+ * Create a new user
+ * POST /api/users
+ */
+router.post('/', authenticateJWT, asyncHandler(async (req: Request, res: Response) => {
+  // This is a placeholder implementation
+  // In a real service, we would validate the input and create a user in the database
+  const newUser = {
+    id: 3,
+    username: req.body.username || 'newuser',
+    email: req.body.email || 'newuser@example.com',
+    role: 'user',
+    createdAt: new Date().toISOString()
+  };
+  
+  res.status(201).json({
+    status: 'success',
+    data: newUser
+  });
+}));
 
 export default router;
