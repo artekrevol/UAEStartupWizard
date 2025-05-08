@@ -6,11 +6,11 @@
  * and reference material.
  */
 
-const axios = require('axios');
-const cheerio = require('cheerio');
-const fs = require('fs');
-const path = require('path');
-const { PlaywrightScraper } = require('./utils/playwright_scraper_base');
+import axios from 'axios';
+import cheerio from 'cheerio';
+import fs from 'fs';
+import path from 'path';
+import { PlaywrightScraper } from './utils/playwright_scraper_base.js';
 
 class SAIFZoneDocumentDownloader extends PlaywrightScraper {
   constructor(options = {}) {
@@ -301,7 +301,7 @@ async function downloadSAIFZoneDocuments(options = {}) {
   return await downloader.download();
 }
 
-module.exports = {
+export {
   SAIFZoneDocumentDownloader,
   downloadSAIFZoneDocuments
 };

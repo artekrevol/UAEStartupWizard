@@ -6,13 +6,13 @@
  * and FAQs.
  */
 
-const axios = require('axios');
-const cheerio = require('cheerio');
-const path = require('path');
-const fs = require('fs');
-const { PlaywrightScraper } = require('./utils/playwright_scraper_base');
+import axios from 'axios';
+import cheerio from 'cheerio';
+import path from 'path';
+import fs from 'fs';
+import { PlaywrightScraper } from './utils/playwright_scraper_base.js';
 
-class SAIFZoneScraper extends PlaywrightScraper {
+export class SAIFZoneScraper extends PlaywrightScraper {
   constructor(options = {}) {
     super({
       name: 'saif_zone_scraper',
@@ -570,7 +570,7 @@ async function runSAIFZoneScraper(options = {}) {
   return await scraper.scrape();
 }
 
-module.exports = {
+export {
   SAIFZoneScraper,
   runSAIFZoneScraper
 };
