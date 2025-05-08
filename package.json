@@ -11,6 +11,8 @@
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
+    "@babel/core": "^7.27.1",
+    "@babel/preset-env": "^7.27.2",
     "@hookform/resolvers": "^3.9.1",
     "@jridgewell/trace-mapping": "^0.3.25",
     "@neondatabase/serverless": "^0.10.4",
@@ -52,6 +54,7 @@
     "@types/supertest": "^6.0.3",
     "amqplib": "^0.10.8",
     "axios": "^1.8.4",
+    "babel-jest": "^29.7.0",
     "bcrypt": "^5.1.1",
     "cheerio": "^1.0.0",
     "class-variance-authority": "^0.7.0",
