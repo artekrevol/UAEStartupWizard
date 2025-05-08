@@ -27,11 +27,13 @@ class PlaywrightScraper extends BaseScraper {
     try {
       console.log('Initializing Playwright browser...');
       
-      this.browser = await chromium.launch({
-        headless: this.headless,
+      const launchOptions = {
+        headless: true,
         slowMo: this.slowMo,
-        executablePath: '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium'
-      });
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+      };
+      
+      this.browser = await chromium.launch(launchOptions);
       
       this.context = await this.browser.newContext({
         userAgent: this.userAgent,
