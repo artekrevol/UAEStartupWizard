@@ -1,8 +1,9 @@
 import express from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
-import { authenticateJWT, requireAdmin } from '../../../shared/middleware/auth';
+import { authenticateJWT, requireAdmin, authorizeRoles } from '../../../shared/middleware/auth';
 import { rateLimiter } from '../middleware/rateLimiter';
 import { getServiceURL } from '../middleware/serviceRegistry';
+import { router as cacheRoutes } from './cache';
 
 const router = express.Router();
 
@@ -34,5 +35,8 @@ const adminUserServiceProxy = createProxyMiddleware({
 
 // All admin routes require authentication and admin role
 router.use('/users', authenticateJWT, requireAdmin, adminRateLimiter, adminUserServiceProxy);
+
+// Cache management routes
+router.use('/cache', adminRateLimiter, cacheRoutes);
 
 export default router;

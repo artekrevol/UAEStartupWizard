@@ -109,3 +109,27 @@ export const requireAdmin = (
   
   next();
 };
+
+/**
+ * Check if user has one of the specified roles
+ * @param roles Array of allowed roles
+ */
+export const authorizeRoles = (roles: string[]) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      throw new AuthException(
+        ErrorCode.UNAUTHORIZED,
+        'Authentication required'
+      );
+    }
+    
+    if (!roles.includes(req.user.role)) {
+      throw new AuthException(
+        ErrorCode.FORBIDDEN,
+        `Access denied. Required roles: ${roles.join(', ')}`
+      );
+    }
+    
+    next();
+  };
+};
