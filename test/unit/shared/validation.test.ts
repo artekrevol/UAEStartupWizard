@@ -1,23 +1,5 @@
 import { describe, expect, test } from '@jest/globals';
-
-// Mock validation functions, replace these with actual imports when available
-const validateEmail = (email: string): boolean => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-};
-
-const validatePassword = (password: string): boolean => {
-  // At least 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special char
-  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-  return passwordRegex.test(password);
-};
-
-const validateBusinessName = (name: string): boolean => {
-  if (!name || name.trim().length < 3) return false;
-  // Allow letters, numbers, spaces, and common punctuation used in business names
-  const businessNameRegex = /^[A-Za-z0-9\s&.,'()-]+$/;
-  return businessNameRegex.test(name);
-};
+import { validateEmail, validatePassword, validateBusinessName } from '../../../shared/utils/validation';
 
 describe('Email Validation', () => {
   test('validates correct email formats', () => {

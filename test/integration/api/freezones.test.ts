@@ -1,21 +1,26 @@
 import { describe, expect, test, beforeAll, afterAll } from '@jest/globals';
 import request from 'supertest';
-import { db } from '../../../server/db';
+import { Server } from 'http';
+import { startMockApiServer, stopMockApiServer } from '../../utils/mockApi';
 
-// URL should point to your test environment
-const API_URL = 'http://localhost:5000';
+// URL for our mock API server
+const API_URL = 'http://localhost:5001';
+let server: Server;
 
 describe('Free Zones API', () => {
   // Setup and teardown for tests
   beforeAll(async () => {
-    // Set up test database or environment if needed
-    console.log('Setting up test database...');
+    // Start mock API server
+    console.log('Starting mock API server...');
+    server = await startMockApiServer();
   });
 
   afterAll(async () => {
-    // Clean up test database or environment
-    console.log('Cleaning up test database...');
-    await db.disconnect?.();
+    // Stop mock API server
+    console.log('Stopping mock API server...');
+    if (server) {
+      await stopMockApiServer(server);
+    }
   });
 
   // GET /api/freezones
