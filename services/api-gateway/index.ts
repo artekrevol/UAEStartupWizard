@@ -9,6 +9,7 @@ import { registerService, deregisterService } from './routes/health';
 import { requestLogger } from './middleware/proxy';
 import { globalRateLimiter } from './middleware/rateLimiter';
 import { initializeMessaging, registerGatewayServices, shutdownMessaging } from './messaging';
+import { eventBus } from '../../shared/event-bus';
 
 // Initialize Express app
 const app = express();

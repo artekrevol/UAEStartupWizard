@@ -43,18 +43,18 @@ const userServiceProxy = createProxyMiddleware({
 router.get('/public-profile/:userId', userRateLimiter, userServiceProxy);
 
 // Protected routes (authentication required)
-router.get('/me', authenticate, userRateLimiter, userServiceProxy);
-router.patch('/me/profile', authenticate, userRateLimiter, userServiceProxy);
-router.patch('/me/account', authenticate, userRateLimiter, userServiceProxy);
-router.patch('/me/preferences', authenticate, userRateLimiter, userServiceProxy);
-router.post('/me/newsletter', authenticate, userRateLimiter, userServiceProxy);
+router.get('/me', authenticateJWT, userRateLimiter, userServiceProxy);
+router.patch('/me/profile', authenticateJWT, userRateLimiter, userServiceProxy);
+router.patch('/me/account', authenticateJWT, userRateLimiter, userServiceProxy);
+router.patch('/me/preferences', authenticateJWT, userRateLimiter, userServiceProxy);
+router.post('/me/newsletter', authenticateJWT, userRateLimiter, userServiceProxy);
 
 // Notification routes
-router.get('/me/notifications', authenticate, userRateLimiter, userServiceProxy);
-router.patch('/me/notifications/:notificationId/read', authenticate, userRateLimiter, userServiceProxy);
-router.patch('/me/notifications/read-all', authenticate, userRateLimiter, userServiceProxy);
+router.get('/me/notifications', authenticateJWT, userRateLimiter, userServiceProxy);
+router.patch('/me/notifications/:id', authenticateJWT, userRateLimiter, userServiceProxy);
+router.patch('/me/notifications', authenticateJWT, userRateLimiter, userServiceProxy);
 
 // Audit log routes
-router.get('/me/audit-logs', authenticate, userRateLimiter, userServiceProxy);
+router.get('/me/audit-logs', authenticateJWT, userRateLimiter, userServiceProxy);
 
 export default router;

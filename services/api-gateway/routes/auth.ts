@@ -1,26 +1,25 @@
 import express from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
+import { authenticateJWT } from '../../../shared/middleware/auth';
 import { rateLimiter } from '../middleware/rateLimiter';
-import { authenticate } from '../../../shared/middleware/auth';
 import { getServiceURL } from '../middleware/serviceRegistry';
 
 const router = express.Router();
 
-// Apply stricter rate limiting to auth endpoints
+// Apply rate limiting - stricter for authentication endpoints
 const authRateLimiter = rateLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20, // limit each IP to 20 requests per windowMs
+  max: 30, // limit each IP to 30 requests per windowMs for auth operations
   standardHeaders: true,
-  legacyHeaders: false,
-  message: 'Too many authentication attempts, please try again later.'
+  legacyHeaders: false
 });
 
-// Create proxy middleware for auth service
+// Create proxy middleware for user authentication service
 const authServiceProxy = createProxyMiddleware({
   target: getServiceURL('user-service'),
   changeOrigin: true,
   pathRewrite: (path, req) => {
-    // Remove the /auth prefix when forwarding to the user service
+    // Rewrite path for the user service auth endpoints
     return path.replace(/^\/auth/, '/api/auth');
   },
   onError: (err, req, res) => {
@@ -34,18 +33,17 @@ const authServiceProxy = createProxyMiddleware({
 });
 
 // Public authentication routes
-router.post('/register', authRateLimiter, authServiceProxy);
 router.post('/login', authRateLimiter, authServiceProxy);
+router.post('/register', authRateLimiter, authServiceProxy);
 router.post('/logout', authServiceProxy);
-router.post('/refresh-token', authRateLimiter, authServiceProxy);
-router.get('/verify-email/:token', authServiceProxy);
 router.post('/forgot-password', authRateLimiter, authServiceProxy);
 router.post('/reset-password/:token', authRateLimiter, authServiceProxy);
+router.get('/verify-email/:token', authServiceProxy);
 
 // Protected authentication routes
-router.get('/sessions', authenticate, authServiceProxy);
-router.delete('/sessions/:sessionId', authenticate, authServiceProxy);
-router.delete('/sessions', authenticate, authServiceProxy);
-router.post('/change-password', authenticate, authRateLimiter, authServiceProxy);
+router.get('/sessions', authenticateJWT, authRateLimiter, authServiceProxy);
+router.delete('/sessions/:sessionId', authenticateJWT, authRateLimiter, authServiceProxy);
+router.delete('/sessions', authenticateJWT, authRateLimiter, authServiceProxy);
+router.post('/change-password', authenticateJWT, authRateLimiter, authServiceProxy);
 
 export default router;
