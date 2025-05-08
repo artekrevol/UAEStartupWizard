@@ -6,6 +6,7 @@ import { freeZones } from "@shared/schema";
 import { sql } from "drizzle-orm";
 import { log } from "./vite";
 import https from "https";
+import { constants } from "crypto";
 
 // Mock data functions for development when MOEC website can't be accessed
 function mockFreeZonesData(): string {
@@ -192,19 +193,24 @@ const ESTABLISHING_COMPANIES_URL = `${MOEC_BASE_URL}/en/establishing-companies`;
 const axiosInstance = axios.create({
   httpsAgent: new https.Agent({
     rejectUnauthorized: false,
-    // For SSL/TLS negotiation issues
     minVersion: "TLSv1.2",
     maxVersion: "TLSv1.3",
-    ciphers: "DEFAULT:@SECLEVEL=1" // Lower security level to be compatible with more servers
+    ciphers: "HIGH:!aNULL:!MD5:!RC4",
+    honorCipherOrder: true,
+    secureOptions: constants.SSL_OP_NO_SSLv3 | constants.SSL_OP_NO_SSLv2 | constants.SSL_OP_NO_RENEGOTIATION
   }),
   timeout: 30000, // 30 seconds timeout
   headers: {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-    'Accept-Language': 'en-US,en;q=0.5',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9',
     'Connection': 'keep-alive',
     'Upgrade-Insecure-Requests': '1',
-    'Cache-Control': 'max-age=0'
+    'Cache-Control': 'max-age=0',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none',
+    'Sec-Fetch-User': '?1'
   }
 });
 
@@ -225,16 +231,21 @@ async function fetchPage(url: string): Promise<string | null> {
       const fallbackAxios = axios.create({
         httpsAgent: new https.Agent({
           rejectUnauthorized: false,
-          maxVersion: "TLSv1.2",
+          maxVersion: "TLSv1.3",
           minVersion: "TLSv1",
+          ciphers: "ALL",
+          secureOptions: constants.SSL_OP_NO_RENEGOTIATION
         }),
         timeout: 60000, // Longer timeout
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36',
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
           'Accept': '*/*',
           'Connection': 'close'
         },
         maxRedirects: 10,
+        validateStatus: function (status) {
+          return status >= 200 && status < 500; // Accept all non-server errors
+        }
       });
       
       const response = await fallbackAxios.get(url);
