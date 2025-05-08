@@ -56,8 +56,25 @@ app.use('/api', router);
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-// Initialize event handlers
-initEventsHandlers();
+// Import migration runner
+import { runMigration } from './migrations/initial';
+
+// Run the database migration
+runMigration()
+  .then(() => {
+    logger.info('Database migration completed successfully', {
+      service: 'freezone-service'
+    });
+    
+    // Initialize event handlers
+    initEventsHandlers();
+  })
+  .catch(error => {
+    logger.error('Failed to run database migration', {
+      service: 'freezone-service',
+      error: error.message
+    });
+  });
 
 // Start the server
 const PORT = config.freezoneService.port || 4001;
