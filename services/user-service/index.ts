@@ -1,136 +1,136 @@
 /**
  * User Service
  * 
- * Main entry point for the User Service microservice
+ * Microservice responsible for user management, authentication, and authorization
  */
-import express from 'express';
+import express, { Express } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { rateLimit } from 'express-rate-limit';
 import { config } from '../../shared/config';
-import { errorHandler, notFoundHandler } from '../../shared/middleware/errorHandler';
 import routes from './routes';
-import { runMigration } from './migrations/initial';
-import { createId } from '@paralleldrive/cuid2';
-import { pool } from './db';
+import { connectDb, disconnectDb, migrateDb } from './db';
+import { EventBus } from '../../shared/event-bus';
 
-// Initialize express app
-const app = express();
+// Initialize Express
+const app: Express = express();
 const PORT = config.userService.port;
 const HOST = config.userService.host;
 
-// Set up basic middleware
-app.use(helmet()); // Security headers
-app.use(cors({
-  origin: config.isProduction 
-    ? [/\.replit\.app$/, /\.repl\.co$/] 
-    : '*',
-  credentials: true,
-  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-  preflightContinue: false,
-  optionsSuccessStatus: 204,
-}));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser());
+// Initialize EventBus for cross-service communication
+const eventBus = new EventBus('user-service');
 
-// Request logging
-app.use((req, res, next) => {
-  const requestId = createId();
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} [ID: ${requestId}]`);
-  res.setHeader('X-Request-ID', requestId);
-  next();
-});
-
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: config.userService.rateLimitWindow,
-  max: config.userService.rateLimitMax,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    success: false,
-    error: {
-      message: 'Too many requests, please try again later.',
-      code: 'RATE_LIMIT_EXCEEDED',
-    },
-  },
-});
-
-// Apply rate limiting to all routes
-app.use(limiter);
-
-// Register routes
-app.use('/api', routes);
-
-// Setup error handling
-app.use(notFoundHandler);
-app.use(errorHandler);
-
-// Start the server
-const startServer = async () => {
+// Connect to database
+async function init() {
   try {
-    // Run database migrations
-    await runMigration();
-    
-    app.listen(PORT, HOST, () => {
-      console.log(`[User Service] Server running at http://${HOST}:${PORT}/`);
-      
-      // Register service health check endpoint
-      app.get('/health', (req, res) => {
-        // Check DB connection
-        pool.query('SELECT 1', (err) => {
-          if (err) {
-            return res.status(503).json({
-              status: 'error',
-              message: 'Database connection issue',
-              service: 'user-service',
-              timestamp: new Date().toISOString(),
-            });
-          }
-          
-          res.json({
-            status: 'healthy',
-            service: 'user-service',
-            timestamp: new Date().toISOString(),
-          });
-        });
-      });
-      
-      // Initial event listeners setup
-      console.log('[User Service] Setting up event listeners...');
-      
-      // Send heartbeat
-      const heartbeatInterval = setInterval(() => {
-        try {
-          // Send heartbeat to service registry
-          // Note: In a production environment, this would use a service discovery mechanism
-          console.log('[User Service] Heartbeat sent');
-        } catch (error) {
-          console.error('[User Service] Failed to send heartbeat:', error);
-        }
-      }, config.serviceRegistry.heartbeatIntervalMs);
-      
-      // Cleanup on shutdown
-      process.on('SIGINT', () => {
-        console.log('[User Service] Shutting down...');
-        clearInterval(heartbeatInterval);
-        pool.end(() => {
-          console.log('[User Service] Database connections closed');
-          process.exit(0);
-        });
-      });
+    // Connect to the database
+    await connectDb();
+    console.log('Connected to database');
+
+    // Run migrations if not in production
+    if (config.env !== 'production') {
+      await migrateDb();
+      console.log('Database migrations completed');
+    }
+
+    // Security middleware
+    app.use(helmet());
+    app.use(
+      cors({
+        origin: config.apiGateway.corsOrigin,
+        credentials: true,
+      })
+    );
+
+    // Body parsing
+    app.use(express.json());
+    app.use(express.urlencoded({ extended: true }));
+    app.use(cookieParser(config.security.cookieSecret));
+
+    // Rate limiting
+    app.use(
+      rateLimit({
+        windowMs: config.security.rateLimitWindowMs,
+        max: config.security.rateLimitMaxRequests,
+        standardHeaders: true,
+        legacyHeaders: false,
+      })
+    );
+
+    // Register routes
+    app.use('/api', routes);
+
+    // Start server
+    const server = app.listen(PORT, HOST, () => {
+      console.log(`User service running at http://${HOST}:${PORT}`);
     });
+
+    // Handle shutdown gracefully
+    process.on('SIGTERM', () => shutdown(server));
+    process.on('SIGINT', () => shutdown(server));
+
+    // Register with EventBus
+    await eventBus.connect();
+    console.log('Connected to event bus');
+
+    // Set up event listeners
+    setupEventListeners();
+
+    return { app, server, eventBus };
   } catch (error) {
-    console.error('[User Service] Failed to start server:', error);
+    console.error('Failed to initialize user service:', error);
     process.exit(1);
   }
-};
-
-// Start the server if this file is executed directly
-if (require.main === module) {
-  startServer();
 }
 
-export { app, startServer };
+// Set up event listeners for cross-service communication
+function setupEventListeners() {
+  // Listen for relevant events from other services
+  eventBus.subscribe('document.created', async (data) => {
+    console.log('Document created event received:', data);
+    // Handle document creation if needed for user notifications
+  });
+
+  eventBus.subscribe('freezone.updated', async (data) => {
+    console.log('Free zone updated event received:', data);
+    // Handle free zone updates if needed for user notifications
+  });
+
+  // Subscribe to user deletion events to clean up related data
+  eventBus.subscribe('user.deleted', async (data) => {
+    console.log('User deleted event received:', data);
+    // This service publishes this event, but other services might need to clean up
+  });
+}
+
+// Graceful shutdown
+async function shutdown(server: any) {
+  console.log('Shutting down user service...');
+  
+  server.close(async () => {
+    console.log('HTTP server closed');
+    
+    try {
+      // Disconnect from event bus
+      await eventBus.disconnect();
+      console.log('Disconnected from event bus');
+      
+      // Disconnect from database
+      await disconnectDb();
+      console.log('Disconnected from database');
+      
+      process.exit(0);
+    } catch (error) {
+      console.error('Error during shutdown:', error);
+      process.exit(1);
+    }
+  });
+}
+
+// If this file is run directly, start the service
+if (require.main === module) {
+  init();
+}
+
+export { init };

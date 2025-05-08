@@ -1,31 +1,79 @@
 /**
  * JWT Authentication Middleware
  * 
- * Validates JWT tokens and attaches the user to the request
+ * Verifies JWT tokens from various sources (Authorization header, cookies, query)
+ * Supports role-based access control
  */
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { UnauthorizedError } from '../errors/ApiError';
 import { config } from '../config';
+import { ApiError } from '../errors/ApiError';
 
-// Extend Express Request to include user property
+// Extend Express Request type to include user property
 declare global {
   namespace Express {
     interface Request {
       user?: any;
-      token?: string;
     }
   }
 }
 
 /**
- * Extract token from request headers, cookies, or query params
+ * Authenticate JWT token and add user payload to request
  */
-const extractToken = (req: Request): string | null => {
-  // Check Authorization header
+export const authenticateJWT = (req: Request, res: Response, next: NextFunction) => {
+  // Extract token from Authorization header, cookies, or query param
+  const token = extractToken(req);
+
+  if (!token) {
+    return next(new ApiError('Authentication required', 'AUTHENTICATION_REQUIRED', 401));
+  }
+
+  try {
+    const decoded = jwt.verify(token, config.userService.jwtSecret);
+    req.user = decoded;
+    next();
+  } catch (error: any) {
+    if (error.name === 'TokenExpiredError') {
+      return next(new ApiError('Token expired', 'TOKEN_EXPIRED', 401));
+    }
+
+    return next(new ApiError('Invalid token', 'INVALID_TOKEN', 401));
+  }
+};
+
+/**
+ * Authentication with specific role requirements
+ * @param roles Array of allowed roles
+ */
+export const requireRole = (roles: string[]) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    // First authenticate the JWT
+    authenticateJWT(req, res, (err: Error | null) => {
+      if (err) {
+        return next(err);
+      }
+
+      // Check if user has one of the required roles
+      if (!req.user || !roles.includes(req.user.role)) {
+        return next(
+          new ApiError('Insufficient permissions', 'INSUFFICIENT_PERMISSIONS', 403)
+        );
+      }
+
+      next();
+    });
+  };
+};
+
+/**
+ * Utility function to extract token from request
+ */
+function extractToken(req: Request): string | null {
+  // Check authorization header
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
-    return authHeader.split(' ')[1];
+    return authHeader.substring(7);
   }
 
   // Check cookies
@@ -33,92 +81,32 @@ const extractToken = (req: Request): string | null => {
     return req.cookies.token;
   }
 
-  // Check query params (less secure, only for specific cases)
+  // Check query parameters
   if (req.query && req.query.token) {
     return req.query.token as string;
   }
 
   return null;
-};
+}
 
 /**
- * Verify and decode JWT token
+ * Optional JWT authentication
+ * Does not return error if token is missing, but will validate if present
  */
-const verifyToken = (token: string): Promise<any> => {
-  return new Promise((resolve, reject) => {
-    jwt.verify(token, config.userService.jwtSecret, (err, decoded) => {
-      if (err) {
-        reject(err);
-      } else {
-        resolve(decoded);
-      }
-    });
-  });
-};
+export const optionalJWT = (req: Request, res: Response, next: NextFunction) => {
+  // Extract token from Authorization header, cookies, or query param
+  const token = extractToken(req);
 
-/**
- * Authentication middleware - validates JWT and attaches user to request
- * Use this middleware in routes that require authentication
- */
-export const authenticateJwt = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    // Extract token
-    const token = extractToken(req);
-    if (!token) {
-      return next(
-        new UnauthorizedError('Authentication required', 'AUTH_REQUIRED')
-      );
-    }
-
-    // Verify token
-    const decoded = await verifyToken(token);
-    
-    // Attach user and token to request
-    req.user = decoded;
-    req.token = token;
-    
-    next();
-  } catch (error: any) {
-    if (
-      error.name === 'JsonWebTokenError' ||
-      error.name === 'TokenExpiredError'
-    ) {
-      // Let the error handler handle JWT-specific errors
-      next(error);
-    } else {
-      next(
-        new UnauthorizedError('Authentication failed', 'AUTH_FAILED')
-      );
-    }
+  if (!token) {
+    return next(); // No token, but that's okay
   }
-};
 
-/**
- * Role-based authorization middleware
- * Use this middleware after authenticateJwt to check user roles
- */
-export const requireRole = (roles: string | string[]) => {
-  const allowedRoles = Array.isArray(roles) ? roles : [roles];
-  
-  return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.user) {
-      return next(
-        new UnauthorizedError('Authentication required', 'AUTH_REQUIRED')
-      );
-    }
-
-    const userRole = req.user.role;
-    
-    if (!allowedRoles.includes(userRole)) {
-      return next(
-        new UnauthorizedError('Insufficient permissions', 'INSUFFICIENT_PERMISSIONS')
-      );
-    }
-    
+  try {
+    const decoded = jwt.verify(token, config.userService.jwtSecret);
+    req.user = decoded;
     next();
-  };
+  } catch (error) {
+    // Invalid token, but we'll proceed without user info
+    next(); 
+  }
 };

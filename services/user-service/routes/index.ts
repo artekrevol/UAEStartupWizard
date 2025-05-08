@@ -1,32 +1,48 @@
 /**
- * User Service Routes
+ * User Service Routes Index
  * 
- * Combines all route modules for the user service
+ * Centralizes all routes for the user service
  */
-import express from 'express';
+import { Router } from 'express';
+import { notFoundHandler, errorHandler } from '../../../shared/middleware/errorHandler';
+import { authenticateJWT } from '../../../shared/middleware/authenticateJwt';
+
+// Import route modules
 import authRoutes from './auth';
 import userRoutes from './users';
 import adminRoutes from './admin';
-import { authenticateJwt, requireRole } from '../../../shared/middleware/authenticateJwt';
 
-const router = express.Router();
+const router = Router();
+
+// API documentation route
+router.get('/', (req, res) => {
+  res.json({
+    service: 'User Service',
+    version: '1.0.0',
+    endpoints: {
+      '/auth': 'Authentication endpoints',
+      '/users': 'User management endpoints',
+      '/admin': 'Admin management endpoints',
+    },
+  });
+});
 
 // Health check endpoint
 router.get('/health', (req, res) => {
   res.json({
-    status: 'healthy',
+    status: 'ok',
+    timestamp: new Date().toISOString(),
     service: 'user-service',
-    timestamp: new Date().toISOString()
   });
 });
 
-// Auth routes (no authentication required)
+// Register route modules
 router.use('/auth', authRoutes);
+router.use('/users', authenticateJWT, userRoutes);
+router.use('/admin', adminRoutes);
 
-// User routes (authentication required)
-router.use('/users', authenticateJwt, userRoutes);
-
-// Admin routes (admin role required)
-router.use('/admin', authenticateJwt, requireRole(['admin', 'superadmin']), adminRoutes);
+// Error handling
+router.use(notFoundHandler);
+router.use(errorHandler);
 
 export default router;

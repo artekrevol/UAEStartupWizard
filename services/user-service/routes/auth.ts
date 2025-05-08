@@ -1,28 +1,31 @@
 /**
  * Authentication Routes
  * 
- * Handles user authentication and session management
+ * Handles user registration, login, logout, and token management
  */
-import express from 'express';
-import { AuthController } from '../controllers/authController';
-import { authenticateJwt } from '../../../shared/middleware/authenticateJwt';
+import { Router } from 'express';
+import authController from '../controllers/authController';
+import { authenticateJWT } from '../../../shared/middleware/authenticateJwt';
 
-const router = express.Router();
-const authController = new AuthController();
+const router = Router();
 
 // Public routes (no authentication required)
-router.post('/login', authController.login);
 router.post('/register', authController.register);
-router.post('/forgot-password', authController.requestPasswordReset);
+router.post('/login', authController.login);
+router.post('/forgot-password', authController.forgotPassword);
 router.post('/reset-password', authController.resetPassword);
-router.get('/verify-email/:token', authController.verifyEmail);
+router.post('/verify-email/:token', authController.verifyEmail);
 
 // Protected routes (authentication required)
-router.use(authenticateJwt);
+router.use(authenticateJWT);
 router.post('/logout', authController.logout);
+router.post('/refresh-token', authController.refreshToken);
+router.get('/me', authController.getCurrentUser);
+router.post('/change-password', authController.changePassword);
+
+// Session management
 router.get('/sessions', authController.getSessions);
 router.delete('/sessions/:id', authController.revokeSession);
 router.delete('/sessions', authController.revokeAllSessions);
-router.put('/change-password', authController.changePassword);
 
 export default router;

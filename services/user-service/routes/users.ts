@@ -1,30 +1,30 @@
 /**
  * User Routes
  * 
- * Handles user profile management and user-specific operations
+ * Routes for managing user information, profiles, and settings
+ * All routes require authentication
  */
-import express from 'express';
-import { UserController } from '../controllers/userController';
+import { Router } from 'express';
+import userController from '../controllers/userController';
+import { authenticateJWT } from '../../../shared/middleware/authenticateJwt';
 
-const router = express.Router();
-const userController = new UserController();
+const router = Router();
 
-// User profile operations
-router.get('/me', userController.getCurrentUser);
-router.put('/me', userController.updateCurrentUser);
-router.delete('/me', userController.deleteCurrentUser);
+// User management
+router.get('/', userController.getCurrentUser);
+router.patch('/', userController.updateCurrentUser);
+router.delete('/', userController.deleteCurrentUser);
 
-// User profile operations
-router.get('/me/profile', userController.getUserProfile);
-router.put('/me/profile', userController.updateUserProfile);
+// User profile
+router.get('/profile', userController.getUserProfile);
+router.patch('/profile', userController.updateUserProfile);
 
-// Notification management
+// Notifications
 router.get('/notifications', userController.getUserNotifications);
-router.put('/notifications/:id/read', userController.markNotificationAsRead);
-router.put('/notifications/read-all', userController.markAllNotificationsAsRead);
+router.patch('/notifications/:id/read', userController.markNotificationAsRead);
 router.delete('/notifications/:id', userController.deleteNotification);
 
-// User sessions and activity
+// User activity and sessions
 router.get('/sessions', userController.getUserSessions);
 router.get('/activity', userController.getUserActivity);
 
