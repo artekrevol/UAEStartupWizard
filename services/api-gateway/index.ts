@@ -1,6 +1,5 @@
 import express from 'express';
 import cors from 'cors';
-import helmet from 'helmet';
 import { json, urlencoded } from 'body-parser';
 import { errorHandler, notFoundHandler } from '../../shared/middleware/errorHandler';
 import routes from './routes';
@@ -10,30 +9,21 @@ import { requestLogger } from './middleware/proxy';
 import { globalRateLimiter } from './middleware/rateLimiter';
 import { initializeMessaging, registerGatewayServices, shutdownMessaging } from './messaging';
 import { eventBus } from '../../shared/event-bus';
+import { applySecurity, preventOpenRedirect } from '../../shared/middleware/security';
 
 // Initialize Express app
 const app = express();
 const PORT = process.env.API_GATEWAY_PORT || 3000;
 
-// Security middleware
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", "data:", "blob:"],
-      connectSrc: ["'self'"],
-      fontSrc: ["'self'"],
-      objectSrc: ["'none'"],
-      mediaSrc: ["'self'"],
-      frameSrc: ["'none'"],
-    },
-  },
-  xssFilter: true,
-  noSniff: true,
-  hidePoweredBy: true,
-}));
+// Apply comprehensive security middleware
+applySecurity(app);
+
+// Add open redirect protection for specific domains
+app.use(preventOpenRedirect([
+  'uae-business-setup.com',
+  'api.uae-business-setup.com',
+  'admin.uae-business-setup.com'
+]));
 
 // CORS configuration
 app.use(cors({

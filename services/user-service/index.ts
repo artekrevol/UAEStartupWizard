@@ -5,13 +5,13 @@
  */
 import express, { Express } from 'express';
 import cors from 'cors';
-import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
-import { rateLimit } from 'express-rate-limit';
 import { config } from '../../shared/config';
 import routes from './routes';
 import { connectDb, disconnectDb, migrateDb } from './db';
 import { EventBus } from '../../shared/event-bus';
+import { applySecurity } from '../../shared/middleware/security';
+import { authenticateService } from '../../shared/middleware/serviceAuth';
 
 // Initialize Express
 const app: Express = express();
@@ -34,8 +34,10 @@ async function init() {
       console.log('Database migrations completed');
     }
 
-    // Security middleware
-    app.use(helmet());
+    // Apply comprehensive security middleware
+    applySecurity(app);
+    
+    // CORS configuration
     app.use(
       cors({
         origin: config.apiGateway.corsOrigin,
@@ -44,19 +46,12 @@ async function init() {
     );
 
     // Body parsing
-    app.use(express.json());
-    app.use(express.urlencoded({ extended: true }));
+    app.use(express.json({ limit: '2mb' }));
+    app.use(express.urlencoded({ extended: true, limit: '2mb' }));
     app.use(cookieParser(config.security.cookieSecret));
-
-    // Rate limiting
-    app.use(
-      rateLimit({
-        windowMs: config.security.rateLimitWindowMs,
-        max: config.security.rateLimitMaxRequests,
-        standardHeaders: true,
-        legacyHeaders: false,
-      })
-    );
+    
+    // Add service authentication for inter-service communication
+    app.use('/api/internal', authenticateService);
 
     // Register routes
     app.use('/api', routes);
