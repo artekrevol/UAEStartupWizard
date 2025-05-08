@@ -19,8 +19,8 @@ const forceHTTPOnly = process.env.SCRAPER_HTTP_ONLY_MODE === 'true';
 
 // Configuration object
 const config = {
-  // Force HTTP-only mode in production or when explicitly set
-  httpOnlyMode: isProduction || forceHTTPOnly,
+  // Always use HTTP-only mode in deployments
+  httpOnlyMode: true,
 
   // Base URLs
   baseURLs: {
