@@ -6,7 +6,26 @@
 
 import { Request, Response } from 'express';
 import { AiService } from '../services/ai-service';
-import { findBestStaticResponse } from '../utils/static-responses';
+// Static responses for common queries
+const staticResponses: { [key: string]: string } = {
+  "what is a free zone": "A free zone in the UAE is a special economic area where businesses can operate with 100% foreign ownership.",
+  "how to start a business": "Starting a business in the UAE requires selecting a setup type, obtaining necessary approvals, and registering with relevant authorities."
+};
+
+// Simplified version of the static response finder
+function findBestStaticResponse(query: string): string | null {
+  // Normalize the query
+  const normalizedQuery = query.toLowerCase().trim();
+  
+  // Check for matches
+  for (const [key, response] of Object.entries(staticResponses)) {
+    if (normalizedQuery.includes(key)) {
+      return response;
+    }
+  }
+  
+  return null;
+}
 
 export class AssistantController {
   private aiService: AiService;

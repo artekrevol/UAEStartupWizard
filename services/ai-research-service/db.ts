@@ -9,7 +9,14 @@ import { Pool, neonConfig } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-serverless';
 import ws from 'ws';
 import * as schema from '../../shared/schema';
-import { logger } from './utils/logger';
+// Import custom logger when available
+// For now use console
+const logger = {
+  info: (message: string) => console.log(`[ai-research-service] INFO: ${message}`),
+  error: (message: string, error?: any) => console.error(`[ai-research-service] ERROR: ${message}`, error),
+  warn: (message: string) => console.warn(`[ai-research-service] WARN: ${message}`),
+  debug: (message: string) => console.log(`[ai-research-service] DEBUG: ${message}`)
+};
 
 // Configure neon to use websockets
 neonConfig.webSocketConstructor = ws;

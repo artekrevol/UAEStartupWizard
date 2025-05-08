@@ -8,7 +8,7 @@
 import OpenAI from 'openai';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
-import { db } from '../../../server/db';
+import { getDb } from '../db';
 import { documents, freeZones, conversations } from '../../../shared/schema';
 import { eq, and, like, or, sql } from 'drizzle-orm';
 import { getCommunicator } from '../../../shared/communication/service-communicator';
@@ -132,7 +132,7 @@ it's not in the context, say so clearly rather than making up information.`
       });
       
       // Get AI response
-      const aiResponse = response.choices[0].message.content;
+      const aiResponse = response.choices[0].message.content || 'No response generated.';
       
       // Save to conversation history if we have a conversation ID
       if (conversationId) {
@@ -187,7 +187,7 @@ it's not in the context, say so clearly rather than making up information.`
       
       if (terms.length === 0) {
         // If no meaningful terms, return popular free zones
-        return await db
+        return await getDb()
           .select()
           .from(freeZones)
           .limit(this.MAX_RESULTS);
@@ -202,7 +202,7 @@ it's not in the context, say so clearly rather than making up information.`
         )
       );
       
-      return await db
+      return await getDb()
         .select()
         .from(freeZones)
         .where(and(...conditions))
@@ -224,7 +224,7 @@ it's not in the context, say so clearly rather than making up information.`
       
       if (terms.length === 0) {
         // If no meaningful terms, return general setup guides
-        return await db
+        return await getDb()
           .select()
           .from(documents)
           .where(
@@ -246,7 +246,7 @@ it's not in the context, say so clearly rather than making up information.`
         )
       );
       
-      return await db
+      return await getDb()
         .select()
         .from(documents)
         .where(and(...conditions))
@@ -451,14 +451,23 @@ ${context}`
    * Extract sources from search results for citation
    */
   private extractSourcesFromSearchResults(searchResults: any) {
-    const sources = [];
+    interface Source {
+      id: string;
+      title: string;
+      type: string;
+      url?: string | null;
+      category?: string | null;
+      subcategory?: string | null;
+    }
+    
+    const sources: Source[] = [];
     
     // Add free zone sources
     if (searchResults.freeZones && searchResults.freeZones.length > 0) {
       searchResults.freeZones.forEach((fz: any, index: number) => {
         sources.push({
           id: `FZ-${index + 1}`,
-          title: fz.name,
+          title: fz.name || 'Unnamed Free Zone',
           type: 'free-zone',
           url: fz.websiteUrl || null
         });
@@ -486,9 +495,17 @@ ${context}`
    */
   private async createConversation(userId: number, topic: string) {
     try {
-      // In a real implementation, we would insert into the database
-      // For now, we'll return a mock conversation ID
-      return Math.floor(Math.random() * 1000);
+      const [result] = await getDb()
+        .insert(conversations)
+        .values({
+          userId,
+          topic,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+        .returning({ id: conversations.id });
+      
+      return result.id;
     } catch (error) {
       console.error('[WebResearchService] Error creating conversation:', error);
       throw error;
@@ -500,9 +517,16 @@ ${context}`
    */
   private async getConversationHistory(conversationId: number) {
     try {
-      // In a real implementation, we would fetch from the database
-      // For now, we'll return an empty array
-      return [];
+      const messages = await getDb()
+        .select({
+          role: sql`role`,
+          content: sql`content`
+        })
+        .from(sql`conversation_messages`)
+        .where(sql`conversation_id = ${conversationId}`)
+        .orderBy(sql`created_at asc`);
+      
+      return messages;
     } catch (error) {
       console.error('[WebResearchService] Error getting conversation history:', error);
       return [];
@@ -514,8 +538,10 @@ ${context}`
    */
   private async saveToConversationHistory(conversationId: number, role: string, content: string) {
     try {
-      // In a real implementation, we would insert into the database
-      console.log(`[WebResearchService] Saving ${role} message to conversation ${conversationId}`);
+      await getDb().execute(
+        sql`INSERT INTO conversation_messages (conversation_id, role, content, created_at) 
+            VALUES (${conversationId}, ${role}, ${content}, ${new Date()})`
+      );
       return true;
     } catch (error) {
       console.error('[WebResearchService] Error saving to conversation history:', error);
