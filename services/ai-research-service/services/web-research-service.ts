@@ -85,7 +85,7 @@ export class WebResearchService {
     
     try {
       // Get conversation history if conversationId is provided
-      let conversationHistory = [];
+      let conversationHistory: { role: string; content: string }[] = [];
       if (conversationId) {
         conversationHistory = await this.getConversationHistory(conversationId);
       } else if (userId) {
@@ -101,7 +101,7 @@ export class WebResearchService {
       const context = this.prepareContextFromSearchResults(searchResults);
       
       // Create messages for OpenAI
-      const messages = [
+      const openaiMessages = [
         {
           role: "system",
           content: `You are a web research assistant specializing in UAE business setup. 
@@ -113,10 +113,16 @@ ${context}
 Always provide helpful, accurate answers based on this context. If you don't know something or 
 it's not in the context, say so clearly rather than making up information.`
         },
-        ...conversationHistory.map((msg) => ({
-          role: msg.role as "user" | "assistant" | "system",
-          content: msg.content
-        })),
+        ...conversationHistory.map((msg) => {
+          // Ensure the role is one of the accepted types
+          const validRole = msg.role === "user" || msg.role === "assistant" || msg.role === "system" 
+            ? msg.role 
+            : "user"; // Default to user if the role is not valid
+          return {
+            role: validRole,
+            content: msg.content
+          };
+        }),
         {
           role: "user",
           content: message
@@ -126,7 +132,7 @@ it's not in the context, say so clearly rather than making up information.`
       // Generate response using OpenAI
       const response = await this.openai.chat.completions.create({
         model: "gpt-4o",
-        messages,
+        messages: openaiMessages,
         temperature: 0.7,
         max_tokens: 1000
       });
@@ -523,12 +529,14 @@ ${context}`
    */
   private async getConversationHistory(conversationId: number) {
     try {
-      interface Message {
+      // Define our message interface
+      interface MessageItem {
         role: string;
         content: string;
       }
       
-      const messages = await getDb()
+      // Use a different name for the result to avoid collision with the imported 'messages' table
+      const messageItems = await getDb()
         .select({
           role: messages.role,
           content: messages.content
@@ -537,7 +545,7 @@ ${context}`
         .where(eq(messages.conversationId, conversationId))
         .orderBy(messages.createdAt);
       
-      return messages as Message[];
+      return messageItems as MessageItem[];
     } catch (error) {
       console.error('[WebResearchService] Error getting conversation history:', error);
       return [];
