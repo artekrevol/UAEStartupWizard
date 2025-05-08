@@ -9,6 +9,20 @@
 import cache from 'memory-cache';
 import { config } from '../config';
 
+// Add type declaration for memory-cache to fix TypeScript errors
+declare module 'memory-cache' {
+  export function put(key: string, value: any, time?: number, timeoutCallback?: Function): any;
+  export function get(key: string): any;
+  export function del(key: string): any;
+  export function clear(): void;
+  export function size(): number;
+  export function memsize(): number;
+  export function debug(bool: boolean): void;
+  export function keys(): any[];
+  export function exportJson(): string;
+  export function importJson(json: string, options?: { maxAge?: number }): void;
+}
+
 // Default TTL from config
 const DEFAULT_TTL = config.redis?.defaultTtl || 3600; // 1 hour
 

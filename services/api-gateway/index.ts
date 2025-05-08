@@ -4,7 +4,7 @@ import { json, urlencoded } from 'body-parser';
 import compression from 'compression';
 import { errorHandler, notFoundHandler } from '../../shared/middleware/errorHandler';
 import routes from './routes';
-import { initServiceRegistry, cleanupInactiveServices, serviceRegistry } from './middleware/serviceRegistry';
+import { initServiceRegistry, cleanupInactiveServices, getAllServices } from './middleware/serviceRegistry';
 import { registerService, deregisterService } from './routes/health';
 import { requestLogger } from './middleware/proxy';
 import { globalRateLimiter } from './middleware/rateLimiter';
