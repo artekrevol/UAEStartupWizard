@@ -1,78 +1,38 @@
 /**
- * Application Logger Module
- * Provides standardized logging functionality across all services
+ * Shared Logger for all services
+ * Provides consistent logging across the application
  */
 
-interface LogData {
-  [key: string]: any;
-}
-
-/**
- * Logger Class 
- * Handles all logging operations with consistent formatting
- */
-class Logger {
+// Simple logger implementation
+// In a production environment, this would be replaced with Winston or similar
+export const logger = {
   /**
-   * Log an informational message
+   * Log debug level message
    */
-  info(message: string, data?: LogData): void {
-    this.log('info', message, data);
-  }
-  
-  /**
-   * Log a warning message
-   */
-  warn(message: string, data?: LogData): void {
-    this.log('warn', message, data);
-  }
-  
-  /**
-   * Log an error message
-   */
-  error(message: string, data?: LogData): void {
-    this.log('error', message, data);
-  }
-  
-  /**
-   * Log a debug message (only in development)
-   */
-  debug(message: string, data?: LogData): void {
+  debug: (message: string, meta?: Record<string, any>) => {
     if (process.env.NODE_ENV !== 'production') {
-      this.log('debug', message, data);
+      console.debug(`[DEBUG] ${message}`, meta || '');
     }
-  }
+  },
   
   /**
-   * Internal logging method that formats and outputs logs
+   * Log info level message
    */
-  private log(level: string, message: string, data?: LogData): void {
-    const timestamp = new Date().toISOString();
-    const logEntry = {
-      timestamp,
-      level,
-      message,
-      ...(data || {})
-    };
-    
-    // In production, we might use a more sophisticated logging service
-    // For now, we'll use console methods based on log level
-    switch (level) {
-      case 'error':
-        console.error(JSON.stringify(logEntry));
-        break;
-      case 'warn':
-        console.warn(JSON.stringify(logEntry));
-        break;
-      case 'debug':
-        console.debug(JSON.stringify(logEntry));
-        break;
-      case 'info':
-      default:
-        console.log(JSON.stringify(logEntry));
-        break;
-    }
+  info: (message: string, meta?: Record<string, any>) => {
+    console.info(`[INFO] ${message}`, meta || '');
+  },
+  
+  /**
+   * Log warning level message
+   */
+  warn: (message: string, meta?: Record<string, any>) => {
+    console.warn(`[WARN] ${message}`, meta || '');
+  },
+  
+  /**
+   * Log error level message
+   */
+  error: (message: string, meta?: Record<string, any>) => {
+    console.error(`[ERROR] ${message}`, meta || '');
   }
-}
-
-// Export a singleton instance
-export const logger = new Logger();
+};

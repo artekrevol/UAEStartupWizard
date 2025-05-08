@@ -16,6 +16,7 @@ const DEFAULT_USER_SERVICE_PORT = 3002;
 const DEFAULT_FREEZONE_SERVICE_PORT = 3003;
 const DEFAULT_SCRAPER_SERVICE_PORT = 3004;
 const DEFAULT_AI_SERVICE_PORT = 3005;
+const DEFAULT_SERVICE_REGISTRY_PORT = 3010;
 
 // Configuration object
 export const config = {
@@ -55,7 +56,9 @@ export const config = {
   
   // Free Zone service settings
   freezoneService: {
-    port: parseInt(process.env.FREEZONE_SERVICE_PORT || DEFAULT_FREEZONE_SERVICE_PORT.toString(), 10)
+    port: parseInt(process.env.FREEZONE_SERVICE_PORT || DEFAULT_FREEZONE_SERVICE_PORT.toString(), 10),
+    databaseUrl: process.env.FREEZONE_DB_URL || process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/freezone_db',
+    uploadDir: './uploads/freezones'
   },
   
   // Scraper service settings
@@ -77,5 +80,12 @@ export const config = {
     connectionString: process.env.DATABASE_URL,
     maxConnections: 20,
     idleTimeoutMillis: 30000
+  },
+  
+  // Service Registry settings
+  serviceRegistry: {
+    host: process.env.SERVICE_REGISTRY_HOST || 'localhost',
+    port: parseInt(process.env.SERVICE_REGISTRY_PORT || DEFAULT_SERVICE_REGISTRY_PORT.toString(), 10),
+    heartbeatInterval: 30000 // 30 seconds
   }
 };

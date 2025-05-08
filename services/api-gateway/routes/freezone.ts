@@ -1,6 +1,6 @@
 import express from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
-import { authenticate } from '../../../shared/middleware/auth';
+import { authenticateJWT, requireAdmin } from '../../../shared/middleware/auth';
 import { rateLimiter } from '../middleware/rateLimiter';
 import { getServiceURL } from '../middleware/serviceRegistry';
 
@@ -59,15 +59,15 @@ router.get('/license-types', freezoneRateLimiter, freezoneServiceProxy);
 router.get('/license-types/:licenseTypeId', freezoneRateLimiter, freezoneServiceProxy);
 
 // Protected routes - only authenticated users can interact with these endpoints
-router.post('/save-comparison', authenticate, freezoneRateLimiter, freezoneServiceProxy);
-router.get('/saved-comparisons', authenticate, freezoneRateLimiter, freezoneServiceProxy);
-router.delete('/saved-comparisons/:comparisonId', authenticate, freezoneRateLimiter, freezoneServiceProxy);
+router.post('/save-comparison', authenticateJWT, freezoneRateLimiter, freezoneServiceProxy);
+router.get('/saved-comparisons', authenticateJWT, freezoneRateLimiter, freezoneServiceProxy);
+router.delete('/saved-comparisons/:comparisonId', authenticateJWT, freezoneRateLimiter, freezoneServiceProxy);
 
 // Admin routes - only admins can modify freezone data
-router.post('/', authenticate, freezoneRateLimiter, freezoneServiceProxy);
-router.patch('/:freezoneId', authenticate, freezoneRateLimiter, freezoneServiceProxy);
-router.delete('/:freezoneId', authenticate, freezoneRateLimiter, freezoneServiceProxy);
-router.post('/import', authenticate, freezoneRateLimiter, freezoneServiceProxy);
-router.post('/bulk-update', authenticate, freezoneRateLimiter, freezoneServiceProxy);
+router.post('/', authenticateJWT, requireAdmin, freezoneRateLimiter, freezoneServiceProxy);
+router.patch('/:freezoneId', authenticateJWT, requireAdmin, freezoneRateLimiter, freezoneServiceProxy);
+router.delete('/:freezoneId', authenticateJWT, requireAdmin, freezoneRateLimiter, freezoneServiceProxy);
+router.post('/import', authenticateJWT, requireAdmin, freezoneRateLimiter, freezoneServiceProxy);
+router.post('/bulk-update', authenticateJWT, requireAdmin, freezoneRateLimiter, freezoneServiceProxy);
 
 export default router;
