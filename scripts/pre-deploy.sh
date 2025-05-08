@@ -1,19 +1,23 @@
 
 #!/bin/bash
+# Pre-deployment setup script
 
 echo "Configuring for HTTP-only mode..."
 
-# Create HTTP-only marker file
-touch .http-only-mode
-echo $(date -u) > .http-only-mode
+# Ensure dist directory exists
+mkdir -p dist
 
-# Set environment variables for build
-export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
-export SCRAPER_HTTP_ONLY_MODE=true
-export NODE_ENV=production
+# Create production HTTP-only entry point
+cat > dist/production-http-only.js << 'EOF'
+import { app } from './index.js';
 
-# Create .npmrc to prevent Playwright installation
-echo "playwright_skip_browser_download=1" > .npmrc
-echo "playwright_browser_path=0" >> .npmrc
+const HOST = '0.0.0.0';
+const PORT = process.env.PORT || 5000;
 
-echo -e "\n✅ Pre-deployment configuration complete\n"
+app.listen(PORT, HOST, () => {
+  console.log(`Production server running on ${HOST}:${PORT}`);
+});
+EOF
+
+echo "✅ Created production HTTP-only entry point"
+echo "✅ Pre-deployment configuration complete"
