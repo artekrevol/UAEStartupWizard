@@ -75,6 +75,8 @@ npm run dev
 
 ### Production Deployment
 
+#### Option 1: Docker Deployment
+
 1. Build and start the services
 
 ```bash
@@ -86,6 +88,23 @@ docker-compose up -d
 ```bash
 docker-compose logs -f
 ```
+
+#### Option 2: Replit Deployment
+
+To deploy on Replit without Playwright browser dependencies:
+
+1. Run the deployment preparation script:
+
+```bash
+bash scripts/build-for-deployment.sh
+```
+
+2. Click the "Deploy" button in your Replit project
+
+This deployment process:
+- Skips Playwright browser installation
+- Uses HTTP-only mode for scraping
+- Creates a production-optimized build without browser dependencies
 
 ## Key Technologies
 
