@@ -8,6 +8,7 @@ import { notFoundHandler } from '../../shared/middleware/notFoundHandler';
 import { ServiceRegistry } from '../../shared/service-registry';
 import { eventBus } from '../../shared/event-bus';
 import { DocumentEventHandler } from './events/documentEventHandler';
+import { runMigration } from './migrations/initial';
 import userRoutes from './routes';
 
 // Initialize Express app
@@ -29,36 +30,60 @@ app.use(errorHandler);
 // Initialize document event handler to listen for document events
 const documentEventHandler = new DocumentEventHandler(eventBus);
 
-// Register service with service registry
-const serviceRegistry = new ServiceRegistry();
-serviceRegistry.register('user-service', {
-  name: 'user-service',
-  baseUrl: `http://localhost:${config.userService.port}`,
-  routes: [
-    { path: '/api/users', methods: ['GET', 'POST'] },
-    { path: '/api/users/:id', methods: ['GET', 'PATCH', 'DELETE'] },
-    { path: '/api/users/:id/documents', methods: ['GET'] },
-    { path: '/api/auth/login', methods: ['POST'] },
-    { path: '/api/auth/register', methods: ['POST'] },
-    { path: '/api/auth/verify', methods: ['POST'] },
-    { path: '/api/auth/refresh', methods: ['POST'] },
-    { path: '/api/profile', methods: ['GET', 'PATCH'] }
-  ],
-  status: 'healthy',
-  version: '1.0.0'
-});
+// Initialize the service registry client
+const serviceRegistry = new ServiceRegistry(
+  'user-service',
+  config.userService.port,
+  config.serviceRegistry.host,
+  config.serviceRegistry.port
+);
 
-// Start heartbeat to update service status
-const HEARTBEAT_INTERVAL = 30000; // 30 seconds
-setInterval(() => {
-  serviceRegistry.updateStatus('user-service', 'healthy');
-}, HEARTBEAT_INTERVAL);
+// Service endpoints for registration
+const serviceEndpoints = [
+  { path: '/api/users', methods: ['GET', 'POST'] },
+  { path: '/api/users/:id', methods: ['GET', 'PATCH', 'DELETE'] },
+  { path: '/api/users/:id/documents', methods: ['GET'] },
+  { path: '/api/auth/login', methods: ['POST'] },
+  { path: '/api/auth/register', methods: ['POST'] },
+  { path: '/api/auth/verify', methods: ['POST'] },
+  { path: '/api/auth/refresh', methods: ['POST'] },
+  { path: '/api/profile', methods: ['GET', 'PATCH'] }
+];
 
-// Start server
-const PORT = config.userService.port || 3001;
-app.listen(PORT, () => {
-  logger.info(`[UserService] Server running on port ${PORT}`);
-});
+// Run database migration
+runMigration()
+  .then(() => {
+    logger.info('Database migration completed successfully', {
+      service: 'user-service'
+    });
+    
+    // Start server
+    const PORT = config.userService.port || 3001;
+    app.listen(PORT, () => {
+      logger.info(`[UserService] Server running on port ${PORT}`);
+      
+      // Register with the service registry after server is running
+      serviceRegistry.register()
+        .then(() => {
+          logger.info('Successfully registered with service registry', {
+            service: 'user-service'
+          });
+        })
+        .catch(err => {
+          logger.error('Failed to register with service registry', {
+            service: 'user-service',
+            error: err.message
+          });
+        });
+    });
+  })
+  .catch(error => {
+    logger.error('Failed to run database migration', {
+      service: 'user-service',
+      error: error.message
+    });
+    process.exit(1);
+  });
 
 // Handle shutdown
 process.on('SIGINT', () => {
