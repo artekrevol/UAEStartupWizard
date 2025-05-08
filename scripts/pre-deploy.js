@@ -39,6 +39,24 @@ CACHE_LONG_TTL=3600
 
 // Create HTTP-only mode configuration for scrapers
 function createScraperConfig() {
+  const scraperConfigPath = path.resolve(rootDir, 'scraper/config.js');
+  
+  // Read existing config
+  let configContent = fs.readFileSync(scraperConfigPath, 'utf8');
+  
+  // Ensure HTTP-only mode is forced
+  if (!configContent.includes('httpOnlyMode: isProduction || forceHTTPOnly')) {
+    configContent = configContent.replace(
+      'const config = {',
+      'const config = {\n  // Force HTTP-only mode in production or when explicitly set\n  httpOnlyMode: isProduction || forceHTTPOnly,'
+    );
+    fs.writeFileSync(scraperConfigPath, configContent);
+  }
+  
+  // Create a copy of the .npmrc file in dist
+  const npmrcContent = 'playwright_skip_browser_download=1\nplaywright_browser_path=0';
+  fs.writeFileSync(path.resolve(rootDir, 'dist/.npmrc'), npmrcContent);
+  
   console.log('✅ Created HTTP-only configuration for scrapers');
 }
 

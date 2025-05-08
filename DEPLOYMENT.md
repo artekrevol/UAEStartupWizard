@@ -33,7 +33,7 @@ Follow these steps to deploy your application:
 
 1. Run our custom deployment script to prepare the build:
    ```
-   ./scripts/deploy.sh
+   node scripts/deploy.js
    ```
 
 2. Click the "Deploy" button in your Replit project

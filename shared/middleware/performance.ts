@@ -1,98 +1,124 @@
 /**
- * Performance Monitoring Middleware
+ * Performance Middleware
+ * Fixed version for TypeScript compatibility in production builds
  * 
- * Tracks response times and logs slow responses
+ * This middleware:
+ * 1. Adds compression for HTTP responses
+ * 2. Implements response time tracking
+ * 3. Adds consistent cache control headers
+ * 4. Provides browser cache directives based on content type
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { logger } from '../logger';
+import compression from 'compression';
+import { performance } from 'perf_hooks';
 
-export interface PerformanceOptions {
-  slowThresholdMs?: number;  // Response time threshold to log warnings
-  logAllRequests?: boolean;  // Whether to log all requests or just slow ones
-  excludePaths?: string[];   // Paths to exclude from monitoring
-  includeBody?: boolean;     // Whether to include request body in logs (careful with sensitive data)
-}
+// Configure cache TTLs from environment or use defaults
+const SHORT_TTL = Number(process.env.CACHE_SHORT_TTL) || 60; // 1 minute
+const MEDIUM_TTL = Number(process.env.CACHE_MEDIUM_TTL) || 300; // 5 minutes
+const LONG_TTL = Number(process.env.CACHE_LONG_TTL) || 3600; // 1 hour
 
-const DEFAULT_OPTIONS: PerformanceOptions = {
-  slowThresholdMs: 1000,     // Log warnings for requests taking over 1 second
-  logAllRequests: false,     // Only log slow requests by default
-  excludePaths: ['/health', '/api/health'], // Don't log health checks
-  includeBody: false,        // Don't include request bodies by default
+// Cache control directives by content type
+const CACHE_CONTROL_MAP: Record<string, string> = {
+  // Static assets - long cache
+  'image/': `public, max-age=${LONG_TTL}`,
+  'font/': `public, max-age=${LONG_TTL}`,
+  'text/css': `public, max-age=${LONG_TTL}`,
+  'text/javascript': `public, max-age=${LONG_TTL}`,
+  'application/javascript': `public, max-age=${LONG_TTL}`,
+  
+  // API responses - shorter cache
+  'application/json': `private, max-age=${SHORT_TTL}`,
+  
+  // Documents - medium cache
+  'application/pdf': `public, max-age=${MEDIUM_TTL}`,
+  'application/msword': `public, max-age=${MEDIUM_TTL}`,
+  'application/vnd.openxmlformats-officedocument': `public, max-age=${MEDIUM_TTL}`,
+  
+  // Default - no cache for dynamic content
+  'default': 'no-store, must-revalidate'
 };
 
 /**
- * Middleware to track response times and log slow responses
- * @param options Performance monitoring options
+ * Track response time and add as header
  */
-export function performanceMonitor(customOptions: PerformanceOptions = {}) {
-  const options = { ...DEFAULT_OPTIONS, ...customOptions };
+export function responseTimeMiddleware(req: Request, res: Response, next: NextFunction) {
+  const startTime = performance.now();
   
-  return (req: Request, res: Response, next: NextFunction) => {
-    // Skip monitoring for excluded paths
-    if (options.excludePaths?.some(path => req.path.startsWith(path))) {
-      return next();
+  // Capture original end method
+  const originalEnd = res.end;
+  
+  // Override end method to add timing header
+  // TypeScript-compatible signature to avoid errors in production builds
+  res.end = function(this: Response, chunk?: any, encoding?: BufferEncoding | (() => void), callback?: () => void): Response {
+    const endTime = performance.now();
+    const responseTime = Math.round(endTime - startTime);
+    
+    // Add response time header
+    this.setHeader('X-Response-Time', `${responseTime}ms`);
+    
+    // Handle overloaded function signature to maintain compatibility
+    if (typeof encoding === 'function') {
+      callback = encoding;
+      encoding = undefined;
     }
     
-    // Record request start time
-    const startTime = process.hrtime();
-    
-    // Store original end function
-    const originalEnd = res.end;
-    
-    // Override response end method to calculate duration
-    // Save the original end function with proper type casting
-    const oldEnd = res.end;
-    
-    // Cast the end method
-    res.end = function(this: Response, chunk?: any, encoding?: BufferEncoding, callback?: () => void): Response {
-      // Calculate duration
-      const hrDuration = process.hrtime(startTime);
-      const durationMs = hrDuration[0] * 1000 + hrDuration[1] / 1000000;
-      
-      // Add response time header
-      res.setHeader('X-Response-Time', `${durationMs.toFixed(2)}ms`);
-      
-      // Determine if this is a slow response
-      const isSlow = durationMs > (options.slowThresholdMs || DEFAULT_OPTIONS.slowThresholdMs!);
-      
-      // Log slow responses or all responses if specified
-      if (isSlow || options.logAllRequests) {
-        const logLevel = isSlow ? 'warn' : 'info';
-        const logMethod = logLevel === 'warn' ? logger.warn : logger.info;
-        
-        const logData: Record<string, any> = {
-          method: req.method,
-          path: req.path,
-          statusCode: res.statusCode,
-          durationMs: durationMs.toFixed(2),
-          userAgent: req.get('user-agent') || 'unknown',
-          ip: req.ip,
-        };
-        
-        // Optionally include request body (be careful with sensitive data)
-        if (options.includeBody && req.body && Object.keys(req.body).length > 0) {
-          // Sanitize body by removing sensitive fields
-          const sanitizedBody = { ...req.body };
-          ['password', 'token', 'secret', 'apiKey'].forEach(key => {
-            if (sanitizedBody[key]) sanitizedBody[key] = '[REDACTED]';
-          });
-          
-          logData.body = sanitizedBody;
-        }
-        
-        // Log with appropriate level
-        const message = isSlow 
-          ? `Slow response (${durationMs.toFixed(2)}ms)` 
-          : `Request completed (${durationMs.toFixed(2)}ms)`;
-          
-        logMethod(message, logData);
-      }
-      
-      // Call original end method with proper parameters
-      return originalEnd.call(this, chunk, encoding, callback);
-    };
-    
-    next();
+    // Call original end with proper arguments
+    return originalEnd.call(this, chunk, encoding as BufferEncoding, callback);
   };
+  
+  next();
 }
+
+/**
+ * Apply content-specific cache control headers
+ */
+export function cacheControlMiddleware(req: Request, res: Response, next: NextFunction) {
+  // Skip for non-GET requests
+  if (req.method !== 'GET') {
+    return next();
+  }
+  
+  // Original send method
+  const originalSend = res.send;
+  
+  // Override send to add appropriate cache headers based on content type
+  res.send = function(this: Response, body?: any): Response {
+    const contentType = String(this.getHeader('Content-Type') || '');
+    let cacheControl = CACHE_CONTROL_MAP['default'];
+    
+    // Find matching cache directive based on content type
+    for (const [type, directive] of Object.entries(CACHE_CONTROL_MAP)) {
+      if (contentType.includes(type)) {
+        cacheControl = directive;
+        break;
+      }
+    }
+    
+    // Set cache control header if not already set
+    if (!this.getHeader('Cache-Control')) {
+      this.setHeader('Cache-Control', cacheControl);
+    }
+    
+    // Call original send
+    return originalSend.call(this, body);
+  };
+  
+  next();
+}
+
+/**
+ * Combined performance middleware
+ */
+export function setupPerformanceMiddleware(app: any) {
+  // Add compression
+  app.use(compression());
+  
+  // Add response time tracking
+  app.use(responseTimeMiddleware);
+  
+  // Add cache control headers
+  app.use(cacheControlMiddleware);
+}
+
+export default setupPerformanceMiddleware;

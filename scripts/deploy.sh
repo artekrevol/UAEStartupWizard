@@ -31,7 +31,7 @@ export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 
 # 5. Build frontend
 echo "🏗️ Building frontend..."
-node scripts/build-frontend.js || { echo "Frontend build failed"; exit 1; }
+node client/build-production.js || { echo "Frontend build failed"; exit 1; }
 
 # 6. Build backend (without Playwright)
 echo "🏗️ Building backend..."

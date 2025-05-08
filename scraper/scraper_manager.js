@@ -5,7 +5,7 @@ import { runEnhancedFreeZoneScraper } from './enhanced_freezone_scraper.js';
 import { downloadDMCCDocuments } from './dmcc_document_downloader.js';
 import { downloadAllDocuments } from './dmcc_business_docs_downloader.js';
 import { downloadDocumentsWithBrowser } from './dmcc_browser_downloader.js';
-import { scraperConfig } from './config.js';
+import config from './config.js';
 
 /**
  * Scraper Manager to orchestrate multiple scrapers
@@ -28,7 +28,7 @@ class ScraperManager {
     };
     
     // In HTTP-only mode, filter out browser-based scrapers
-    if (scraperConfig.httpOnlyMode) {
+    if (config.httpOnlyMode) {
       console.log('[Scraper Manager] Running in HTTP-only mode, browser-based scrapers disabled');
       this.scrapers = {
         'uaefreezones': allScrapers['uaefreezones'],
@@ -41,10 +41,10 @@ class ScraperManager {
     
     // Default options for scrapers (merge with config)
     this.defaultOptions = {
-      retryCount: scraperConfig.maxRetries || 3,
-      retryDelay: scraperConfig.retryDelay || 2000,
-      timeout: scraperConfig.timeout || 30000,
-      httpOnlyMode: scraperConfig.httpOnlyMode
+      retryCount: config.http?.retries || 3,
+      retryDelay: config.http?.retryDelay || 2000,
+      timeout: config.http?.timeout || 30000,
+      httpOnlyMode: config.httpOnlyMode
     };
   }
   
