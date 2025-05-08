@@ -1,6 +1,6 @@
 import express from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
-import { authenticate } from '../../../shared/middleware/auth';
+import { authenticateJWT } from '../../../shared/middleware/auth';
 import { rateLimiter } from '../middleware/rateLimiter';
 import { getServiceURL } from '../middleware/serviceRegistry';
 

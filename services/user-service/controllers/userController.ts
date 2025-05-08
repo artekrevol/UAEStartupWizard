@@ -1,3 +1,8 @@
+/**
+ * User Controller
+ * 
+ * Handles user management operations
+ */
 import { Request, Response } from 'express';
 import { UserRepository } from '../repositories/userRepository';
 import {
@@ -13,17 +18,15 @@ import {
   NotFoundException
 } from '../../../shared/errors';
 import { eventBus } from '../../../shared/event-bus';
+import bcrypt from 'bcrypt';
+import { config } from '../../../shared/config';
 
 // Initialize repository
 const userRepo = new UserRepository();
 
-/**
- * User Controller
- * Handles user management operations
- */
 export class UserController {
   /**
-   * Get current user profile
+   * Get current user (from JWT)
    */
   getCurrentUser = asyncHandler(async (req: Request, res: Response) => {
     const userId = req.user.userId;
@@ -38,18 +41,69 @@ export class UserController {
     // Get user profile
     const profile = await userRepo.getUserProfile(userId);
     
-    // Remove sensitive information
-    const { password, resetPasswordToken, refreshToken, ...safeUser } = user;
-    
+    // Return combined data
     res.json({
       status: 'success',
       data: {
-        user: safeUser,
-        profile
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        status: user.status,
+        profilePictureUrl: user.profilePictureUrl,
+        company: user.company,
+        position: user.position,
+        phone: user.phone,
+        address: user.address,
+        newsletterSubscribed: user.newsletterSubscribed,
+        preferences: user.preferences,
+        verified: user.verified,
+        profile: profile || null
       }
     });
   });
-  
+
+  /**
+   * Get public user profile
+   */
+  getPublicProfile = asyncHandler(async (req: Request, res: Response) => {
+    const userId = parseInt(req.params.userId, 10);
+    
+    if (isNaN(userId)) {
+      throw new ValidationException('Invalid user ID');
+    }
+    
+    // Get user
+    const user = await userRepo.getUser(userId);
+    
+    if (!user) {
+      throw new NotFoundException('User', userId);
+    }
+    
+    // Get user profile
+    const profile = await userRepo.getUserProfile(userId);
+    
+    // Return public data only
+    res.json({
+      status: 'success',
+      data: {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        company: user.company,
+        position: user.position,
+        profilePictureUrl: user.profilePictureUrl,
+        profile: profile ? {
+          bio: profile.bio,
+          country: profile.country,
+          websiteUrl: profile.websiteUrl,
+          industry: profile.industry
+        } : null
+      }
+    });
+  });
+
   /**
    * Update user profile
    */
@@ -57,23 +111,29 @@ export class UserController {
     const userId = req.user.userId;
     const profileData = req.body;
     
-    // Validate profile data
-    if (!profileData || Object.keys(profileData).length === 0) {
-      throw new ValidationException('Profile data is required');
-    }
-    
-    // Check if user exists
+    // Get user
     const user = await userRepo.getUser(userId);
     
     if (!user) {
       throw new NotFoundException('User', userId);
     }
     
-    // Update user profile
-    await userRepo.updateUserProfile(userId, profileData);
+    // Get current profile
+    const existingProfile = await userRepo.getUserProfile(userId);
     
-    // Get updated profile
-    const updatedProfile = await userRepo.getUserProfile(userId);
+    if (existingProfile) {
+      // Update existing profile
+      await userRepo.updateUserProfile(userId, {
+        ...profileData,
+        updatedAt: new Date()
+      });
+    } else {
+      // Create new profile
+      await userRepo.createUserProfile({
+        userId,
+        ...profileData
+      });
+    }
     
     // Log the action
     await userRepo.createAuditLog({
@@ -83,19 +143,15 @@ export class UserController {
       userAgent: req.headers['user-agent']
     });
     
-    // Publish event
-    eventBus.publish('user-profile-updated', {
-      userId,
-      timestamp: new Date().toISOString()
-    });
+    // Get updated profile
+    const updatedProfile = await userRepo.getUserProfile(userId);
     
     res.json({
       status: 'success',
-      message: 'Profile updated successfully',
       data: updatedProfile
     });
   });
-  
+
   /**
    * Update user account
    */
@@ -103,12 +159,7 @@ export class UserController {
     const userId = req.user.userId;
     const { firstName, lastName, company, position, phone, address } = req.body;
     
-    // Validate account data
-    if (!firstName && !lastName && !company && !position && !phone && !address) {
-      throw new ValidationException('At least one account field is required');
-    }
-    
-    // Check if user exists
+    // Get user
     const user = await userRepo.getUser(userId);
     
     if (!user) {
@@ -126,9 +177,6 @@ export class UserController {
       updatedAt: new Date()
     });
     
-    // Get updated user
-    const updatedUser = await userRepo.getUser(userId);
-    
     // Log the action
     await userRepo.createAuditLog({
       userId,
@@ -137,98 +185,24 @@ export class UserController {
       userAgent: req.headers['user-agent']
     });
     
-    // Publish event
-    eventBus.publish('user-updated', {
-      userId,
-      timestamp: new Date().toISOString()
-    });
-    
-    // Remove sensitive information
-    const { password, resetPasswordToken, refreshToken, ...safeUser } = updatedUser;
+    // Get updated user
+    const updatedUser = await userRepo.getUser(userId);
     
     res.json({
       status: 'success',
-      message: 'Account updated successfully',
-      data: safeUser
+      data: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        company: updatedUser.company,
+        position: updatedUser.position,
+        phone: updatedUser.phone,
+        address: updatedUser.address
+      }
     });
   });
-  
-  /**
-   * Get user notifications
-   */
-  getNotifications = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user.userId;
-    const { includeRead = false, limit = 50, offset = 0 } = req.query;
-    
-    // Get notifications
-    const notifications = await userRepo.getUserNotifications(
-      userId,
-      includeRead === 'true',
-      parseInt(limit as string, 10),
-      parseInt(offset as string, 10)
-    );
-    
-    res.json({
-      status: 'success',
-      data: notifications
-    });
-  });
-  
-  /**
-   * Mark notification as read
-   */
-  markNotificationRead = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user.userId;
-    const { notificationId } = req.params;
-    
-    if (!notificationId) {
-      throw new ValidationException('Notification ID is required');
-    }
-    
-    // Mark notification as read
-    await userRepo.markNotificationAsRead(parseInt(notificationId, 10), userId);
-    
-    res.json({
-      status: 'success',
-      message: 'Notification marked as read'
-    });
-  });
-  
-  /**
-   * Mark all notifications as read
-   */
-  markAllNotificationsRead = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user.userId;
-    
-    // Mark all notifications as read
-    await userRepo.markAllNotificationsAsRead(userId);
-    
-    res.json({
-      status: 'success',
-      message: 'All notifications marked as read'
-    });
-  });
-  
-  /**
-   * Get audit logs
-   */
-  getAuditLogs = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user.userId;
-    const { limit = 50, offset = 0 } = req.query;
-    
-    // Get audit logs
-    const auditLogs = await userRepo.getUserAuditLogs(
-      userId,
-      parseInt(limit as string, 10),
-      parseInt(offset as string, 10)
-    );
-    
-    res.json({
-      status: 'success',
-      data: auditLogs
-    });
-  });
-  
+
   /**
    * Update preferences
    */
@@ -264,78 +238,97 @@ export class UserController {
       userId,
       action: 'PREFERENCES_UPDATED',
       ipAddress: req.ip,
-      userAgent: req.headers['user-agent'],
-      details: { changes: preferences }
-    });
-    
-    res.json({
-      status: 'success',
-      message: 'Preferences updated successfully',
-      data: updatedPreferences
-    });
-  });
-  
-  /**
-   * Toggle newsletter subscription
-   */
-  toggleNewsletter = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user.userId;
-    const { subscribed } = req.body;
-    
-    if (subscribed === undefined) {
-      throw new ValidationException('Subscription status is required');
-    }
-    
-    // Check if user exists
-    const user = await userRepo.getUser(userId);
-    
-    if (!user) {
-      throw new NotFoundException('User', userId);
-    }
-    
-    // Update newsletter subscription
-    await userRepo.updateUser(userId, {
-      newsletterSubscribed: !!subscribed,
-      updatedAt: new Date()
-    });
-    
-    // Log the action
-    await userRepo.createAuditLog({
-      userId,
-      action: subscribed ? 'NEWSLETTER_SUBSCRIBED' : 'NEWSLETTER_UNSUBSCRIBED',
-      ipAddress: req.ip,
       userAgent: req.headers['user-agent']
     });
     
-    // Publish event
-    eventBus.publish('newsletter-preference-changed', {
-      userId,
-      subscribed: !!subscribed,
-      timestamp: new Date().toISOString()
+    res.json({
+      status: 'success',
+      data: updatedPreferences
     });
+  });
+
+  /**
+   * Get user notifications
+   */
+  getNotifications = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user.userId;
+    const includeRead = req.query.includeRead === 'true';
+    const limit = parseInt(req.query.limit as string, 10) || 50;
+    const offset = parseInt(req.query.offset as string, 10) || 0;
+    
+    // Get notifications
+    const notifications = await userRepo.getUserNotifications(
+      userId,
+      includeRead,
+      limit,
+      offset
+    );
     
     res.json({
       status: 'success',
-      message: subscribed
-        ? 'Successfully subscribed to newsletter'
-        : 'Successfully unsubscribed from newsletter'
+      data: notifications
     });
   });
-  
+
   /**
-   * Get all users (admin only)
+   * Mark notification as read
    */
-  getAllUsers = asyncHandler(async (req: Request, res: Response) => {
-    // Check if user is admin
-    if (req.user.role !== 'admin') {
-      throw new ServiceException(
-        ErrorCode.FORBIDDEN,
-        'You do not have permission to access this resource',
-        undefined,
-        403
-      );
+  markNotificationAsRead = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user.userId;
+    const notificationId = parseInt(req.params.id, 10);
+    
+    if (isNaN(notificationId)) {
+      throw new ValidationException('Invalid notification ID');
     }
     
+    // Mark notification as read
+    await userRepo.markNotificationAsRead(notificationId, userId);
+    
+    res.json({
+      status: 'success',
+      message: 'Notification marked as read'
+    });
+  });
+
+  /**
+   * Mark all notifications as read
+   */
+  markAllNotificationsAsRead = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user.userId;
+    
+    // Mark all notifications as read
+    await userRepo.markAllNotificationsAsRead(userId);
+    
+    res.json({
+      status: 'success',
+      message: 'All notifications marked as read'
+    });
+  });
+
+  /**
+   * Get audit logs
+   */
+  getAuditLogs = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user.userId;
+    const { limit = 50, offset = 0 } = req.query;
+    
+    // Get audit logs
+    const auditLogs = await userRepo.getUserAuditLogs(
+      userId,
+      parseInt(limit as string, 10),
+      parseInt(offset as string, 10)
+    );
+    
+    res.json({
+      status: 'success',
+      data: auditLogs
+    });
+  });
+
+  /**
+   * ADMIN: Get all users
+   */
+  getAllUsers = asyncHandler(async (req: Request, res: Response) => {
     const {
       limit = 50,
       offset = 0,
@@ -346,8 +339,8 @@ export class UserController {
       search
     } = req.query;
     
-    // Build filters
     const filters: Record<string, any> = {};
+    
     if (role) filters.role = role;
     if (status) filters.status = status;
     if (search) filters.search = search;
@@ -362,220 +355,226 @@ export class UserController {
     );
     
     // Get total count
-    const totalCount = await userRepo.countUsers(filters);
-    
-    // Remove sensitive information
-    const safeUsers = users.map(user => {
-      const { password, resetPasswordToken, refreshToken, ...safeUser } = user;
-      return safeUser;
-    });
+    const count = await userRepo.countUsers(filters);
     
     res.json({
       status: 'success',
       data: {
-        users: safeUsers,
-        total: totalCount,
+        users,
+        count,
         limit: parseInt(limit as string, 10),
         offset: parseInt(offset as string, 10)
       }
     });
   });
-  
+
   /**
-   * Update user status (admin only)
+   * ADMIN: Get user by ID
    */
-  updateUserStatus = asyncHandler(async (req: Request, res: Response) => {
-    // Check if user is admin
-    if (req.user.role !== 'admin') {
-      throw new ServiceException(
-        ErrorCode.FORBIDDEN,
-        'You do not have permission to access this resource',
-        undefined,
-        403
-      );
-    }
+  getUser = asyncHandler(async (req: Request, res: Response) => {
+    const userId = parseInt(req.params.userId, 10);
     
-    const { userId } = req.params;
-    const { status } = req.body;
-    
-    if (!userId) {
-      throw new ValidationException('User ID is required');
-    }
-    
-    if (!status || !['active', 'inactive', 'suspended'].includes(status)) {
-      throw new ValidationException('Valid status is required (active, inactive, suspended)');
-    }
-    
-    // Check if user exists
-    const user = await userRepo.getUser(parseInt(userId, 10));
-    
-    if (!user) {
-      throw new NotFoundException('User', userId);
-    }
-    
-    // Don't allow changing admin status unless current user is super-admin
-    if (user.role === 'admin' && req.user.role !== 'super-admin') {
-      throw new ServiceException(
-        ErrorCode.FORBIDDEN,
-        'You do not have permission to modify an admin user',
-        undefined,
-        403
-      );
-    }
-    
-    // Update user status
-    await userRepo.updateUser(parseInt(userId, 10), {
-      status,
-      updatedAt: new Date()
-    });
-    
-    // Log the action
-    await userRepo.createAuditLog({
-      userId: req.user.userId,
-      action: 'ADMIN_UPDATE_USER_STATUS',
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent'],
-      details: { targetUserId: userId, status }
-    });
-    
-    // Publish event
-    eventBus.publish('user-status-changed', {
-      userId: parseInt(userId, 10),
-      status,
-      changedBy: req.user.userId,
-      timestamp: new Date().toISOString()
-    });
-    
-    res.json({
-      status: 'success',
-      message: `User status updated to ${status} successfully`
-    });
-  });
-  
-  /**
-   * Get user by ID (admin only)
-   */
-  getUserById = asyncHandler(async (req: Request, res: Response) => {
-    // Check if user is admin
-    if (req.user.role !== 'admin') {
-      throw new ServiceException(
-        ErrorCode.FORBIDDEN,
-        'You do not have permission to access this resource',
-        undefined,
-        403
-      );
-    }
-    
-    const { userId } = req.params;
-    
-    if (!userId) {
-      throw new ValidationException('User ID is required');
+    if (isNaN(userId)) {
+      throw new ValidationException('Invalid user ID');
     }
     
     // Get user
-    const user = await userRepo.getUser(parseInt(userId, 10));
+    const user = await userRepo.getUser(userId);
     
     if (!user) {
       throw new NotFoundException('User', userId);
     }
     
     // Get user profile
-    const profile = await userRepo.getUserProfile(parseInt(userId, 10));
-    
-    // Get user sessions
-    const sessions = await userRepo.getUserSessions(parseInt(userId, 10));
-    
-    // Remove sensitive information
-    const { password, resetPasswordToken, refreshToken, ...safeUser } = user;
+    const profile = await userRepo.getUserProfile(userId);
     
     res.json({
       status: 'success',
       data: {
-        user: safeUser,
-        profile,
-        sessions: sessions.map(session => ({
-          ...session,
-          token: undefined // Don't expose session tokens
-        }))
+        ...user,
+        profile: profile || null
       }
     });
   });
-  
+
   /**
-   * Delete user (admin only)
+   * ADMIN: Create user
    */
-  deleteUser = asyncHandler(async (req: Request, res: Response) => {
-    // Check if user is admin
-    if (req.user.role !== 'admin') {
+  createUser = asyncHandler(async (req: Request, res: Response) => {
+    const { email, password, firstName, lastName, role, status, ...profileData } = req.body;
+    
+    if (!email || !password) {
+      throw new ValidationException('Email and password are required');
+    }
+    
+    // Check if user already exists
+    const existingUser = await userRepo.getUserByEmail(email);
+    
+    if (existingUser) {
       throw new ServiceException(
-        ErrorCode.FORBIDDEN,
-        'You do not have permission to access this resource',
-        undefined,
-        403
+        ErrorCode.USER_ALREADY_EXISTS,
+        'A user with this email already exists'
       );
     }
     
-    const { userId } = req.params;
+    // Hash password
+    const hashedPassword = await bcrypt.hash(
+      password,
+      config.userService.saltRounds
+    );
     
-    if (!userId) {
-      throw new ValidationException('User ID is required');
+    // Create user
+    const user = await userRepo.createUser({
+      email,
+      password: hashedPassword,
+      firstName,
+      lastName,
+      role: role || 'user',
+      status: status || 'active',
+      verified: true
+    });
+    
+    // Create profile if profile data provided
+    if (Object.keys(profileData).length > 0) {
+      await userRepo.createUserProfile({
+        userId: user.id,
+        ...profileData
+      });
     }
     
-    const targetUserId = parseInt(userId, 10);
+    // Log the action
+    await userRepo.createAuditLog({
+      userId: req.user.userId,
+      action: 'USER_CREATED',
+      resourceType: 'user',
+      resourceId: user.id.toString(),
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent']
+    });
+    
+    // Get complete user data
+    const completeUser = await userRepo.getUser(user.id);
+    const profile = await userRepo.getUserProfile(user.id);
+    
+    res.status(201).json({
+      status: 'success',
+      data: {
+        ...completeUser,
+        profile: profile || null
+      }
+    });
+  });
+
+  /**
+   * ADMIN: Update user
+   */
+  updateUser = asyncHandler(async (req: Request, res: Response) => {
+    const userId = parseInt(req.params.userId, 10);
+    const { email, password, firstName, lastName, role, status, ...profileData } = req.body;
+    
+    if (isNaN(userId)) {
+      throw new ValidationException('Invalid user ID');
+    }
     
     // Check if user exists
-    const user = await userRepo.getUser(targetUserId);
+    const user = await userRepo.getUser(userId);
     
     if (!user) {
       throw new NotFoundException('User', userId);
     }
     
-    // Don't allow deleting admin users unless current user is super-admin
-    if (user.role === 'admin' && req.user.role !== 'super-admin') {
-      throw new ServiceException(
-        ErrorCode.FORBIDDEN,
-        'You do not have permission to delete an admin user',
-        undefined,
-        403
+    // Prepare user update
+    const userUpdate: Partial<User> = {};
+    
+    if (email) userUpdate.email = email;
+    if (firstName) userUpdate.firstName = firstName;
+    if (lastName) userUpdate.lastName = lastName;
+    if (role) userUpdate.role = role;
+    if (status) userUpdate.status = status;
+    
+    // Hash password if provided
+    if (password) {
+      userUpdate.password = await bcrypt.hash(
+        password,
+        config.userService.saltRounds
       );
     }
     
-    // Don't allow deleting yourself
-    if (targetUserId === req.user.userId) {
-      throw new ServiceException(
-        ErrorCode.CONFLICT,
-        'You cannot delete your own account',
-        undefined,
-        409
-      );
+    // Update user
+    if (Object.keys(userUpdate).length > 0) {
+      await userRepo.updateUser(userId, {
+        ...userUpdate,
+        updatedAt: new Date()
+      });
     }
     
-    // Log the action before deletion
+    // Update profile if profile data provided
+    if (Object.keys(profileData).length > 0) {
+      await userRepo.updateUserProfile(userId, profileData);
+    }
+    
+    // Log the action
     await userRepo.createAuditLog({
       userId: req.user.userId,
-      action: 'ADMIN_DELETE_USER',
+      action: 'USER_UPDATED',
+      resourceType: 'user',
+      resourceId: userId.toString(),
       ipAddress: req.ip,
-      userAgent: req.headers['user-agent'],
-      details: { targetUserId, email: user.email }
+      userAgent: req.headers['user-agent']
     });
     
-    // Publish event before deletion
-    eventBus.publish('user-deleted', {
-      userId: targetUserId,
-      email: user.email,
-      deletedBy: req.user.userId,
-      timestamp: new Date().toISOString()
-    });
-    
-    // Delete user sessions first
-    await userRepo.deleteUserSessions(targetUserId);
-    
-    // Delete user
-    await userRepo.deleteUser(targetUserId);
+    // Get updated user data
+    const updatedUser = await userRepo.getUser(userId);
+    const profile = await userRepo.getUserProfile(userId);
     
     res.json({
       status: 'success',
-      message: 'User deleted successfully'
+      data: {
+        ...updatedUser,
+        profile: profile || null
+      }
+    });
+  });
+
+  /**
+   * ADMIN: Delete user
+   */
+  deleteUser = asyncHandler(async (req: Request, res: Response) => {
+    const userId = parseInt(req.params.userId, 10);
+    
+    if (isNaN(userId)) {
+      throw new ValidationException('Invalid user ID');
+    }
+    
+    // Check if user exists
+    const user = await userRepo.getUser(userId);
+    
+    if (!user) {
+      throw new NotFoundException('User', userId);
+    }
+    
+    // Delete user
+    await userRepo.deleteUser(userId);
+    
+    // Publish user deleted event
+    eventBus.publish('user-deleted', {
+      userId,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Log the action
+    await userRepo.createAuditLog({
+      userId: req.user.userId,
+      action: 'USER_DELETED',
+      resourceType: 'user',
+      resourceId: userId.toString(),
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent']
+    });
+    
+    res.json({
+      status: 'success',
+      message: `User ${userId} deleted successfully`
     });
   });
 }
