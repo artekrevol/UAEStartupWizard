@@ -1,20 +1,38 @@
 /**
- * Database Connection for User Service
+ * Database Connection
+ * 
+ * Sets up the PostgreSQL connection for the User Service
  */
-import { Pool, neonConfig } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-serverless';
-import ws from 'ws';
-import * as schema from './schema';
+import { Pool } from 'pg';
+import { config } from '../../shared/config';
 
-neonConfig.webSocketConstructor = ws;
+// Create PostgreSQL connection pool
+export const pool = new Pool({
+  connectionString: config.database.url,
+  max: config.database.poolSize,
+  idleTimeoutMillis: config.database.idleTimeoutMs,
+});
 
-const connectionString = process.env.USER_SERVICE_DATABASE_URL || process.env.DATABASE_URL;
+// Test database connection
+pool.query('SELECT NOW()', (err, res) => {
+  if (err) {
+    console.error('[Database] Connection error:', err.message);
+  } else {
+    console.log(`[Database] Connected successfully at ${res.rows[0].now}`);
+  }
+});
 
-if (!connectionString) {
-  throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?"
-  );
-}
+// Handle unexpected errors
+pool.on('error', (err) => {
+  console.error('[Database] Unexpected error on idle client:', err.message);
+});
 
-export const pool = new Pool({ connectionString });
-export const db = drizzle(pool, { schema });
+// Handle process termination
+process.on('SIGINT', () => {
+  pool.end(() => {
+    console.log('[Database] Pool has ended');
+    process.exit(0);
+  });
+});
+
+export default pool;

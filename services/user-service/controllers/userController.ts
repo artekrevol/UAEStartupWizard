@@ -1,292 +1,327 @@
 /**
  * User Controller
  * 
- * Handles user management operations
+ * Handles user profile management and user-specific operations
  */
 import { Request, Response } from 'express';
 import { UserRepository } from '../repositories/userRepository';
-import {
-  type User,
-  type UserProfile,
-  type InsertUserProfile
-} from '../schema';
+import { User, UserProfile, InsertUserProfile, UserErrorCode } from '../schema';
+import { 
+  NotFoundError, 
+  BadRequestError, 
+  ForbiddenError, 
+  UnauthorizedError 
+} from '../../../shared/errors/ApiError';
 import { asyncHandler } from '../../../shared/middleware/errorHandler';
-import {
-  ServiceException,
-  ErrorCode,
-  ValidationException,
-  NotFoundException
-} from '../../../shared/errors';
-import { eventBus } from '../../../shared/event-bus';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { pool } from '../db';
 import bcrypt from 'bcrypt';
 import { config } from '../../../shared/config';
 
-// Initialize repository
-const userRepo = new UserRepository();
-
 export class UserController {
+  private userRepository: UserRepository;
+
+  constructor() {
+    const db = drizzle(pool);
+    this.userRepository = new UserRepository(db);
+
+    // Bind methods to this instance
+    this.getCurrentUser = this.getCurrentUser.bind(this);
+    this.updateProfile = this.updateProfile.bind(this);
+    this.changePassword = this.changePassword.bind(this);
+    this.deleteAccount = this.deleteAccount.bind(this);
+    this.getProfile = this.getProfile.bind(this);
+    this.getNotifications = this.getNotifications.bind(this);
+    this.markNotificationAsRead = this.markNotificationAsRead.bind(this);
+    this.markAllNotificationsAsRead = this.markAllNotificationsAsRead.bind(this);
+    this.deleteNotificationById = this.deleteNotificationById.bind(this);
+    this.getSessions = this.getSessions.bind(this);
+    this.getActivity = this.getActivity.bind(this);
+  }
+
   /**
-   * Get current user (from JWT)
+   * Get current user information
    */
   getCurrentUser = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user.userId;
+    const userId = req.user!.id;
     
-    // Get user
-    const user = await userRepo.getUser(userId);
+    const user = await this.userRepository.getUserById(userId);
     
     if (!user) {
-      throw new NotFoundException('User', userId);
+      throw new NotFoundError('User not found', UserErrorCode.USER_NOT_FOUND);
     }
     
-    // Get user profile
-    const profile = await userRepo.getUserProfile(userId);
+    // Get unread notifications count
+    const unreadNotifications = await this.userRepository.countUnreadNotifications(userId);
     
-    // Return combined data
     res.json({
-      status: 'success',
-      data: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-        status: user.status,
-        profilePictureUrl: user.profilePictureUrl,
-        company: user.company,
-        position: user.position,
-        phone: user.phone,
-        address: user.address,
-        newsletterSubscribed: user.newsletterSubscribed,
-        preferences: user.preferences,
-        verified: user.verified,
-        profile: profile || null
-      }
+      success: true,
+      data: this.sanitizeUserData(user, { unreadNotifications }),
     });
   });
 
   /**
-   * Get public user profile
-   */
-  getPublicProfile = asyncHandler(async (req: Request, res: Response) => {
-    const userId = parseInt(req.params.userId, 10);
-    
-    if (isNaN(userId)) {
-      throw new ValidationException('Invalid user ID');
-    }
-    
-    // Get user
-    const user = await userRepo.getUser(userId);
-    
-    if (!user) {
-      throw new NotFoundException('User', userId);
-    }
-    
-    // Get user profile
-    const profile = await userRepo.getUserProfile(userId);
-    
-    // Return public data only
-    res.json({
-      status: 'success',
-      data: {
-        id: user.id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        company: user.company,
-        position: user.position,
-        profilePictureUrl: user.profilePictureUrl,
-        profile: profile ? {
-          bio: profile.bio,
-          country: profile.country,
-          websiteUrl: profile.websiteUrl,
-          industry: profile.industry
-        } : null
-      }
-    });
-  });
-
-  /**
-   * Update user profile
+   * Update user profile information
    */
   updateProfile = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user.userId;
-    const profileData = req.body;
-    
-    // Get user
-    const user = await userRepo.getUser(userId);
-    
-    if (!user) {
-      throw new NotFoundException('User', userId);
-    }
-    
-    // Get current profile
-    const existingProfile = await userRepo.getUserProfile(userId);
-    
-    if (existingProfile) {
-      // Update existing profile
-      await userRepo.updateUserProfile(userId, {
-        ...profileData,
-        updatedAt: new Date()
-      });
-    } else {
-      // Create new profile
-      await userRepo.createUserProfile({
-        userId,
-        ...profileData
-      });
-    }
-    
-    // Log the action
-    await userRepo.createAuditLog({
-      userId,
-      action: 'PROFILE_UPDATED',
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent']
-    });
-    
-    // Get updated profile
-    const updatedProfile = await userRepo.getUserProfile(userId);
-    
-    res.json({
-      status: 'success',
-      data: updatedProfile
-    });
-  });
-
-  /**
-   * Update user account
-   */
-  updateAccount = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user.userId;
-    const { firstName, lastName, company, position, phone, address } = req.body;
-    
-    // Get user
-    const user = await userRepo.getUser(userId);
-    
-    if (!user) {
-      throw new NotFoundException('User', userId);
-    }
-    
-    // Update user account
-    await userRepo.updateUser(userId, {
+    const userId = req.user!.id;
+    const {
       firstName,
       lastName,
+      bio,
+      location,
       company,
       position,
+      website,
       phone,
-      address,
-      updatedAt: new Date()
-    });
+      socialLinks,
+      timeZone,
+      language,
+      dateFormat,
+    } = req.body;
     
-    // Log the action
-    await userRepo.createAuditLog({
+    // Update user basic info
+    const userUpdateData: Partial<User> = {};
+    
+    if (firstName !== undefined) userUpdateData.firstName = firstName;
+    if (lastName !== undefined) userUpdateData.lastName = lastName;
+    
+    if (Object.keys(userUpdateData).length > 0) {
+      userUpdateData.updatedAt = new Date();
+      await this.userRepository.updateUser(userId, userUpdateData);
+    }
+    
+    // Update or create profile
+    const profileData: InsertUserProfile = {
       userId,
-      action: 'ACCOUNT_UPDATED',
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent']
-    });
-    
-    // Get updated user
-    const updatedUser = await userRepo.getUser(userId);
-    
-    res.json({
-      status: 'success',
-      data: {
-        id: updatedUser.id,
-        email: updatedUser.email,
-        firstName: updatedUser.firstName,
-        lastName: updatedUser.lastName,
-        company: updatedUser.company,
-        position: updatedUser.position,
-        phone: updatedUser.phone,
-        address: updatedUser.address
-      }
-    });
-  });
-
-  /**
-   * Update preferences
-   */
-  updatePreferences = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user.userId;
-    const { preferences } = req.body;
-    
-    if (!preferences) {
-      throw new ValidationException('Preferences are required');
-    }
-    
-    // Check if user exists
-    const user = await userRepo.getUser(userId);
-    
-    if (!user) {
-      throw new NotFoundException('User', userId);
-    }
-    
-    // Merge existing preferences with new ones
-    const updatedPreferences = {
-      ...user.preferences,
-      ...preferences
+      updatedAt: new Date(),
     };
     
-    // Update user preferences
-    await userRepo.updateUser(userId, {
-      preferences: updatedPreferences,
-      updatedAt: new Date()
-    });
+    if (bio !== undefined) profileData.bio = bio;
+    if (location !== undefined) profileData.location = location;
+    if (company !== undefined) profileData.company = company;
+    if (position !== undefined) profileData.position = position;
+    if (website !== undefined) profileData.website = website;
+    if (phone !== undefined) profileData.phone = phone;
+    if (socialLinks !== undefined) profileData.socialLinks = socialLinks;
+    if (timeZone !== undefined) profileData.timeZone = timeZone;
+    if (language !== undefined) profileData.language = language;
+    if (dateFormat !== undefined) profileData.dateFormat = dateFormat;
     
-    // Log the action
-    await userRepo.createAuditLog({
+    const userProfile = await this.userRepository.upsertUserProfile(profileData);
+    
+    // Log the activity
+    await this.userRepository.createAuditLog({
+      action: 'profile.update',
       userId,
-      action: 'PREFERENCES_UPDATED',
+      resourceType: 'profile',
+      resourceId: String(userId),
+      timestamp: new Date(),
       ipAddress: req.ip,
-      userAgent: req.headers['user-agent']
+      userAgent: req.headers['user-agent'],
     });
     
+    const updatedUser = await this.userRepository.getUserById(userId);
+    
     res.json({
-      status: 'success',
-      data: updatedPreferences
+      success: true,
+      data: {
+        user: this.sanitizeUserData(updatedUser!),
+        profile: userProfile,
+      },
+      message: 'Profile updated successfully',
     });
   });
 
   /**
-   * Get user notifications
+   * Change user password
    */
-  getNotifications = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user.userId;
-    const includeRead = req.query.includeRead === 'true';
-    const limit = parseInt(req.query.limit as string, 10) || 50;
-    const offset = parseInt(req.query.offset as string, 10) || 0;
+  changePassword = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user!.id;
+    const { currentPassword, newPassword } = req.body;
     
-    // Get notifications
-    const notifications = await userRepo.getUserNotifications(
-      userId,
-      includeRead,
-      limit,
-      offset
-    );
-    
-    res.json({
-      status: 'success',
-      data: notifications
-    });
-  });
-
-  /**
-   * Mark notification as read
-   */
-  markNotificationAsRead = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user.userId;
-    const notificationId = parseInt(req.params.id, 10);
-    
-    if (isNaN(notificationId)) {
-      throw new ValidationException('Invalid notification ID');
+    if (!currentPassword || !newPassword) {
+      throw new BadRequestError('Current password and new password are required');
     }
     
-    // Mark notification as read
-    await userRepo.markNotificationAsRead(notificationId, userId);
+    if (newPassword.length < 8) {
+      throw new BadRequestError('New password must be at least 8 characters long');
+    }
+    
+    const user = await this.userRepository.getUserById(userId);
+    
+    if (!user) {
+      throw new NotFoundError('User not found', UserErrorCode.USER_NOT_FOUND);
+    }
+    
+    // Verify current password
+    const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    
+    if (!isPasswordValid) {
+      throw new BadRequestError(
+        'Current password is incorrect',
+        UserErrorCode.INVALID_CREDENTIALS
+      );
+    }
+    
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(
+      newPassword,
+      config.userService.bcryptSaltRounds
+    );
+    
+    // Update password
+    await this.userRepository.updateUser(userId, {
+      password: hashedPassword,
+      updatedAt: new Date(),
+    });
+    
+    // Log the activity
+    await this.userRepository.createAuditLog({
+      action: 'password.change',
+      userId,
+      resourceType: 'user',
+      resourceId: String(userId),
+      timestamp: new Date(),
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+    
+    // Revoke all other sessions
+    await this.userRepository.deleteUserSessions(userId, parseInt(req.body.keepCurrentSession));
     
     res.json({
-      status: 'success',
-      message: 'Notification marked as read'
+      success: true,
+      message: 'Password changed successfully',
+    });
+  });
+
+  /**
+   * Delete user account
+   */
+  deleteAccount = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user!.id;
+    const { password } = req.body;
+    
+    if (!password) {
+      throw new BadRequestError('Password is required to delete account');
+    }
+    
+    const user = await this.userRepository.getUserById(userId);
+    
+    if (!user) {
+      throw new NotFoundError('User not found', UserErrorCode.USER_NOT_FOUND);
+    }
+    
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    
+    if (!isPasswordValid) {
+      throw new BadRequestError(
+        'Password is incorrect',
+        UserErrorCode.INVALID_CREDENTIALS
+      );
+    }
+    
+    // Log the activity before deletion
+    await this.userRepository.createAuditLog({
+      action: 'account.delete',
+      userId,
+      resourceType: 'user',
+      resourceId: String(userId),
+      timestamp: new Date(),
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+      details: {
+        email: user.email,
+        username: user.username,
+      },
+    });
+    
+    // Delete user (this will cascade delete profiles, sessions, etc.)
+    await this.userRepository.deleteUser(userId);
+    
+    res.json({
+      success: true,
+      message: 'Account deleted successfully',
+    });
+  });
+
+  /**
+   * Get user profile information
+   */
+  getProfile = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user!.id;
+    
+    const user = await this.userRepository.getUserById(userId);
+    const profile = await this.userRepository.getUserProfile(userId);
+    
+    if (!user) {
+      throw new NotFoundError('User not found', UserErrorCode.USER_NOT_FOUND);
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        user: this.sanitizeUserData(user),
+        profile: profile || { userId },
+      },
+    });
+  });
+
+  /**
+   * Get user notifications with pagination
+   */
+  getNotifications = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user!.id;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const offset = parseInt(req.query.offset as string) || 0;
+    const onlyUnread = req.query.unread === 'true';
+    
+    const notifications = await this.userRepository.getUserNotifications(
+      userId,
+      limit,
+      offset,
+      onlyUnread
+    );
+    
+    const unreadCount = await this.userRepository.countUnreadNotifications(userId);
+    
+    res.json({
+      success: true,
+      data: notifications,
+      meta: {
+        unreadCount,
+        limit,
+        offset,
+      },
+    });
+  });
+
+  /**
+   * Mark a notification as read
+   */
+  markNotificationAsRead = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user!.id;
+    const notificationId = parseInt(req.params.id);
+    
+    if (isNaN(notificationId)) {
+      throw new BadRequestError('Invalid notification ID');
+    }
+    
+    const notification = await this.userRepository.markNotificationAsRead(
+      notificationId,
+      userId
+    );
+    
+    if (!notification) {
+      throw new NotFoundError('Notification not found');
+    }
+    
+    res.json({
+      success: true,
+      data: notification,
+      message: 'Notification marked as read',
     });
   });
 
@@ -294,287 +329,105 @@ export class UserController {
    * Mark all notifications as read
    */
   markAllNotificationsAsRead = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user.userId;
+    const userId = req.user!.id;
     
-    // Mark all notifications as read
-    await userRepo.markAllNotificationsAsRead(userId);
+    const count = await this.userRepository.markAllNotificationsAsRead(userId);
     
     res.json({
-      status: 'success',
-      message: 'All notifications marked as read'
+      success: true,
+      data: { count },
+      message: `${count} notifications marked as read`,
     });
   });
 
   /**
-   * Get audit logs
+   * Delete a notification
    */
-  getAuditLogs = asyncHandler(async (req: Request, res: Response) => {
-    const userId = req.user.userId;
-    const { limit = 50, offset = 0 } = req.query;
+  deleteNotificationById = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user!.id;
+    const notificationId = parseInt(req.params.id);
     
-    // Get audit logs
-    const auditLogs = await userRepo.getUserAuditLogs(
-      userId,
-      parseInt(limit as string, 10),
-      parseInt(offset as string, 10)
+    if (isNaN(notificationId)) {
+      throw new BadRequestError('Invalid notification ID');
+    }
+    
+    const notification = await this.userRepository.deleteNotification(
+      notificationId,
+      userId
     );
     
+    if (!notification) {
+      throw new NotFoundError('Notification not found');
+    }
+    
     res.json({
-      status: 'success',
-      data: auditLogs
+      success: true,
+      message: 'Notification deleted',
     });
   });
 
   /**
-   * ADMIN: Get all users
+   * Get user's active sessions
    */
-  getAllUsers = asyncHandler(async (req: Request, res: Response) => {
+  getSessions = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user!.id;
+    
+    const sessions = await this.userRepository.getUserSessions(userId);
+    
+    // Format and sanitize session data
+    const formattedSessions = sessions.map(session => ({
+      id: session.id,
+      createdAt: session.createdAt,
+      lastActivityAt: session.lastActivityAt,
+      ipAddress: session.ipAddress,
+      userAgent: session.userAgent,
+      deviceInfo: session.deviceInfo,
+      isRevoked: session.isRevoked,
+      isCurrent: session.token === req.token,
+    }));
+    
+    res.json({
+      success: true,
+      data: formattedSessions,
+    });
+  });
+
+  /**
+   * Get user activity logs
+   */
+  getActivity = asyncHandler(async (req: Request, res: Response) => {
+    const userId = req.user!.id;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const offset = parseInt(req.query.offset as string) || 0;
+    
+    const logs = await this.userRepository.getUserAuditLogs(userId, limit, offset);
+    
+    res.json({
+      success: true,
+      data: logs,
+      meta: {
+        limit,
+        offset,
+      },
+    });
+  });
+
+  /**
+   * Remove sensitive data from user objects and add extra data if needed
+   */
+  private sanitizeUserData(user: User, extraData: Record<string, any> = {}): Partial<User> & Record<string, any> {
     const {
-      limit = 50,
-      offset = 0,
-      sortBy = 'id',
-      sortOrder = 'asc',
-      role,
-      status,
-      search
-    } = req.query;
-    
-    const filters: Record<string, any> = {};
-    
-    if (role) filters.role = role;
-    if (status) filters.status = status;
-    if (search) filters.search = search;
-    
-    // Get users
-    const users = await userRepo.getAllUsers(
-      parseInt(limit as string, 10),
-      parseInt(offset as string, 10),
-      sortBy as keyof User,
-      sortOrder as 'asc' | 'desc',
-      filters
-    );
-    
-    // Get total count
-    const count = await userRepo.countUsers(filters);
-    
-    res.json({
-      status: 'success',
-      data: {
-        users,
-        count,
-        limit: parseInt(limit as string, 10),
-        offset: parseInt(offset as string, 10)
-      }
-    });
-  });
-
-  /**
-   * ADMIN: Get user by ID
-   */
-  getUser = asyncHandler(async (req: Request, res: Response) => {
-    const userId = parseInt(req.params.userId, 10);
-    
-    if (isNaN(userId)) {
-      throw new ValidationException('Invalid user ID');
-    }
-    
-    // Get user
-    const user = await userRepo.getUser(userId);
-    
-    if (!user) {
-      throw new NotFoundException('User', userId);
-    }
-    
-    // Get user profile
-    const profile = await userRepo.getUserProfile(userId);
-    
-    res.json({
-      status: 'success',
-      data: {
-        ...user,
-        profile: profile || null
-      }
-    });
-  });
-
-  /**
-   * ADMIN: Create user
-   */
-  createUser = asyncHandler(async (req: Request, res: Response) => {
-    const { email, password, firstName, lastName, role, status, ...profileData } = req.body;
-    
-    if (!email || !password) {
-      throw new ValidationException('Email and password are required');
-    }
-    
-    // Check if user already exists
-    const existingUser = await userRepo.getUserByEmail(email);
-    
-    if (existingUser) {
-      throw new ServiceException(
-        ErrorCode.USER_ALREADY_EXISTS,
-        'A user with this email already exists'
-      );
-    }
-    
-    // Hash password
-    const hashedPassword = await bcrypt.hash(
       password,
-      config.userService.saltRounds
-    );
+      verificationToken,
+      passwordResetToken,
+      passwordResetExpires,
+      twoFactorSecret,
+      ...sanitizedUser
+    } = user;
     
-    // Create user
-    const user = await userRepo.createUser({
-      email,
-      password: hashedPassword,
-      firstName,
-      lastName,
-      role: role || 'user',
-      status: status || 'active',
-      verified: true
-    });
-    
-    // Create profile if profile data provided
-    if (Object.keys(profileData).length > 0) {
-      await userRepo.createUserProfile({
-        userId: user.id,
-        ...profileData
-      });
-    }
-    
-    // Log the action
-    await userRepo.createAuditLog({
-      userId: req.user.userId,
-      action: 'USER_CREATED',
-      resourceType: 'user',
-      resourceId: user.id.toString(),
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent']
-    });
-    
-    // Get complete user data
-    const completeUser = await userRepo.getUser(user.id);
-    const profile = await userRepo.getUserProfile(user.id);
-    
-    res.status(201).json({
-      status: 'success',
-      data: {
-        ...completeUser,
-        profile: profile || null
-      }
-    });
-  });
-
-  /**
-   * ADMIN: Update user
-   */
-  updateUser = asyncHandler(async (req: Request, res: Response) => {
-    const userId = parseInt(req.params.userId, 10);
-    const { email, password, firstName, lastName, role, status, ...profileData } = req.body;
-    
-    if (isNaN(userId)) {
-      throw new ValidationException('Invalid user ID');
-    }
-    
-    // Check if user exists
-    const user = await userRepo.getUser(userId);
-    
-    if (!user) {
-      throw new NotFoundException('User', userId);
-    }
-    
-    // Prepare user update
-    const userUpdate: Partial<User> = {};
-    
-    if (email) userUpdate.email = email;
-    if (firstName) userUpdate.firstName = firstName;
-    if (lastName) userUpdate.lastName = lastName;
-    if (role) userUpdate.role = role;
-    if (status) userUpdate.status = status;
-    
-    // Hash password if provided
-    if (password) {
-      userUpdate.password = await bcrypt.hash(
-        password,
-        config.userService.saltRounds
-      );
-    }
-    
-    // Update user
-    if (Object.keys(userUpdate).length > 0) {
-      await userRepo.updateUser(userId, {
-        ...userUpdate,
-        updatedAt: new Date()
-      });
-    }
-    
-    // Update profile if profile data provided
-    if (Object.keys(profileData).length > 0) {
-      await userRepo.updateUserProfile(userId, profileData);
-    }
-    
-    // Log the action
-    await userRepo.createAuditLog({
-      userId: req.user.userId,
-      action: 'USER_UPDATED',
-      resourceType: 'user',
-      resourceId: userId.toString(),
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent']
-    });
-    
-    // Get updated user data
-    const updatedUser = await userRepo.getUser(userId);
-    const profile = await userRepo.getUserProfile(userId);
-    
-    res.json({
-      status: 'success',
-      data: {
-        ...updatedUser,
-        profile: profile || null
-      }
-    });
-  });
-
-  /**
-   * ADMIN: Delete user
-   */
-  deleteUser = asyncHandler(async (req: Request, res: Response) => {
-    const userId = parseInt(req.params.userId, 10);
-    
-    if (isNaN(userId)) {
-      throw new ValidationException('Invalid user ID');
-    }
-    
-    // Check if user exists
-    const user = await userRepo.getUser(userId);
-    
-    if (!user) {
-      throw new NotFoundException('User', userId);
-    }
-    
-    // Delete user
-    await userRepo.deleteUser(userId);
-    
-    // Publish user deleted event
-    eventBus.publish('user-deleted', {
-      userId,
-      timestamp: new Date().toISOString()
-    });
-    
-    // Log the action
-    await userRepo.createAuditLog({
-      userId: req.user.userId,
-      action: 'USER_DELETED',
-      resourceType: 'user',
-      resourceId: userId.toString(),
-      ipAddress: req.ip,
-      userAgent: req.headers['user-agent']
-    });
-    
-    res.json({
-      status: 'success',
-      message: `User ${userId} deleted successfully`
-    });
-  });
+    return {
+      ...sanitizedUser,
+      ...extraData,
+    };
+  }
 }

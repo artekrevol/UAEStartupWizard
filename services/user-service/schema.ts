@@ -1,168 +1,181 @@
 /**
  * User Service Schema
  * 
- * Contains Drizzle ORM schema definitions for user management microservice
+ * Defines the database schema for the User Service using Drizzle ORM
  */
-import { pgTable, serial, text, varchar, timestamp, boolean, integer, json, jsonb } from 'drizzle-orm/pg-core';
-import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
+import { 
+  pgTable, 
+  serial, 
+  text, 
+  varchar, 
+  timestamp, 
+  boolean, 
+  integer,
+  json,
+  primaryKey,
+  uniqueIndex
+} from 'drizzle-orm/pg-core';
+import { createInsertSchema } from 'drizzle-zod';
 import { z } from 'zod';
 
 /**
- * User table definition
+ * User Table
+ * Stores user account information
  */
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
+  username: varchar('username', { length: 100 }).notNull().unique(),
   email: varchar('email', { length: 255 }).notNull().unique(),
-  username: varchar('username', { length: 50 }).unique(),
-  password: text('password').notNull(),
+  password: varchar('password', { length: 255 }).notNull(),
   firstName: varchar('first_name', { length: 100 }),
   lastName: varchar('last_name', { length: 100 }),
-  role: varchar('role', { length: 20 }).notNull().default('user'),
-  status: varchar('status', { length: 20 }).notNull().default('active'),
-  profilePictureUrl: text('profile_picture_url'),
-  company: varchar('company', { length: 255 }),
-  position: varchar('position', { length: 255 }),
-  phone: varchar('phone', { length: 50 }),
-  address: text('address'),
-  newsletterSubscribed: boolean('newsletter_subscribed').default(false),
-  preferences: jsonb('preferences').default({}),
-  verified: boolean('verified').default(false),
-  verificationToken: text('verification_token'),
-  passwordResetToken: text('password_reset_token'),
-  passwordResetExpires: timestamp('password_reset_expires'),
-  lastLogin: timestamp('last_login'),
-  lastActive: timestamp('last_active'),
-  loginAttempts: integer('login_attempts').default(0),
-  lockUntil: timestamp('lock_until'),
+  role: varchar('role', { length: 50 }).notNull().default('user'),
+  status: varchar('status', { length: 50 }).notNull().default('active'),
+  verified: boolean('verified').notNull().default(false),
+  verificationToken: varchar('verification_token', { length: 255 }),
+  passwordResetToken: varchar('password_reset_token', { length: 255 }),
+  passwordResetExpires: timestamp('password_reset_expires', { mode: 'date' }),
+  lastLoginAt: timestamp('last_login_at', { mode: 'date' }),
+  failedLoginAttempts: integer('failed_login_attempts').default(0),
+  lockedUntil: timestamp('locked_until', { mode: 'date' }),
   twoFactorEnabled: boolean('two_factor_enabled').default(false),
-  twoFactorSecret: text('two_factor_secret'),
-  createdAt: timestamp('created_at').notNull(),
-  updatedAt: timestamp('updated_at').notNull()
+  twoFactorSecret: varchar('two_factor_secret', { length: 255 }),
+  preferences: json('preferences').default({}),
+  createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
 });
 
 /**
- * User profile table definition - extended user data
+ * User Profile Table
+ * Stores additional user profile information
  */
 export const userProfiles = pgTable('user_profiles', {
   id: serial('id').primaryKey(),
-  userId: integer('user_id').notNull().unique().references(() => users.id, { 
-    onDelete: 'cascade' 
-  }),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   bio: text('bio'),
-  country: varchar('country', { length: 100 }),
-  language: varchar('language', { length: 50 }).default('en'),
-  timezone: varchar('timezone', { length: 50 }).default('UTC'),
-  websiteUrl: text('website_url'),
-  socialLinks: jsonb('social_links').default({}),
-  skills: jsonb('skills').default([]),
-  interests: jsonb('interests').default([]),
-  industry: varchar('industry', { length: 100 }),
-  experience: jsonb('experience').default([]),
-  education: jsonb('education').default([]),
-  settings: jsonb('settings').default({}),
-  metadata: jsonb('metadata').default({}),
-  createdAt: timestamp('created_at').notNull(),
-  updatedAt: timestamp('updated_at').notNull()
+  avatar: varchar('avatar', { length: 255 }),
+  company: varchar('company', { length: 100 }),
+  position: varchar('position', { length: 100 }),
+  location: varchar('location', { length: 100 }),
+  phone: varchar('phone', { length: 50 }),
+  website: varchar('website', { length: 255 }),
+  socialLinks: json('social_links').default({}),
+  timeZone: varchar('time_zone', { length: 50 }),
+  language: varchar('language', { length: 10 }).default('en'),
+  dateFormat: varchar('date_format', { length: 20 }).default('YYYY-MM-DD'),
+  createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
+}, (table) => {
+  return {
+    userIdIdx: uniqueIndex('user_profiles_user_id_idx').on(table.userId),
+  };
 });
 
 /**
- * User sessions table definition - for tracking login sessions
+ * User Session Table
+ * Tracks active user sessions
  */
 export const userSessions = pgTable('user_sessions', {
-  id: varchar('id', { length: 255 }).primaryKey(),
-  userId: integer('user_id').notNull().references(() => users.id, { 
-    onDelete: 'cascade' 
-  }),
-  token: text('token').notNull(),
-  ipAddress: varchar('ip_address', { length: 50 }),
-  userAgent: text('user_agent'),
-  location: jsonb('location').default({}),
-  device: varchar('device', { length: 100 }),
-  browser: varchar('browser', { length: 100 }),
-  expiresAt: timestamp('expires_at').notNull(),
-  createdAt: timestamp('created_at').notNull(),
-  updatedAt: timestamp('updated_at').notNull(),
-  lastActive: timestamp('last_active')
-});
-
-/**
- * Audit logs table definition - for activity tracking
- */
-export const auditLogs = pgTable('audit_logs', {
   id: serial('id').primaryKey(),
-  userId: integer('user_id').references(() => users.id, { 
-    onDelete: 'set null' 
-  }),
-  action: varchar('action', { length: 100 }).notNull(),
-  resourceType: varchar('resource_type', { length: 100 }),
-  resourceId: varchar('resource_id', { length: 255 }),
-  details: jsonb('details').default({}),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  token: varchar('token', { length: 255 }).notNull(),
+  refreshToken: varchar('refresh_token', { length: 255 }),
+  expiresAt: timestamp('expires_at', { mode: 'date' }).notNull(),
   ipAddress: varchar('ip_address', { length: 50 }),
-  userAgent: text('user_agent'),
-  timestamp: timestamp('timestamp').notNull()
+  userAgent: varchar('user_agent', { length: 255 }),
+  deviceInfo: json('device_info').default({}),
+  isRevoked: boolean('is_revoked').default(false),
+  lastActivityAt: timestamp('last_activity_at', { mode: 'date' }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+}, (table) => {
+  return {
+    userIdIdx: uniqueIndex('user_sessions_user_id_idx').on(table.userId),
+    tokenIdx: uniqueIndex('user_sessions_token_idx').on(table.token),
+  };
 });
 
 /**
- * User notifications table definition
+ * User Notification Table
+ * Stores notifications for users
  */
 export const userNotifications = pgTable('user_notifications', {
   id: serial('id').primaryKey(),
-  userId: integer('user_id').notNull().references(() => users.id, { 
-    onDelete: 'cascade' 
-  }),
+  userId: integer('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  type: varchar('type', { length: 50 }).notNull(),
   title: varchar('title', { length: 255 }).notNull(),
   message: text('message').notNull(),
-  type: varchar('type', { length: 50 }).notNull(),
-  read: boolean('read').default(false),
-  actionUrl: text('action_url'),
-  metadata: jsonb('metadata').default({}),
-  createdAt: timestamp('created_at').notNull()
+  link: varchar('link', { length: 255 }),
+  isRead: boolean('is_read').default(false),
+  metadata: json('metadata').default({}),
+  createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
 });
 
-// Type definitions
-export type User = typeof users.$inferSelect;
-export type InsertUser = typeof users.$inferInsert;
-export type UserProfile = typeof userProfiles.$inferSelect;
-export type InsertUserProfile = typeof userProfiles.$inferInsert;
-export type UserSession = typeof userSessions.$inferSelect;
-export type InsertUserSession = typeof userSessions.$inferInsert;
-export type AuditLog = typeof auditLogs.$inferSelect;
-export type InsertAuditLog = typeof auditLogs.$inferInsert;
-export type UserNotification = typeof userNotifications.$inferSelect;
-export type InsertUserNotification = typeof userNotifications.$inferInsert;
+/**
+ * Audit Log Table
+ * Tracks user actions for security and compliance
+ */
+export const auditLogs = pgTable('audit_logs', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id, { onDelete: 'set null' }),
+  action: varchar('action', { length: 255 }).notNull(),
+  resourceType: varchar('resource_type', { length: 50 }),
+  resourceId: varchar('resource_id', { length: 50 }),
+  details: json('details').default({}),
+  ipAddress: varchar('ip_address', { length: 50 }),
+  userAgent: varchar('user_agent', { length: 255 }),
+  timestamp: timestamp('timestamp', { mode: 'date' }).notNull().defaultNow(),
+});
 
-// Zod schemas for validation
+// Zod schemas for type validation
 export const insertUserSchema = createInsertSchema(users, {
-  email: (schema) => schema.email.email('Invalid email format'),
+  email: z.string().email('Invalid email format'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   role: z.enum(['user', 'admin', 'superadmin']),
-  status: z.enum(['active', 'inactive', 'pending', 'suspended', 'deleted'])
-});
+  status: z.enum(['active', 'inactive', 'suspended', 'pending']),
+}).omit({ id: true });
 
-export const insertUserProfileSchema = createInsertSchema(userProfiles);
-export const insertUserSessionSchema = createInsertSchema(userSessions);
-export const insertAuditLogSchema = createInsertSchema(auditLogs);
-export const insertUserNotificationSchema = createInsertSchema(userNotifications);
+export const insertUserProfileSchema = createInsertSchema(userProfiles, {
+  bio: z.string().max(500, 'Bio must be less than 500 characters').optional(),
+  phone: z.string().regex(/^[\d\+\-\(\) ]+$/, 'Invalid phone number format').optional(),
+  website: z.string().url('Invalid website URL').optional(),
+}).omit({ id: true });
 
-// Additional schemas for specific operations
-export const UserSelectSchema = createSelectSchema(users);
-export const UserUpdateSchema = insertUserSchema.partial().omit({ id: true });
-export const UserCredentialsSchema = insertUserSchema.pick({ email: true, password: true });
-export const UserRegistrationSchema = insertUserSchema.pick({
-  email: true,
-  password: true,
-  firstName: true,
-  lastName: true,
-  username: true
-});
-export const UserProfileUpdateSchema = insertUserProfileSchema.partial().omit({ id: true, userId: true });
+export const insertUserSessionSchema = createInsertSchema(userSessions, {
+  ipAddress: z.string().ip().optional(),
+}).omit({ id: true });
 
-// Error codes for user service
+export const insertUserNotificationSchema = createInsertSchema(userNotifications, {
+  type: z.enum(['system', 'alert', 'message', 'task']),
+}).omit({ id: true });
+
+export const insertAuditLogSchema = createInsertSchema(auditLogs, {
+  action: z.string().min(1, 'Action is required'),
+}).omit({ id: true });
+
+// TypeScript types
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
+
+export type UserProfile = typeof userProfiles.$inferSelect;
+export type InsertUserProfile = z.infer<typeof insertUserProfileSchema>;
+
+export type UserSession = typeof userSessions.$inferSelect;
+export type InsertUserSession = z.infer<typeof insertUserSessionSchema>;
+
+export type UserNotification = typeof userNotifications.$inferSelect;
+export type InsertUserNotification = z.infer<typeof insertUserNotificationSchema>;
+
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+
+// Error codes for consistent error handling
 export enum UserErrorCode {
   INVALID_CREDENTIALS = 'INVALID_CREDENTIALS',
   ACCOUNT_LOCKED = 'ACCOUNT_LOCKED',
-  ACCOUNT_INACTIVE = 'ACCOUNT_INACTIVE',
-  VERIFICATION_REQUIRED = 'VERIFICATION_REQUIRED',
   EMAIL_ALREADY_EXISTS = 'EMAIL_ALREADY_EXISTS',
-  USERNAME_ALREADY_EXISTS = 'USERNAME_ALREADY_EXISTS'
+  USERNAME_ALREADY_EXISTS = 'USERNAME_ALREADY_EXISTS',
+  USER_NOT_FOUND = 'USER_NOT_FOUND',
+  SESSION_EXPIRED = 'SESSION_EXPIRED',
+  INVALID_TOKEN = 'INVALID_TOKEN',
+  INSUFFICIENT_PERMISSIONS = 'INSUFFICIENT_PERMISSIONS',
 }

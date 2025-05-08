@@ -1,177 +1,196 @@
 /**
- * Initial User Service Migration
+ * Initial Migration for User Service
  * 
- * This migration creates all the necessary tables for the user service
+ * This migration creates all the necessary tables for the User Service
  */
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
-import { sql } from 'drizzle-orm';
 import { config } from '../../../shared/config';
+import * as schema from '../schema';
+import path from 'path';
 
-// Initialize PostgreSQL connection pool
-const pool = new Pool({
-  connectionString: config.database.url,
-  max: config.database.maxConnections,
-  idleTimeoutMillis: config.database.idleTimeoutMillis
-});
-
-// Initialize Drizzle ORM
-const db = drizzle(pool);
-
-/**
- * Run migrations
- */
-export async function runMigrations() {
+async function runMigration() {
+  console.log('[Migration] Starting initial migration for User Service...');
+  
+  // Create a dedicated connection for migrations
+  const pool = new Pool({
+    connectionString: config.database.url,
+    max: config.database.poolSize,
+    idleTimeoutMillis: config.database.idleTimeoutMs,
+  });
+  
   try {
-    console.log('[UserService:Migration] Starting database migrations...');
+    const db = drizzle(pool, { schema });
     
-    // Create user table if it doesn't exist
-    await db.execute(sql`
+    // Check if users table already exists
+    const tableExists = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public'
+        AND table_name = 'users'
+      );
+    `);
+    
+    if (tableExists.rows[0].exists) {
+      console.log('[Migration] Tables already exist. Skipping initial migration.');
+      return;
+    }
+    
+    // Create users table
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
+        username VARCHAR(100) NOT NULL UNIQUE,
         email VARCHAR(255) NOT NULL UNIQUE,
-        username VARCHAR(50) UNIQUE,
-        password TEXT NOT NULL,
+        password VARCHAR(255) NOT NULL,
         first_name VARCHAR(100),
         last_name VARCHAR(100),
-        role VARCHAR(20) NOT NULL DEFAULT 'user',
-        status VARCHAR(20) NOT NULL DEFAULT 'active',
-        profile_picture_url TEXT,
-        company VARCHAR(255),
-        position VARCHAR(255),
-        phone VARCHAR(50),
-        address TEXT,
-        newsletter_subscribed BOOLEAN DEFAULT FALSE,
-        preferences JSONB DEFAULT '{}',
-        verified BOOLEAN DEFAULT FALSE,
-        verification_token TEXT,
-        password_reset_token TEXT,
+        role VARCHAR(50) NOT NULL DEFAULT 'user',
+        status VARCHAR(50) NOT NULL DEFAULT 'active',
+        verified BOOLEAN NOT NULL DEFAULT false,
+        verification_token VARCHAR(255),
+        password_reset_token VARCHAR(255),
         password_reset_expires TIMESTAMP,
-        last_login TIMESTAMP,
-        last_active TIMESTAMP,
-        login_attempts INTEGER DEFAULT 0,
-        lock_until TIMESTAMP,
-        two_factor_enabled BOOLEAN DEFAULT FALSE,
-        two_factor_secret TEXT,
-        created_at TIMESTAMP NOT NULL,
-        updated_at TIMESTAMP NOT NULL
+        last_login_at TIMESTAMP,
+        failed_login_attempts INTEGER DEFAULT 0,
+        locked_until TIMESTAMP,
+        two_factor_enabled BOOLEAN DEFAULT false,
+        two_factor_secret VARCHAR(255),
+        preferences JSONB DEFAULT '{}',
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
       );
-      
-      CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-      CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
-      CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
-      CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);
     `);
-    console.log('[UserService:Migration] Created users table');
     
-    // Create user profiles table if it doesn't exist
-    await db.execute(sql`
+    // Create user_profiles table
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS user_profiles (
         id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
-        bio TEXT,
-        country VARCHAR(100),
-        language VARCHAR(50) DEFAULT 'en',
-        timezone VARCHAR(50) DEFAULT 'UTC',
-        website_url TEXT,
-        social_links JSONB DEFAULT '{}',
-        skills JSONB DEFAULT '[]',
-        interests JSONB DEFAULT '[]',
-        industry VARCHAR(100),
-        experience JSONB DEFAULT '[]',
-        education JSONB DEFAULT '[]',
-        settings JSONB DEFAULT '{}',
-        metadata JSONB DEFAULT '{}',
-        created_at TIMESTAMP NOT NULL,
-        updated_at TIMESTAMP NOT NULL
-      );
-      
-      CREATE INDEX IF NOT EXISTS idx_user_profiles_user_id ON user_profiles(user_id);
-    `);
-    console.log('[UserService:Migration] Created user_profiles table');
-    
-    // Create user sessions table if it doesn't exist
-    await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS user_sessions (
-        id VARCHAR(255) PRIMARY KEY,
         user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        token TEXT NOT NULL,
-        ip_address VARCHAR(50),
-        user_agent TEXT,
-        location JSONB DEFAULT '{}',
-        device VARCHAR(100),
-        browser VARCHAR(100),
-        expires_at TIMESTAMP NOT NULL,
-        created_at TIMESTAMP NOT NULL,
-        updated_at TIMESTAMP NOT NULL,
-        last_active TIMESTAMP
+        bio TEXT,
+        avatar VARCHAR(255),
+        company VARCHAR(100),
+        position VARCHAR(100),
+        location VARCHAR(100),
+        phone VARCHAR(50),
+        website VARCHAR(255),
+        social_links JSONB DEFAULT '{}',
+        time_zone VARCHAR(50),
+        language VARCHAR(10) DEFAULT 'en',
+        date_format VARCHAR(20) DEFAULT 'YYYY-MM-DD',
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        UNIQUE(user_id)
       );
-      
-      CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
-      CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON user_sessions(expires_at);
     `);
-    console.log('[UserService:Migration] Created user_sessions table');
     
-    // Create audit logs table if it doesn't exist
-    await db.execute(sql`
+    // Create user_sessions table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_sessions (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token VARCHAR(255) NOT NULL UNIQUE,
+        refresh_token VARCHAR(255),
+        expires_at TIMESTAMP NOT NULL,
+        ip_address VARCHAR(50),
+        user_agent VARCHAR(255),
+        device_info JSONB DEFAULT '{}',
+        is_revoked BOOLEAN DEFAULT false,
+        last_activity_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+    `);
+    
+    // Create user_notifications table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_notifications (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        type VARCHAR(50) NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        message TEXT NOT NULL,
+        link VARCHAR(255),
+        is_read BOOLEAN DEFAULT false,
+        metadata JSONB DEFAULT '{}',
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+    `);
+    
+    // Create audit_logs table
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS audit_logs (
         id SERIAL PRIMARY KEY,
         user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
-        action VARCHAR(100) NOT NULL,
-        resource_type VARCHAR(100),
-        resource_id VARCHAR(255),
+        action VARCHAR(255) NOT NULL,
+        resource_type VARCHAR(50),
+        resource_id VARCHAR(50),
         details JSONB DEFAULT '{}',
         ip_address VARCHAR(50),
-        user_agent TEXT,
-        timestamp TIMESTAMP NOT NULL
+        user_agent VARCHAR(255),
+        timestamp TIMESTAMP NOT NULL DEFAULT NOW()
       );
-      
+    `);
+    
+    // Create indexes for better query performance
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
+      CREATE INDEX IF NOT EXISTS idx_user_sessions_token ON user_sessions(token);
+      CREATE INDEX IF NOT EXISTS idx_user_notifications_user_id ON user_notifications(user_id);
       CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
       CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
       CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp);
     `);
-    console.log('[UserService:Migration] Created audit_logs table');
     
-    // Create user notifications table if it doesn't exist
-    await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS user_notifications (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        title VARCHAR(255) NOT NULL,
-        message TEXT NOT NULL,
-        type VARCHAR(50) NOT NULL,
-        read BOOLEAN DEFAULT FALSE,
-        action_url TEXT,
-        metadata JSONB DEFAULT '{}',
-        created_at TIMESTAMP NOT NULL
+    console.log('[Migration] Initial migration completed successfully.');
+    
+    // Create super admin user if it doesn't exist
+    const adminExists = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM users
+        WHERE email = 'admin@example.com'
       );
-      
-      CREATE INDEX IF NOT EXISTS idx_user_notifications_user_id ON user_notifications(user_id);
-      CREATE INDEX IF NOT EXISTS idx_user_notifications_read ON user_notifications(read);
-      CREATE INDEX IF NOT EXISTS idx_user_notifications_created_at ON user_notifications(created_at);
     `);
-    console.log('[UserService:Migration] Created user_notifications table');
     
-    console.log('[UserService:Migration] Database migrations completed successfully!');
-  } catch (error) {
-    console.error('[UserService:Migration] Migration failed:', error);
-    throw error;
+    if (!adminExists.rows[0].exists) {
+      // Hash password using bcrypt
+      const bcrypt = require('bcrypt');
+      const hashedPassword = await bcrypt.hash('admin123', 10);
+      
+      // Insert super admin user
+      await pool.query(`
+        INSERT INTO users (
+          username, email, password, first_name, last_name, 
+          role, status, verified, created_at, updated_at
+        ) VALUES (
+          'admin', 'admin@example.com', $1, 'System', 'Administrator',
+          'superadmin', 'active', true, NOW(), NOW()
+        );
+      `, [hashedPassword]);
+      
+      console.log('[Migration] Created default superadmin user: admin@example.com');
+    }
+    
+  } catch (err) {
+    console.error('[Migration] Error during migration:', err);
+    throw err;
   } finally {
     // Close the pool
     await pool.end();
   }
 }
 
-// If this file is run directly (not imported), run migrations
+// Run the migration if this file is executed directly
 if (require.main === module) {
-  runMigrations()
+  runMigration()
     .then(() => {
-      console.log('[UserService:Migration] Migration script completed');
+      console.log('[Migration] Process completed.');
       process.exit(0);
     })
-    .catch((error) => {
-      console.error('[UserService:Migration] Migration script failed:', error);
+    .catch((err) => {
+      console.error('[Migration] Process failed:', err);
       process.exit(1);
     });
 }
+
+export { runMigration };
