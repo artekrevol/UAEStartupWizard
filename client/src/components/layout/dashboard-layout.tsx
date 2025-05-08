@@ -10,7 +10,8 @@ import {
   Map,
   ShieldAlert,
   Bot,
-  Database
+  Database,
+  Search
 } from "lucide-react";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -68,8 +69,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </Button>
             
             <Button 
-              variant="ghost" 
+              variant={location === "/business-setup" ? "default" : "ghost"} 
+              className="w-full justify-start" 
+              onClick={() => setLocation("/business-setup")}
+            >
+              <Building2 className="mr-2 h-5 w-5" />
+              Business Setup
+            </Button>
+            
+            <Button 
+              variant={location === "/business-maps" ? "default" : "ghost"} 
               className="w-full justify-start"
+              onClick={() => setLocation("/business-maps")}
             >
               <Map className="mr-2 h-5 w-5" />
               Business Maps
@@ -85,8 +96,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </Button>
             
             <Button 
-              variant="ghost" 
+              variant={location === "/settings" ? "default" : "ghost"} 
               className="w-full justify-start"
+              onClick={() => setLocation("/settings")}
             >
               <Settings className="mr-2 h-5 w-5" />
               Settings
@@ -99,6 +111,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             >
               <Bot className="mr-2 h-5 w-5" />
               AI Assistant
+            </Button>
+            
+            <Button 
+              variant={location === "/ai-research" ? "default" : "ghost"} 
+              className="w-full justify-start"
+              onClick={() => setLocation("/ai-research")}
+            >
+              <Search className="mr-2 h-5 w-5" />
+              AI Research
             </Button>
             
             {isAdmin && (
