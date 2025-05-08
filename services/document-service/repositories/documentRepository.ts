@@ -295,5 +295,109 @@ export class DocumentRepository {
     }
   }
 
-  // Additional repository methods would be added here for the remaining entities
+  /**
+   * Get document count by category
+   */
+  async getDocumentCountsByCategory(): Promise<Array<{ category: string, count: number }>> {
+    try {
+      const result = await db
+        .select({
+          category: documents.category,
+          count: sql`count(*)`,
+        })
+        .from(documents)
+        .groupBy(documents.category);
+      
+      return result.map(item => ({
+        category: item.category || 'uncategorized',
+        count: Number(item.count)
+      }));
+    } catch (error) {
+      throw new DatabaseException('Failed to fetch document counts by category', { originalError: error.message });
+    }
+  }
+  
+  /**
+   * Get document count by subcategory
+   */
+  async getDocumentCountsBySubcategory(category?: string): Promise<Array<{ category: string, subcategory: string, count: number }>> {
+    try {
+      let query = db
+        .select({
+          category: documents.category,
+          subcategory: documents.subcategory,
+          count: sql`count(*)`,
+        })
+        .from(documents);
+      
+      // Apply category filter if provided
+      if (category) {
+        query = query.where(eq(documents.category, category));
+      }
+      
+      const result = await query.groupBy(documents.category, documents.subcategory);
+      
+      return result.map(item => ({
+        category: item.category || 'uncategorized',
+        subcategory: item.subcategory || 'general',
+        count: Number(item.count)
+      }));
+    } catch (error) {
+      throw new DatabaseException('Failed to fetch document counts by subcategory', { originalError: error.message });
+    }
+  }
+  
+  /**
+   * Get total document count
+   */
+  async getDocumentCount(): Promise<number> {
+    try {
+      const result = await db
+        .select({ count: sql`count(*)` })
+        .from(documents);
+      
+      return Number(result[0]?.count || 0);
+    } catch (error) {
+      throw new DatabaseException('Failed to fetch document count', { originalError: error.message });
+    }
+  }
+
+  /**
+   * Search documents by text
+   */
+  async searchDocuments(
+    searchTerm: string,
+    filters: { category?: string; subcategory?: string; freeZoneId?: number } = {},
+    limit: number = 50,
+    offset: number = 0
+  ): Promise<Document[]> {
+    try {
+      let query = db
+        .select()
+        .from(documents)
+        .where(
+          sql`to_tsvector('english', coalesce(title, '') || ' ' || coalesce(content, '')) @@ to_tsquery('english', ${searchTerm.split(' ').join(' & ')})`
+        );
+      
+      // Apply filters
+      if (filters.category) {
+        query = query.where(eq(documents.category, filters.category));
+      }
+      
+      if (filters.subcategory) {
+        query = query.where(eq(documents.subcategory, filters.subcategory));
+      }
+      
+      if (filters.freeZoneId) {
+        query = query.where(eq(documents.freeZoneId, filters.freeZoneId));
+      }
+      
+      // Apply pagination
+      query = query.limit(limit).offset(offset);
+      
+      return await query;
+    } catch (error) {
+      throw new DatabaseException('Failed to search documents', { originalError: error.message });
+    }
+  }
 }

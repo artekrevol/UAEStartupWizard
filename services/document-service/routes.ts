@@ -2,6 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import { DocumentController } from './controllers/documentController';
 import { authenticateJWT, requireAdmin } from '../../services/api-gateway/middleware/auth';
+import { DocumentRepository } from './repositories/documentRepository';
 
 // Configure multer for file uploads
 const upload = multer({
@@ -36,8 +37,9 @@ const upload = multer({
   },
 });
 
-// Initialize controller
+// Initialize controller and repository
 const documentController = new DocumentController();
+const documentRepo = new DocumentRepository();
 
 // Create router
 const router = express.Router();
@@ -101,6 +103,46 @@ router.post(
   documentController.createUserDocument
 );
 
-// Additional routes for other document entities would be defined here
+// Document statistics routes
+router.get('/documents/stats', documentController.getDocumentStatsByCategory);
+router.get('/documents/stats/subcategories', documentController.getDocumentStatsBySubcategory);
+
+// Document processing routes
+router.get('/documents/process-dmcc', 
+  authenticateJWT, 
+  requireAdmin, 
+  documentController.processDMCCDocuments
+);
+
+// Public endpoint for DMCC document processing
+router.get('/public/documents/process-dmcc', documentController.processDMCCDocuments);
+
+// Document search route
+router.post('/documents/search', authenticateJWT, async (req, res, next) => {
+  try {
+    const { searchTerm, filters, limit, offset } = req.body;
+    
+    if (!searchTerm || typeof searchTerm !== 'string') {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Search term is required'
+      });
+    }
+    
+    const results = await documentRepo.searchDocuments(
+      searchTerm,
+      filters || {},
+      limit || 50,
+      offset || 0
+    );
+    
+    res.json({
+      status: 'success',
+      data: results
+    });
+  } catch (error) {
+    next(error);
+  }
+});
 
 export default router;

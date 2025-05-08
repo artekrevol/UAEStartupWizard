@@ -6,8 +6,9 @@ import {
   type InsertDocument,
   type InsertUserDocument 
 } from '../schema';
-import { ServiceException, ErrorCode, ValidationException } from '../../../shared/errors';
+import { ServiceException, ErrorCode, ValidationException, DatabaseException } from '../../../shared/errors';
 import { asyncHandler } from '../../../shared/middleware/errorHandler';
+import { eventBus } from '../index';
 import path from 'path';
 import fs from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
@@ -339,5 +340,126 @@ export class DocumentController {
     });
   });
   
-  // Additional controller methods for other endpoints would be added here
+  /**
+   * Get document statistics by category
+   */
+  getDocumentStatsByCategory = asyncHandler(async (req: Request, res: Response) => {
+    try {
+      // Get document counts by category from repository
+      const categoryCounts = await documentRepo.getDocumentCountsByCategory();
+      
+      // Calculate total document count
+      const totalCount = categoryCounts.reduce((sum, item) => sum + Number(item.count), 0);
+      
+      // Format and sort the categories by count in descending order
+      const formattedCounts = categoryCounts.map(item => ({
+        category: item.category,
+        count: Number(item.count),
+        percentage: Math.round((Number(item.count) / totalCount) * 100)
+      })).sort((a, b) => b.count - a.count);
+      
+      // Format the response
+      const stats = {
+        totalDocuments: totalCount,
+        categoryCounts: formattedCounts
+      };
+      
+      res.json(stats);
+    } catch (error) {
+      throw new DatabaseException('Failed to fetch document statistics', { 
+        originalError: error.message 
+      });
+    }
+  });
+  
+  /**
+   * Get document statistics by subcategory 
+   */
+  getDocumentStatsBySubcategory = asyncHandler(async (req: Request, res: Response) => {
+    try {
+      const category = req.query.category as string | undefined;
+      
+      // Get document counts by subcategory from repository
+      const subcategoryCounts = await documentRepo.getDocumentCountsBySubcategory(category);
+      
+      // Calculate total document count
+      const totalCount = subcategoryCounts.reduce((sum, item) => sum + Number(item.count), 0);
+      
+      // Format and sort the subcategories by count in descending order
+      const formattedCounts = subcategoryCounts.map(item => ({
+        subcategory: item.subcategory,
+        category: item.category,
+        count: Number(item.count),
+        percentage: totalCount > 0 ? Math.round((Number(item.count) / totalCount) * 100) : 0
+      })).sort((a, b) => b.count - a.count);
+      
+      // Format the response
+      const stats = {
+        totalDocuments: totalCount,
+        subcategoryCounts: formattedCounts
+      };
+      
+      res.json(stats);
+    } catch (error) {
+      throw new DatabaseException('Failed to fetch subcategory statistics', { 
+        originalError: error.message 
+      });
+    }
+  });
+
+  /**
+   * Process DMCC documents
+   */
+  processDMCCDocuments = asyncHandler(async (req: Request, res: Response) => {
+    try {
+      // This is where we would call the processing logic
+      // For now, we'll create a placeholder implementation
+      
+      // Count documents in the database before processing
+      const documentsBeforeCount = await documentRepo.getDocumentCount();
+      
+      // Notify via event bus that processing has started
+      eventBus.publish('document-processing-started', {
+        type: 'dmcc',
+        startedAt: new Date().toISOString()
+      });
+      
+      // In the real implementation, we would call the DMCC document processor here
+      
+      // Count documents in the database after processing
+      const documentsAfterCount = await documentRepo.getDocumentCount();
+      
+      // Calculate documents added
+      const documentsAdded = documentsAfterCount - documentsBeforeCount;
+      
+      // Notify via event bus that processing has completed
+      eventBus.publish('document-processing-completed', {
+        type: 'dmcc',
+        documentsAdded,
+        completedAt: new Date().toISOString()
+      });
+      
+      res.status(200).json({
+        status: 'success',
+        message: "DMCC documents processed successfully",
+        count: documentsAfterCount,
+        documentsAdded
+      });
+    } catch (error) {
+      console.error("Error processing DMCC documents:", error);
+      
+      // Notify via event bus that processing has failed
+      eventBus.publish('document-processing-failed', {
+        type: 'dmcc',
+        error: error.message,
+        failedAt: new Date().toISOString()
+      });
+      
+      throw new ServiceException(
+        ErrorCode.INTERNAL_SERVER_ERROR,
+        'Failed to process DMCC documents',
+        { originalError: error.message }
+      );
+    }
+  });
 }
