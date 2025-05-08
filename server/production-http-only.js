@@ -1,8 +1,9 @@
+
 /**
  * Production Server Entry Point (HTTP-only)
  * 
  * This file is the entry point for production deployment
- * with all browser-based scrapers completely disabled.
+ * with all browser-based scrapers disabled.
  */
 
 // Force environment variables before any imports
