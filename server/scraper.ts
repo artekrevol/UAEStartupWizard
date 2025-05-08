@@ -7,6 +7,25 @@ import { sql } from "drizzle-orm";
 import { log } from "./vite";
 import https from "https";
 import { constants } from "crypto";
+import { execSync } from "child_process";
+
+// Try to use a different approach for the MOEC website by using curl when we absolutely need to bypass TLS issues
+function execCurlRequest(url: string): string | null {
+  try {
+    log(`Attempting curl request to ${url}`, "scraper");
+    // Execute curl with options to ignore SSL errors and use a specific user agent
+    const result = execSync(
+      `curl -k -L --insecure --max-time 60 -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.0.0 Safari/537.36" "${url}"`,
+      { encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 }
+    );
+    log(`Successfully fetched ${url} with curl`, "scraper");
+    return result;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    log(`Curl request failed: ${errorMessage}`, "scraper");
+    return null;
+  }
+}
 
 // Mock data functions for development when MOEC website can't be accessed
 function mockFreeZonesData(): string {
@@ -369,6 +388,19 @@ async function fetchPage(url: string): Promise<string | null> {
       } catch (directError: unknown) {
         const directErrorMessage = directError instanceof Error ? directError.message : String(directError);
         log(`Failed with direct HTTPS request: ${directErrorMessage}`, "scraper");
+      }
+      
+      // Try with curl as a last resort - this method bypasses Node's TLS stack entirely
+      try {
+        log(`Attempting to use curl as a last resort for ${url}`, "scraper");
+        const html = execCurlRequest(url);
+        if (html) {
+          log(`Successfully fetched ${url} with curl`, "scraper");
+          return html;
+        }
+      } catch (curlError: unknown) {
+        const curlErrorMessage = curlError instanceof Error ? curlError.message : String(curlError);
+        log(`Failed with curl approach: ${curlErrorMessage}`, "scraper");
       }
       
       // Last resort - create a mock based on the URL for development purposes
