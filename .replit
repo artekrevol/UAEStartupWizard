@@ -8,7 +8,7 @@ packages = ["bash", "gitFull", "playwright-driver", "xcodebuild", "zlib"]
 
 [deployment]
 deploymentTarget = "cloudrun"
-build = ["sh", "-c", "bash scripts/pre-deploy.sh && PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm run build --no-playwright"]
+build = ["sh", "-c", "bash scripts/pre-deploy.sh && npm run build"]
 run = ["sh", "-c", "NODE_ENV=production SCRAPER_HTTP_ONLY_MODE=true node dist/production-http-only.js"]
 
 [[ports]]
