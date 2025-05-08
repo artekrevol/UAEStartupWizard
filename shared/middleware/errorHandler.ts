@@ -1,75 +1,81 @@
+/**
+ * Error Handler Middleware
+ * Provides consistent error handling for all microservices
+ */
 import { Request, Response, NextFunction } from 'express';
-import { 
-  ServiceException, 
-  ErrorCode, 
-  ValidationException, 
-  DatabaseException, 
-  AuthenticationException,
-  AuthorizationException,
-  RateLimitException,
-  ExternalServiceException
-} from '../errors';
+import { ServiceException, ErrorCode } from '../errors';
+import { logger } from '../logger';
 
 /**
- * Async handler to catch errors in async route handlers
- * @param fn The route handler function
- * @returns A function that handles errors in async route handlers
+ * Middleware to handle errors consistently across all services
  */
-export const asyncHandler = (fn: Function) => (req: Request, res: Response, next: NextFunction) => {
-  Promise.resolve(fn(req, res, next)).catch(next);
-};
+export const errorHandler = (
+  err: Error | ServiceException,
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  // If headers already sent, let Express handle it
+  if (res.headersSent) {
+    return next(err);
+  }
 
-/**
- * Global error handler middleware
- */
-export const errorHandler = (err: Error, req: Request, res: Response, next: NextFunction) => {
-  console.error(`[Error] ${err.message}`, err);
-  
-  // Handle ServiceException
+  // Default error response
+  let statusCode = 500;
+  let errorResponse = {
+    error: {
+      code: ErrorCode.UNKNOWN_ERROR,
+      message: 'An unexpected error occurred'
+    }
+  };
+
+  // Handle ServiceException with proper error format
   if (err instanceof ServiceException) {
-    return res.status(err.status).json({
-      status: 'error',
-      code: err.code,
-      message: err.message,
-      details: err.details
+    statusCode = err.statusCode;
+    errorResponse = err.toJSON();
+    
+    // Log error details based on severity
+    if (statusCode >= 500) {
+      logger.error(`[ServiceError] ${err.message}`, {
+        code: err.code,
+        path: req.path,
+        method: req.method,
+        details: err.details
+      });
+    } else if (statusCode >= 400) {
+      logger.warn(`[ClientError] ${err.message}`, {
+        code: err.code,
+        path: req.path,
+        method: req.method
+      });
+    }
+  } else {
+    // For unhandled errors, log with stack trace
+    logger.error(`[UnhandledError] ${err.message}`, {
+      stack: err.stack,
+      path: req.path,
+      method: req.method
     });
+    
+    // In production, don't expose internal error details
+    if (process.env.NODE_ENV === 'production') {
+      errorResponse.error.message = 'An internal server error occurred';
+    } else {
+      // In development, include more details
+      errorResponse.error.message = err.message;
+      (errorResponse.error as any).stack = err.stack;
+    }
   }
-  
-  // Handle 404 errors
-  if (err.message === 'Not Found') {
-    return res.status(404).json({
-      status: 'error',
-      code: ErrorCode.NOT_FOUND,
-      message: 'Resource not found'
-    });
-  }
-  
-  // Handle validation errors from express-validator
-  if (err.name === 'ValidationError') {
-    return res.status(400).json({
-      status: 'error',
-      code: ErrorCode.VALIDATION_ERROR,
-      message: 'Validation error',
-      details: err
-    });
-  }
-  
-  // Handle unexpected errors
-  return res.status(500).json({
-    status: 'error',
-    code: ErrorCode.UNKNOWN_ERROR,
-    message: 'An unexpected error occurred',
-    details: process.env.NODE_ENV === 'development' ? err.message : undefined
-  });
+
+  // Send error response
+  res.status(statusCode).json(errorResponse);
 };
 
 /**
- * 404 handler middleware
+ * Async request handler wrapper to automatically catch errors
  */
-export const notFoundHandler = (req: Request, res: Response, next: NextFunction) => {
-  res.status(404).json({
-    status: 'error',
-    code: ErrorCode.NOT_FOUND,
-    message: `Route not found: ${req.method} ${req.originalUrl}`
-  });
+export const asyncHandler = (fn: Function) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
 };
