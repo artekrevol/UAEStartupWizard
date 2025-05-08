@@ -117,4 +117,15 @@ export const config = {
     level: process.env.LOG_LEVEL || 'info',
     prettyPrint: process.env.LOG_PRETTY_PRINT === 'true' || process.env.NODE_ENV !== 'production',
   },
+  redis: {
+    host: process.env.REDIS_HOST || 'localhost',
+    port: parseInt(process.env.REDIS_PORT || '6379', 10),
+    password: process.env.REDIS_PASSWORD || undefined,
+    defaultTtl: parseInt(process.env.REDIS_DEFAULT_TTL || '3600', 10), // 1 hour default TTL
+  },
+  cache: {
+    enabled: process.env.CACHE_ENABLED !== 'false',
+    browserMaxAge: parseInt(process.env.BROWSER_CACHE_MAX_AGE || '86400', 10), // 24 hours
+    serverMaxAge: parseInt(process.env.SERVER_CACHE_MAX_AGE || '3600', 10),    // 1 hour
+  },
 };
