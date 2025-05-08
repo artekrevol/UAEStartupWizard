@@ -1,6 +1,6 @@
 import express from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
-import { authenticate } from '../../../shared/middleware/auth';
+import { authenticateJWT } from '../../../shared/middleware/auth';
 import { rateLimiter } from '../middleware/rateLimiter';
 import { getServiceURL } from '../middleware/serviceRegistry';
 
@@ -45,37 +45,37 @@ router.get('/public/:documentId', documentRateLimiter, documentServiceProxy);
 router.get('/categories', documentRateLimiter, documentServiceProxy);
 
 // Protected routes
-router.get('/', authenticate, documentRateLimiter, documentServiceProxy);
-router.get('/:documentId', authenticate, documentRateLimiter, documentServiceProxy);
-router.post('/', authenticate, documentRateLimiter, documentServiceProxy);
-router.patch('/:documentId', authenticate, documentRateLimiter, documentServiceProxy);
-router.delete('/:documentId', authenticate, documentRateLimiter, documentServiceProxy);
+router.get('/', authenticateJWT, documentRateLimiter, documentServiceProxy);
+router.get('/:documentId', authenticateJWT, documentRateLimiter, documentServiceProxy);
+router.post('/', authenticateJWT, documentRateLimiter, documentServiceProxy);
+router.patch('/:documentId', authenticateJWT, documentRateLimiter, documentServiceProxy);
+router.delete('/:documentId', authenticateJWT, documentRateLimiter, documentServiceProxy);
 
 // Document search routes
-router.get('/search', authenticate, documentRateLimiter, documentServiceProxy);
-router.post('/search', authenticate, documentRateLimiter, documentServiceProxy);
+router.get('/search', authenticateJWT, documentRateLimiter, documentServiceProxy);
+router.post('/search', authenticateJWT, documentRateLimiter, documentServiceProxy);
 
 // Document category routes
-router.get('/category/:categoryId', authenticate, documentRateLimiter, documentServiceProxy);
-router.post('/category', authenticate, documentRateLimiter, documentServiceProxy);
-router.patch('/category/:categoryId', authenticate, documentRateLimiter, documentServiceProxy);
-router.delete('/category/:categoryId', authenticate, documentRateLimiter, documentServiceProxy);
+router.get('/category/:categoryId', authenticateJWT, documentRateLimiter, documentServiceProxy);
+router.post('/category', authenticateJWT, documentRateLimiter, documentServiceProxy);
+router.patch('/category/:categoryId', authenticateJWT, documentRateLimiter, documentServiceProxy);
+router.delete('/category/:categoryId', authenticateJWT, documentRateLimiter, documentServiceProxy);
 
 // Document upload routes
-router.post('/upload', authenticate, documentRateLimiter, documentServiceProxy);
-router.post('/batch-upload', authenticate, documentRateLimiter, documentServiceProxy);
+router.post('/upload', authenticateJWT, documentRateLimiter, documentServiceProxy);
+router.post('/batch-upload', authenticateJWT, documentRateLimiter, documentServiceProxy);
 
 // Document statistics routes
-router.get('/stats', authenticate, documentRateLimiter, documentServiceProxy);
-router.get('/stats/subcategories', authenticate, documentRateLimiter, documentServiceProxy);
+router.get('/stats', authenticateJWT, documentRateLimiter, documentServiceProxy);
+router.get('/stats/subcategories', authenticateJWT, documentRateLimiter, documentServiceProxy);
 
 // Document processing routes
-router.get('/process-dmcc', authenticate, documentRateLimiter, documentServiceProxy);
+router.get('/process-dmcc', authenticateJWT, documentRateLimiter, documentServiceProxy);
 router.get('/public/process-dmcc', documentRateLimiter, documentServiceProxy);
 
 // User documents routes
-router.get('/user-documents/:id', authenticate, documentRateLimiter, documentServiceProxy);
-router.get('/user-documents/user/:userId', authenticate, documentRateLimiter, documentServiceProxy);
-router.post('/user-documents', authenticate, documentRateLimiter, documentServiceProxy);
+router.get('/user-documents/:id', authenticateJWT, documentRateLimiter, documentServiceProxy);
+router.get('/user-documents/user/:userId', authenticateJWT, documentRateLimiter, documentServiceProxy);
+router.post('/user-documents', authenticateJWT, documentRateLimiter, documentServiceProxy);
 
 export default router;

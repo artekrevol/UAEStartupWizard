@@ -149,6 +149,17 @@ export class DocumentController {
     
     const document = await documentRepo.createDocument(validationResult.data);
     
+    // Broadcast document created event for other services
+    eventBus.publish('document-created', {
+      documentId: document.id,
+      title: document.title,
+      category: document.category,
+      subcategory: document.subcategory,
+      freeZoneId: document.freeZoneId,
+      documentType: document.documentType,
+      createdAt: new Date().toISOString()
+    });
+    
     res.status(201).json({
       status: 'success',
       data: document
@@ -190,6 +201,19 @@ export class DocumentController {
     // Fetch updated document
     const updatedDocument = await documentRepo.getDocument(documentId);
     
+    // Broadcast document updated event for other services
+    if (updatedDocument) {
+      eventBus.publish('document-updated', {
+        documentId: updatedDocument.id,
+        title: updatedDocument.title,
+        category: updatedDocument.category || null,
+        subcategory: updatedDocument.subcategory || null,
+        freeZoneId: updatedDocument.freeZoneId || null,
+        documentType: updatedDocument.documentType || null,
+        updatedAt: new Date().toISOString()
+      });
+    }
+    
     res.json({
       status: 'success',
       data: updatedDocument
@@ -228,6 +252,16 @@ export class DocumentController {
         // Continue with response even if file deletion fails
       }
     }
+    
+    // Broadcast document deleted event for other services
+    eventBus.publish('document-deleted', {
+      documentId: existingDocument.id,
+      title: existingDocument.title,
+      category: existingDocument.category,
+      subcategory: existingDocument.subcategory,
+      freeZoneId: existingDocument.freeZoneId,
+      deletedAt: new Date().toISOString()
+    });
     
     res.json({
       status: 'success',
@@ -455,7 +489,8 @@ export class DocumentController {
         failedAt: new Date().toISOString()
       });
       
-      throw new InternalServerError(
+      throw new ServiceException(
+        ErrorCode.EXTERNAL_SERVICE_ERROR,
         'Failed to process DMCC documents',
         { originalError: error.message }
       );
