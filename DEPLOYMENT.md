@@ -29,11 +29,22 @@ Before deploying, ensure you have:
 
 ### 1. Using Replit Deployment
 
-The simplest way to deploy this application is using Replit's built-in deployment feature:
+Follow these steps to deploy your application:
 
-1. Click the "Deploy" button in your Replit project
-2. Wait for the build process to complete
-3. Your application will be available at your `.replit.app` domain
+1. Run our custom deployment script to prepare the build:
+   ```
+   ./scripts/deploy.sh
+   ```
+
+2. Click the "Deploy" button in your Replit project
+3. Wait for the build process to complete
+4. Your application will be available at your `.replit.app` domain
+
+The custom deployment script handles:
+- Setting up environment variables with fallbacks
+- Configuring HTTP-only mode for scrapers
+- Removing Playwright browser dependencies
+- Using a production-optimized server entry point with enhanced error handling
 
 ### 2. HTTP-Only Mode
 
