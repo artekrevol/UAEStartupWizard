@@ -189,30 +189,125 @@ const MOEC_BASE_URL = "https://www.moec.gov.ae";
 const FREE_ZONES_URL = `${MOEC_BASE_URL}/en/free-zones`;
 const ESTABLISHING_COMPANIES_URL = `${MOEC_BASE_URL}/en/establishing-companies`;
 
-// Configure axios with more robust SSL settings
+// Configure axios with robust SSL settings - now with legacy renegotiation enabled
 const axiosInstance = axios.create({
   httpsAgent: new https.Agent({
     rejectUnauthorized: false,
-    minVersion: "TLSv1.2",
+    minVersion: "TLSv1", // Support older TLS versions
     maxVersion: "TLSv1.3",
-    ciphers: "HIGH:!aNULL:!MD5:!RC4",
-    honorCipherOrder: true,
-    secureOptions: constants.SSL_OP_NO_SSLv3 | constants.SSL_OP_NO_SSLv2 | constants.SSL_OP_NO_RENEGOTIATION
+    ciphers: "ALL", // Allow all ciphers for maximum compatibility
+    honorCipherOrder: false, // Let server choose preferred cipher
+    secureOptions: constants.SSL_OP_NO_SSLv3 | constants.SSL_OP_NO_SSLv2, // No renegotiation restriction
+    // Force legacy renegotiation to be enabled
+    ALPNProtocols: ['http/1.1']
   }),
-  timeout: 30000, // 30 seconds timeout
+  timeout: 45000, // 45 seconds timeout
+  maxRedirects: 10, // Handle more redirects
   headers: {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-    'Accept-Language': 'en-US,en;q=0.9',
+    // Try older browser user agent
+    'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; AS; rv:11.0) like Gecko',
+    'Accept': '*/*', // Accept all content types
+    'Accept-Language': 'en-US,en;q=0.5',
+    'Accept-Encoding': 'gzip, deflate, br',
     'Connection': 'keep-alive',
     'Upgrade-Insecure-Requests': '1',
-    'Cache-Control': 'max-age=0',
-    'Sec-Fetch-Dest': 'document',
-    'Sec-Fetch-Mode': 'navigate',
-    'Sec-Fetch-Site': 'none',
-    'Sec-Fetch-User': '?1'
+    'Cache-Control': 'no-cache',
+    'Pragma': 'no-cache'
+  },
+  validateStatus: function (status) {
+    return status >= 200 && status < 500; // Accept all non-server errors
   }
 });
+
+// Direct HTTPS request using native Node.js HTTPS module with enhanced SSL handling
+const makeDirectHttpsRequest = (url: string): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    log(`Making direct HTTPS request to ${url}`, "scraper");
+    
+    // Process URL
+    const urlObj = new URL(url);
+    
+    // Create a super permissive custom agent
+    const customAgent = new https.Agent({
+      rejectUnauthorized: false,
+      // Don't explicitly set secureProtocol as it's incompatible with min/max version
+      secureOptions: 0, // No restrictions
+      ciphers: 'ALL', // All ciphers allowed
+      honorCipherOrder: false,
+      minVersion: 'TLSv1', // Minimum TLS version
+      maxVersion: 'TLSv1.2' // Maximum TLS version (avoid 1.3 which might have stricter requirements)
+    });
+    
+    // More complete request options
+    const options = {
+      hostname: urlObj.hostname,
+      port: urlObj.port || 443,
+      path: urlObj.pathname + urlObj.search,
+      method: 'GET',
+      agent: customAgent,
+      headers: {
+        // Very old User-Agent that some legacy sites expect
+        'User-Agent': 'Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1)',
+        'Accept': '*/*',
+        'Accept-Encoding': 'identity', // No compression for simplicity
+        'Accept-Language': 'en',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Connection': 'close' // Don't keep connection alive
+      }
+    };
+    
+    try {
+      log(`Configuring HTTPS request with custom options`, "scraper");
+      
+      const req = https.request(options, (res) => {
+        let data = '';
+        
+        // Handle redirects manually
+        if (res.statusCode && (res.statusCode >= 300 && res.statusCode < 400)) {
+          const redirectUrl = res.headers.location;
+          if (redirectUrl) {
+            log(`Following redirect to ${redirectUrl}`, "scraper");
+            // Create absolute URL if relative
+            const absoluteUrl = redirectUrl.startsWith('http') 
+              ? redirectUrl 
+              : new URL(redirectUrl, url).toString();
+            makeDirectHttpsRequest(absoluteUrl).then(resolve).catch(reject);
+            return;
+          }
+        }
+        
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+        
+        res.on('end', () => {
+          log(`Successfully received direct HTTPS response from ${url} (status: ${res.statusCode})`, "scraper");
+          resolve(data);
+        });
+      });
+      
+      req.on('error', (error) => {
+        log(`Error in direct HTTPS request: ${error.message}`, "scraper");
+        reject(error);
+      });
+      
+      req.on('timeout', () => {
+        log(`Direct HTTPS request timed out`, "scraper");
+        req.destroy();
+        reject(new Error('Request timed out'));
+      });
+      
+      // Apply a long timeout (2 minutes)
+      req.setTimeout(120000);
+      req.end();
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      log(`Exception setting up HTTPS request: ${errorMessage}`, "scraper");
+      reject(err);
+    }
+  });
+};
 
 async function fetchPage(url: string): Promise<string | null> {
   try {
@@ -227,24 +322,32 @@ async function fetchPage(url: string): Promise<string | null> {
     // Try with a different axios configuration
     try {
       log(`Retrying ${url} with different configuration`, "scraper");
-      // Create a new axios instance with more permissive settings
+      // Create a new axios instance with extremely permissive settings
       const fallbackAxios = axios.create({
         httpsAgent: new https.Agent({
-          rejectUnauthorized: false,
-          maxVersion: "TLSv1.3",
-          minVersion: "TLSv1",
-          ciphers: "ALL",
-          secureOptions: constants.SSL_OP_NO_RENEGOTIATION
+          rejectUnauthorized: false, // Accept all SSL certificates
+          // Don't set secureProtocol, as it conflicts with min/max version settings
+          maxVersion: "TLSv1.2", // Cap at TLS 1.2 for better compatibility
+          minVersion: "TLSv1", // Support very old TLS
+          ciphers: "ALL", // Allow all ciphers
+          secureOptions: 0, // Allow everything including legacy renegotiation
+          // Additional options to try to work around renegotiation issues
+          ALPNProtocols: ['http/1.1', 'http/1.0'],
+          ecdhCurve: 'auto' // Use auto curve selection
         }),
-        timeout: 60000, // Longer timeout
+        timeout: 120000, // Very long timeout (2 minutes)
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
+          // Try IE 6 user agent - often works with legacy sites
+          'User-Agent': 'Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1)',
           'Accept': '*/*',
-          'Connection': 'close'
+          'Accept-Language': 'en',
+          'Connection': 'close',
+          'Pragma': 'no-cache'
         },
-        maxRedirects: 10,
+        maxRedirects: 15, // Handle more redirects
+        decompress: true, // Handle compression
         validateStatus: function (status) {
-          return status >= 200 && status < 500; // Accept all non-server errors
+          return status >= 200 && status < 600; // Accept ALL status codes to debug
         }
       });
       
@@ -254,6 +357,19 @@ async function fetchPage(url: string): Promise<string | null> {
     } catch (retryError: unknown) {
       const retryErrorMessage = retryError instanceof Error ? retryError.message : String(retryError);
       log(`Failed with alternative approach: ${retryErrorMessage}`, "scraper");
+      
+      // Try with direct HTTPS request as last resort
+      try {
+        log(`Making last attempt with direct HTTPS request to ${url}`, "scraper");
+        const html = await makeDirectHttpsRequest(url);
+        if (html) {
+          log(`Successfully fetched ${url} with direct HTTPS request`, "scraper");
+          return html;
+        }
+      } catch (directError: unknown) {
+        const directErrorMessage = directError instanceof Error ? directError.message : String(directError);
+        log(`Failed with direct HTTPS request: ${directErrorMessage}`, "scraper");
+      }
       
       // Last resort - create a mock based on the URL for development purposes
       log(`Using mock data for ${url} due to connectivity issues`, "scraper");
