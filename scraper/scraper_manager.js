@@ -5,6 +5,7 @@ import { runEnhancedFreeZoneScraper } from './enhanced_freezone_scraper.js';
 import { downloadDMCCDocuments } from './dmcc_document_downloader.js';
 import { downloadAllDocuments } from './dmcc_business_docs_downloader.js';
 import { downloadDocumentsWithBrowser } from './dmcc_browser_downloader.js';
+import { scraperConfig } from './config.js';
 
 /**
  * Scraper Manager to orchestrate multiple scrapers
@@ -13,27 +14,37 @@ import { downloadDocumentsWithBrowser } from './dmcc_browser_downloader.js';
  */
 class ScraperManager {
   constructor() {
-    this.scrapers = {
-      // Original Cheerio-based scrapers
+    // Define all available scrapers
+    const allScrapers = {
+      // Original Cheerio-based scrapers (HTTP-only, safe for deployment)
       'uaefreezones': scrapeUAEFreeZones,
-      
-      // New Playwright-based scrapers
-      'uaegovportal': scrapeUAEGovernmentPortal,
-      
-      // Enhanced free zone scraper with detailed data collection
-      'enhanced_freezones': runEnhancedFreeZoneScraper,
-      
-      // DMCC document downloaders
       'dmcc-documents': downloadDMCCDocuments,
       'dmcc-business-docs': downloadAllDocuments,
+      
+      // Browser-based scrapers (require Playwright, not suitable for deployment)
+      'uaegovportal': scrapeUAEGovernmentPortal,
+      'enhanced_freezones': runEnhancedFreeZoneScraper,
       'dmcc-browser-docs': downloadDocumentsWithBrowser
     };
     
-    // Default options for scrapers
+    // In HTTP-only mode, filter out browser-based scrapers
+    if (scraperConfig.httpOnlyMode) {
+      console.log('[Scraper Manager] Running in HTTP-only mode, browser-based scrapers disabled');
+      this.scrapers = {
+        'uaefreezones': allScrapers['uaefreezones'],
+        'dmcc-documents': allScrapers['dmcc-documents'],
+        'dmcc-business-docs': allScrapers['dmcc-business-docs']
+      };
+    } else {
+      this.scrapers = allScrapers;
+    }
+    
+    // Default options for scrapers (merge with config)
     this.defaultOptions = {
-      retryCount: 3,
-      retryDelay: 2000,
-      timeout: 30000
+      retryCount: scraperConfig.maxRetries || 3,
+      retryDelay: scraperConfig.retryDelay || 2000,
+      timeout: scraperConfig.timeout || 30000,
+      httpOnlyMode: scraperConfig.httpOnlyMode
     };
   }
   
