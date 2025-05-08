@@ -1,81 +1,106 @@
 /**
  * Error Handler Middleware
- * Provides consistent error handling for all microservices
+ * 
+ * Provides consistent error handling across all microservices
  */
 import { Request, Response, NextFunction } from 'express';
-import { ServiceException, ErrorCode } from '../errors';
-import { logger } from '../logger';
+import { ApiError } from '../errors/ApiError';
+import { ZodError } from 'zod';
+import { fromZodError } from 'zod-validation-error';
+import { config } from '../config';
 
 /**
- * Middleware to handle errors consistently across all services
+ * Global error handler middleware
  */
 export const errorHandler = (
-  err: Error | ServiceException,
+  err: Error,
   req: Request,
   res: Response,
   next: NextFunction
-): void => {
-  // If headers already sent, let Express handle it
-  if (res.headersSent) {
-    return next(err);
-  }
+) => {
+  console.error(`[ErrorHandler] ${err.message}`, err);
 
-  // Default error response
-  let statusCode = 500;
-  let errorResponse = {
-    error: {
-      code: ErrorCode.UNKNOWN_ERROR,
-      message: 'An unexpected error occurred'
-    }
-  };
-
-  // Handle ServiceException with proper error format
-  if (err instanceof ServiceException) {
-    statusCode = err.statusCode;
-    errorResponse = err.toJSON();
-    
-    // Log error details based on severity
-    if (statusCode >= 500) {
-      logger.error(`[ServiceError] ${err.message}`, {
-        code: err.code,
-        path: req.path,
-        method: req.method,
-        details: err.details
-      });
-    } else if (statusCode >= 400) {
-      logger.warn(`[ClientError] ${err.message}`, {
-        code: err.code,
-        path: req.path,
-        method: req.method
-      });
-    }
-  } else {
-    // For unhandled errors, log with stack trace
-    logger.error(`[UnhandledError] ${err.message}`, {
-      stack: err.stack,
-      path: req.path,
-      method: req.method
+  // Handle ApiError instances
+  if (err instanceof ApiError) {
+    return res.status(err.statusCode).json({
+      success: false,
+      error: {
+        message: err.message,
+        code: err.errorCode,
+        details: err.details,
+      },
     });
-    
-    // In production, don't expose internal error details
-    if (process.env.NODE_ENV === 'production') {
-      errorResponse.error.message = 'An internal server error occurred';
-    } else {
-      // In development, include more details
-      errorResponse.error.message = err.message;
-      (errorResponse.error as any).stack = err.stack;
-    }
   }
 
-  // Send error response
-  res.status(statusCode).json(errorResponse);
+  // Handle Zod validation errors
+  if (err instanceof ZodError) {
+    const validationError = fromZodError(err);
+    return res.status(400).json({
+      success: false,
+      error: {
+        message: 'Validation error',
+        code: 'VALIDATION_ERROR',
+        details: validationError.details,
+      },
+    });
+  }
+
+  // Handle JWT errors
+  if (err.name === 'JsonWebTokenError') {
+    return res.status(401).json({
+      success: false,
+      error: {
+        message: 'Invalid token',
+        code: 'INVALID_TOKEN',
+      },
+    });
+  }
+
+  if (err.name === 'TokenExpiredError') {
+    return res.status(401).json({
+      success: false,
+      error: {
+        message: 'Token expired',
+        code: 'TOKEN_EXPIRED',
+      },
+    });
+  }
+
+  // Handle generic errors
+  const statusCode = 500;
+  const message = config.isProduction
+    ? 'Internal server error'
+    : err.message || 'Internal server error';
+
+  res.status(statusCode).json({
+    success: false,
+    error: {
+      message,
+      stack: config.isProduction ? undefined : err.stack,
+    },
+  });
 };
 
 /**
- * Async request handler wrapper to automatically catch errors
+ * Handle 404 - Not Found errors
  */
-export const asyncHandler = (fn: Function) => {
-  return (req: Request, res: Response, next: NextFunction) => {
-    Promise.resolve(fn(req, res, next)).catch(next);
-  };
+export const notFoundHandler = (req: Request, res: Response) => {
+  res.status(404).json({
+    success: false,
+    error: {
+      message: `Not found - ${req.originalUrl}`,
+      code: 'NOT_FOUND',
+    },
+  });
+};
+
+/**
+ * Async handler to simplify try/catch in controllers
+ */
+export const asyncHandler = (fn: Function) => (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
 };
