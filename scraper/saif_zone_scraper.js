@@ -12,7 +12,7 @@ import path from 'path';
 import fs from 'fs';
 import { PlaywrightScraper } from './utils/playwright_scraper_base.js';
 
-export class SAIFZoneScraper extends PlaywrightScraper {
+class SAIFZoneScraper extends PlaywrightScraper {
   constructor(options = {}) {
     super({
       name: 'saif_zone_scraper',
