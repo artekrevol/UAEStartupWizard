@@ -12,6 +12,7 @@ import { initializeMessaging, registerGatewayServices, shutdownMessaging } from 
 import { eventBus } from '../../shared/event-bus';
 import { applySecurity, preventOpenRedirect } from '../../shared/middleware/security';
 import { setCacheHeaders } from '../../shared/middleware/cache-middleware';
+import { performanceMonitor } from '../../shared/middleware/performance';
 
 // Initialize Express app
 const app = express();
@@ -59,6 +60,13 @@ app.use(urlencoded({ extended: true, limit: '10mb' }));
 
 // Request logging
 app.use(requestLogger);
+
+// Performance monitoring
+app.use(performanceMonitor({
+  slowThresholdMs: 1000, // Log warning for requests taking over 1 second
+  logAllRequests: process.env.NODE_ENV !== 'production', // Log all requests in development
+  excludePaths: ['/health', '/api/health'],
+}));
 
 // Global rate limiting
 app.use(globalRateLimiter);
