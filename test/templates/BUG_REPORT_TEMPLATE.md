@@ -1,51 +1,58 @@
 # Bug Report
 
-## Title
-[Concise summary of the issue]
-
-## Description
-[Detailed explanation of the bug and its impact]
-
-## Steps to Reproduce
-1. [First step]
-2. [Second step]
-3. [...]
-
-## Expected Behavior
-[What should happen]
-
-## Actual Behavior
-[What actually happens]
+## Summary
+<!-- Provide a brief, clear description of the bug -->
 
 ## Environment
-- **Browser/Device**: [e.g., Chrome 90, iPhone 12]
-- **OS**: [e.g., Windows 10, iOS 14]
-- **Screen Size**: [if relevant]
-- **User Role**: [if applicable]
+- **Browser/Device:** <!-- e.g., Chrome 112.0.5615.121, iPhone 13 iOS 16.2 -->
+- **Operating System:** <!-- e.g., Windows 11, macOS 13.3.1 -->
+- **Application Version/Commit:** <!-- e.g., v1.2.3, commit hash -->
+- **User Role:** <!-- e.g., Admin, Regular User, Guest -->
 
-## Visual Evidence
-[Screenshots or videos demonstrating the issue]
+## Steps to Reproduce
+1. <!-- First step -->
+2. <!-- Second step -->
+3. <!-- And so on... -->
 
-## Severity
-- [ ] Critical - System crash, data loss, security breach, complete feature failure
-- [ ] High - Major functionality affected, but workarounds exist
-- [ ] Medium - Minor functionality affected, non-core features
-- [ ] Low - Cosmetic issues, typos, UI improvements
+## Expected Behavior
+<!-- What should happen when the steps are followed -->
 
-## Priority
-- [ ] Immediate - Must be fixed immediately, blocking development/release
-- [ ] High - Should be fixed in the current sprint
-- [ ] Medium - Should be fixed in the next sprint
-- [ ] Low - Can be fixed when resources are available
+## Actual Behavior
+<!-- What actually happens when the steps are followed -->
 
-## Additional Context
-[Any other relevant information]
+## Evidence
+<!-- Screenshots, videos, console logs, network requests, etc. -->
 
-## Assignee
-[Who should fix this bug]
+## Impact & Severity
+<!-- Choose one severity level and explain the impact -->
 
-## Reporter
-[Who reported this bug]
+**Severity:** 
+- [ ] Critical - Complete system outage, security breach
+- [ ] High - Major functionality broken, no workaround
+- [ ] Medium - Feature partially broken, workaround exists
+- [ ] Low - Minor issue, cosmetic or enhancement
 
-## Date Reported
-[YYYY-MM-DD]
+**Impact:**
+<!-- Describe who is affected and how severely -->
+
+## Possible Fixes
+<!-- If you have any ideas on what might be causing the issue or how to fix it -->
+
+## Related Issues/PRs
+<!-- Links to related issues or pull requests -->
+
+---
+
+## For Development Team
+
+### Root Cause Analysis
+<!-- Technical explanation of what caused the bug -->
+
+### Resolution
+<!-- Description of how the bug was fixed -->
+
+### Preventive Measures
+<!-- Changes made to prevent similar bugs in the future -->
+
+### Regression Testing
+<!-- Tests performed to ensure the bug is fixed and no new issues introduced -->
