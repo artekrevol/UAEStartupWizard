@@ -46,7 +46,21 @@ const mockFreeZones = [
 ];
 
 // Business setup mock data
-const mockBusinessSetups = [];
+// Define the BusinessSetup interface
+interface BusinessSetup {
+  id: number;
+  freeZoneId?: number;
+  companyName?: string;
+  legalStructure?: string;
+  activityType?: string;
+  visaCount?: number;
+  officeSpace?: string;
+  initialCapital?: string;
+  createdAt: string;
+  [key: string]: any; // Allow additional fields
+}
+
+const mockBusinessSetups: BusinessSetup[] = [];
 
 // Industries list
 const mockIndustries = [
