@@ -460,7 +460,7 @@ const AIProductManager: React.FC = () => {
       
       toast({
         title: "Recommendations Ready",
-        description: `Generated ${recommendations.length} product recommendations.`,
+        description: `Generated ${recommendations ? recommendations.length : 0} product recommendations.`,
         variant: "default",
       });
     } catch (error) {
@@ -494,7 +494,7 @@ const AIProductManager: React.FC = () => {
       
       toast({
         title: "Cycle Complete",
-        description: `Analyzed ${result.analysis.length} free zones, enriched ${result.enhancements.length} fields, and generated ${result.recommendations.length} recommendations.`,
+        description: `Analyzed ${result.analysis.length} free zones, enriched ${result.enhancements.length} fields, and generated ${result.recommendations ? result.recommendations.length : 0} recommendations.`,
         variant: "default",
       });
       
@@ -1023,7 +1023,7 @@ const AIProductManager: React.FC = () => {
                 </Button>
               </div>
               
-              {recommendations.length === 0 ? (
+              {(!recommendations || recommendations.length === 0) ? (
                 <Alert>
                   <FileQuestion className="h-4 w-4" />
                   <AlertTitle>No recommendations yet</AlertTitle>
@@ -1071,7 +1071,7 @@ const AIProductManager: React.FC = () => {
                         </div>
                         <div className="p-4 border rounded bg-purple-50">
                           <p className="text-lg font-semibold text-purple-700">
-                            {cycleResults.recommendations.length}
+                            {cycleResults.recommendations ? cycleResults.recommendations.length : 0}
                           </p>
                           <p className="text-sm text-purple-600">Recommendations</p>
                         </div>
