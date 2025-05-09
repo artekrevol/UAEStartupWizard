@@ -11,7 +11,7 @@ import {
   ShieldAlert,
   Bot,
   Database,
-  Search
+  Search as SearchIcon // Renamed to avoid conflicts
 } from "lucide-react";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -118,7 +118,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               className="w-full justify-start"
               onClick={() => setLocation("/ai-research")}
             >
-              <Search className="mr-2 h-5 w-5" />
+              <SearchIcon className="mr-2 h-5 w-5" />
               AI Research
             </Button>
             
