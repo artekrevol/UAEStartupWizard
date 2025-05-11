@@ -86,12 +86,14 @@ export default function DocumentRequirementsStep({
     });
     
     // Track interaction
-    trackUserAction({
-      interactionType: 'business_setup_requirement_acknowledgment',
-      component: 'DocumentRequirementsStep',
-      elementId: `requirement-${requirementId}`,
-      interactionValue: (!acknowledgedRequirements[requirementId]).toString()
-    });
+    trackUserAction(
+      'business_setup_requirement_acknowledgment',
+      'DocumentRequirementsStep',
+      {
+        elementId: `requirement-${requirementId}`,
+        interactionValue: (!acknowledgedRequirements[requirementId]).toString()
+      }
+    );
   };
 
   // Group requirements by category
@@ -114,22 +116,24 @@ export default function DocumentRequirementsStep({
   // Function to handle download (placeholder for now)
   const handleDownload = (requirementId: string) => {
     // This would eventually link to actual document templates
-    trackUserAction({
-      interactionType: 'document_download',
-      component: 'DocumentRequirementsStep',
-      elementId: `download-${requirementId}`,
-    });
+    trackUserAction(
+      'document_download',
+      'DocumentRequirementsStep',
+      { elementId: `download-${requirementId}` }
+    );
   };
 
   // Handle continuing to next step
   const handleContinue = () => {
     // Track acknowledgment
-    trackUserAction({
-      interactionType: 'business_setup_step_complete',
-      component: 'DocumentRequirementsStep',
-      elementId: 'continueButton',
-      interactionValue: 'document_requirements_acknowledged'
-    });
+    trackUserAction(
+      'business_setup_step_complete',
+      'DocumentRequirementsStep',
+      {
+        elementId: 'continueButton',
+        interactionValue: 'document_requirements_acknowledged'
+      }
+    );
     
     onNext();
   };
@@ -252,11 +256,11 @@ export default function DocumentRequirementsStep({
                                     rel="noopener noreferrer"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      trackUserAction({
-                                        interactionType: 'external_link_click',
-                                        component: 'DocumentRequirementsStep',
-                                        elementId: `external-link-${requirement.id}`,
-                                      });
+                                      trackUserAction(
+                                        'external_link_click',
+                                        'DocumentRequirementsStep',
+                                        { elementId: `external-link-${requirement.id}` }
+                                      );
                                     }}
                                   >
                                     <Link2 className="h-3 w-3" />

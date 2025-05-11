@@ -172,12 +172,14 @@ export default function LegalStructureStep({
     updateBusinessSetupData('legalStructure', legalForm);
     
     // Track selection
-    trackUserAction({
-      interactionType: 'business_setup_selection',
-      component: 'LegalStructureStep',
-      elementId: 'legalStructureOption',
-      interactionValue: legalForm
-    });
+    trackUserAction(
+      'business_setup_selection',
+      'LegalStructureStep',
+      {
+        elementId: 'legalStructureOption',
+        interactionValue: legalForm
+      }
+    );
     
     // Auto progress after selection
     setTimeout(onNext, 800);

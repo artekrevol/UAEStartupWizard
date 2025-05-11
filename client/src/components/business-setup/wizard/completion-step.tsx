@@ -87,30 +87,30 @@ export default function CompletionStep({
   const handleDocuments = () => {
     navigate('/documents');
     
-    trackUserAction({
-      interactionType: 'button_click',
-      component: 'CompletionStep',
-      elementId: 'documentsButton'
-    });
+    trackUserAction(
+      'button_click',
+      'CompletionStep',
+      { elementId: 'documentsButton' }
+    );
   };
 
   const handleSupport = () => {
     navigate('/support');
     
-    trackUserAction({
-      interactionType: 'button_click',
-      component: 'CompletionStep',
-      elementId: 'supportButton'
-    });
+    trackUserAction(
+      'button_click',
+      'CompletionStep',
+      { elementId: 'supportButton' }
+    );
   };
 
   const handleDownloadSummary = () => {
     // This would eventually generate a PDF summary
-    trackUserAction({
-      interactionType: 'document_download',
-      component: 'CompletionStep',
-      elementId: 'downloadSummaryButton'
-    });
+    trackUserAction(
+      'document_download',
+      'CompletionStep',
+      { elementId: 'downloadSummaryButton' }
+    );
   };
 
   return (
