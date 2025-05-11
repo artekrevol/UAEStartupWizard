@@ -75,9 +75,13 @@ export default function BusinessSetupWizard() {
   }, [currentStep, visitedSteps]);
   
   const steps = [
-    { title: "Business Type", component: BusinessTypeStep },
+    { title: "Introduction", component: IntroductionStep },
+    { title: "Your Goal", component: IntroductionStep, condition: () => true },
+    { title: "Business Type", component: BusinessTypeStep, condition: () => !!businessSetupData.primaryGoal },
     { title: "Industry Sector", component: IndustrySectorStep, condition: () => !!businessSetupData.businessType },
-    { title: "Free Zone", component: FreezoneStep, condition: () => !!businessSetupData.industrySector },
+    { title: "Location Info", component: BusinessLocationEducationStep, condition: () => !!businessSetupData.industrySector },
+    { title: "Location Preference", component: LocationPreferenceStep, condition: () => businessSetupData.educationComplete },
+    { title: "Free Zone", component: FreezoneStep, condition: () => !!businessSetupData.locationPreference },
     { title: "Business Activity", component: BusinessActivityStep, condition: () => !!businessSetupData.selectedFreeZone },
     { title: "Legal Structure", component: LegalStructureStep, condition: () => !!businessSetupData.businessActivity },
     { title: "Document Requirements", component: DocumentRequirementsStep, condition: () => !!businessSetupData.legalStructure },

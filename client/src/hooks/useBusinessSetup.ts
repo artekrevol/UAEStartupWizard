@@ -5,8 +5,20 @@ import { useToast } from '@/hooks/use-toast';
 import { trackUserAction } from '@/lib/user-tracker';
 
 export type BusinessSetupData = {
+  // New intro fields
+  primaryGoal: string | null;
+  
+  // Original fields
   businessType: string | null;
   industrySector: string | null;
+  
+  // New location fields
+  educationComplete: boolean;
+  locationPreference: string | null; 
+  locationPriorities: string[];
+  locationRecommendation: string | null;
+  
+  // Remaining fields
   selectedFreeZone: number | null;
   businessActivity: string | null;
   legalStructure: string | null;
@@ -21,8 +33,20 @@ export function useBusinessSetup() {
   const [currentStep, setCurrentStep] = useState(0);
   const [direction, setDirection] = useState<'forward' | 'backward'>('forward');
   const [businessSetupData, setBusinessSetupData] = useState<BusinessSetupData>({
+    // New intro fields
+    primaryGoal: null,
+    
+    // Original fields
     businessType: null,
     industrySector: null,
+    
+    // New location fields
+    educationComplete: false,
+    locationPreference: null,
+    locationPriorities: [],
+    locationRecommendation: null,
+    
+    // Remaining fields
     selectedFreeZone: null,
     businessActivity: null,
     legalStructure: null,
@@ -113,8 +137,20 @@ export function useBusinessSetup() {
   useEffect(() => {
     if (existingSetup) {
       const newData = {
+        // New intro fields
+        primaryGoal: existingSetup.primaryGoal || null,
+        
+        // Original fields
         businessType: existingSetup.businessType,
         industrySector: existingSetup.industrySector || existingSetup.businessActivity, // Backwards compatibility
+        
+        // New location fields
+        educationComplete: existingSetup.educationComplete || false,
+        locationPreference: existingSetup.locationPreference || null,
+        locationPriorities: existingSetup.locationPriorities || [],
+        locationRecommendation: existingSetup.locationRecommendation || null,
+        
+        // Remaining fields
         selectedFreeZone: existingSetup.selectedFreeZone,
         businessActivity: existingSetup.businessActivity,
         legalStructure: existingSetup.legalStructure,
@@ -129,7 +165,7 @@ export function useBusinessSetup() {
       // Resume from last completed step if available
       if (existingSetup.lastCompletedStep) {
         // Go to the next incomplete step
-        setCurrentStep(Math.min(existingSetup.lastCompletedStep + 1, 6)); // 6 is max steps
+        setCurrentStep(Math.min(existingSetup.lastCompletedStep + 1, 9)); // 9 is the new max steps
       }
     }
   }, [existingSetup]);
@@ -192,17 +228,25 @@ export function useBusinessSetup() {
   // Check if we can proceed to the next step based on current data
   const canProceedToNextStep = () => {
     switch (currentStep) {
-      case 0: // Business Type
+      case 0: // Introduction
+        return true; // Always allow proceeding from introduction
+      case 1: // Primary Goal
+        return !!businessSetupData.primaryGoal;
+      case 2: // Business Type
         return !!businessSetupData.businessType;
-      case 1: // Industry Sector
+      case 3: // Industry Sector
         return !!businessSetupData.industrySector;
-      case 2: // Free Zone
+      case 4: // Business Location Education
+        return businessSetupData.educationComplete;
+      case 5: // Location Preference
+        return !!businessSetupData.locationPreference;
+      case 6: // Free Zone Selection
         return !!businessSetupData.selectedFreeZone;
-      case 3: // Business Activity
+      case 7: // Business Activity
         return !!businessSetupData.businessActivity;
-      case 4: // Legal Structure
+      case 8: // Legal Structure
         return !!businessSetupData.legalStructure;
-      case 5: // Document Requirements
+      case 9: // Document Requirements
         return true; // Always allow proceeding from document requirements
       default:
         return true;
