@@ -2,6 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import * as path from "path";
 import * as fs from "fs";
+import { WebSocketServer, WebSocket } from 'ws';
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { getBusinessRecommendations, generateDocumentRequirements, getUAEBusinessAssistantResponse } from "./openai";
@@ -2326,5 +2327,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerAIProductManagerRoutes(app);
 
   const httpServer = createServer(app);
+  
+  // Create WebSocket server on a distinct path so it doesn't conflict with Vite's HMR
+  const wss = new WebSocketServer({ 
+    server: httpServer, 
+    path: '/ws' 
+  });
+  
+  // Define extended WebSocket interface with userId property
+  interface ExtendedWebSocket extends WebSocket {
+    userId?: number;
+  }
+
+  // Declare global functions for TypeScript
+  declare global {
+    var broadcastWebSocketMessage: (message: any) => void;
+    var sendUserWebSocketMessage: (userId: number, message: any) => void;
+  }
+
+  // Handle WebSocket connections
+  wss.on('connection', (ws: ExtendedWebSocket) => {
+    console.log('WebSocket client connected');
+    
+    // Handle messages from clients
+    ws.on('message', (message: any) => {
+      try {
+        // Parse the incoming message
+        const data = JSON.parse(message.toString());
+        console.log('Received message:', data);
+        
+        // Handle different message types
+        switch (data.type) {
+          case 'ping':
+            // Send a pong response
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ type: 'pong', timestamp: Date.now() }));
+            }
+            break;
+            
+          case 'notification_subscribe':
+            // Store client subscription info (in a real implementation, you'd store this in a more permanent way)
+            ws.userId = data.userId;
+            console.log(`User ${data.userId} subscribed to notifications`);
+            
+            // Send confirmation
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ 
+                type: 'subscription_confirmed', 
+                message: 'You are now subscribed to real-time notifications' 
+              }));
+            }
+            break;
+            
+          default:
+            console.log(`Unhandled message type: ${data.type}`);
+        }
+      } catch (error) {
+        console.error('Error processing WebSocket message:', error);
+      }
+    });
+    
+    // Handle disconnection
+    ws.on('close', () => {
+      console.log('WebSocket client disconnected');
+    });
+    
+    // Send welcome message
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ 
+        type: 'welcome', 
+        message: 'Connected to UAE Business Setup Platform WebSocket Server',
+        timestamp: Date.now()
+      }));
+    }
+  });
+  
+  // Broadcast a message to all connected clients
+  global.broadcastWebSocketMessage = (message: any) => {
+    wss.clients.forEach((client: WebSocket) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify(message));
+      }
+    });
+  };
+  
+  // Broadcast a message to a specific user
+  global.sendUserWebSocketMessage = (userId: number, message: any) => {
+    wss.clients.forEach((client: ExtendedWebSocket) => {
+      if (client.readyState === WebSocket.OPEN && client.userId === userId) {
+        client.send(JSON.stringify(message));
+      }
+    });
+  };
+  
   return httpServer;
 }

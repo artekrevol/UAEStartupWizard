@@ -13,6 +13,10 @@ declare global {
   namespace Express {
     interface User extends SelectUser {}
   }
+  
+  // Define global WebSocket message functions
+  var broadcastWebSocketMessage: (message: any) => void;
+  var sendUserWebSocketMessage: (userId: number, message: any) => void;
 }
 
 const scryptAsync = promisify(scrypt);
@@ -148,6 +152,47 @@ export function setupAuth(app: Express) {
       res.json(safeUserData);
     } else {
       res.sendStatus(401);
+    }
+  });
+  
+  // Test endpoint to send a notification to a user via WebSocket
+  app.post("/api/test-notification", (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      const { type, title, message } = req.body;
+      
+      // Create notification object
+      const notification = {
+        id: `notification-${Date.now()}`,
+        type: type || 'info',
+        title: title || 'Test Notification',
+        message: message || 'This is a test notification',
+        timestamp: Date.now()
+      };
+      
+      // Send to specific user if global function exists
+      if (global.sendUserWebSocketMessage) {
+        global.sendUserWebSocketMessage(req.user.id, {
+          type: 'notification',
+          notification
+        });
+        
+        // Log the sent notification
+        console.log(`Sent test notification to user ${req.user.id}`);
+        res.status(200).json({ success: true, notification });
+      } else {
+        res.status(500).json({ 
+          success: false, 
+          error: 'WebSocket messaging function not available' 
+        });
+      }
+    } catch (error) {
+      console.error('Error sending test notification:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   });
 }
