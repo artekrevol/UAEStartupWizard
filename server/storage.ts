@@ -847,6 +847,136 @@ export class DatabaseStorage implements IStorage {
       })
       .where(eq(issuesLog.id, id));
   }
+
+  // Admin Dashboard methods implementation
+  async createAdminDashboard(dashboard: InsertAdminDashboard): Promise<AdminDashboard> {
+    const [createdDashboard] = await db
+      .insert(adminDashboards)
+      .values(dashboard)
+      .returning();
+    return createdDashboard;
+  }
+  
+  async getAdminDashboard(id: number): Promise<AdminDashboard | undefined> {
+    const [dashboard] = await db.select().from(adminDashboards).where(eq(adminDashboards.id, id));
+    return dashboard;
+  }
+  
+  async getAdminDashboardByPath(path: string): Promise<AdminDashboard | undefined> {
+    const [dashboard] = await db.select().from(adminDashboards).where(eq(adminDashboards.path, path));
+    return dashboard;
+  }
+  
+  async getAllAdminDashboards(): Promise<AdminDashboard[]> {
+    return await db
+      .select()
+      .from(adminDashboards)
+      .where(eq(adminDashboards.isActive, true))
+      .orderBy(adminDashboards.order);
+  }
+  
+  async getAdminDashboardsByRole(role: string): Promise<AdminDashboard[]> {
+    return await db
+      .select()
+      .from(adminDashboards)
+      .orderBy(adminDashboards.order);
+    // Note: We need to filter by role in the application layer as requiredRoles is a JSONB field
+  }
+  
+  async updateAdminDashboard(id: number, dashboard: Partial<AdminDashboard>): Promise<void> {
+    await db
+      .update(adminDashboards)
+      .set({
+        ...dashboard,
+        updatedAt: new Date(),
+      })
+      .where(eq(adminDashboards.id, id));
+  }
+  
+  async deleteAdminDashboard(id: number): Promise<void> {
+    await db.delete(adminDashboards).where(eq(adminDashboards.id, id));
+  }
+  
+  // Admin Dashboard Widget methods implementation
+  async createAdminDashboardWidget(widget: InsertAdminDashboardWidget): Promise<AdminDashboardWidget> {
+    const [createdWidget] = await db
+      .insert(adminDashboardWidgets)
+      .values(widget)
+      .returning();
+    return createdWidget;
+  }
+  
+  async getAdminDashboardWidget(id: number): Promise<AdminDashboardWidget | undefined> {
+    const [widget] = await db.select().from(adminDashboardWidgets).where(eq(adminDashboardWidgets.id, id));
+    return widget;
+  }
+  
+  async getAdminDashboardWidgetsByDashboard(dashboardId: number): Promise<AdminDashboardWidget[]> {
+    return await db
+      .select()
+      .from(adminDashboardWidgets)
+      .where(eq(adminDashboardWidgets.dashboardId, dashboardId))
+      .orderBy(adminDashboardWidgets.order);
+  }
+  
+  async updateAdminDashboardWidget(id: number, widget: Partial<AdminDashboardWidget>): Promise<void> {
+    await db
+      .update(adminDashboardWidgets)
+      .set({
+        ...widget,
+        updatedAt: new Date(),
+      })
+      .where(eq(adminDashboardWidgets.id, id));
+  }
+  
+  async deleteAdminDashboardWidget(id: number): Promise<void> {
+    await db.delete(adminDashboardWidgets).where(eq(adminDashboardWidgets.id, id));
+  }
+  
+  // Conversation Interface methods implementation
+  async createConversationInterface(interfaceData: InsertConversationInterface): Promise<ConversationInterface> {
+    const [createdInterface] = await db
+      .insert(conversationInterfaces)
+      .values(interfaceData)
+      .returning();
+    return createdInterface;
+  }
+  
+  async getConversationInterface(id: number): Promise<ConversationInterface | undefined> {
+    const [conversationInterface] = await db.select().from(conversationInterfaces).where(eq(conversationInterfaces.id, id));
+    return conversationInterface;
+  }
+  
+  async getConversationInterfaceByName(name: string): Promise<ConversationInterface | undefined> {
+    const [conversationInterface] = await db.select().from(conversationInterfaces).where(eq(conversationInterfaces.name, name));
+    return conversationInterface;
+  }
+  
+  async getAllConversationInterfaces(): Promise<ConversationInterface[]> {
+    return await db.select().from(conversationInterfaces);
+  }
+  
+  async getActiveConversationInterfaces(): Promise<ConversationInterface[]> {
+    return await db
+      .select()
+      .from(conversationInterfaces)
+      .where(eq(conversationInterfaces.isActive, true))
+      .orderBy(conversationInterfaces.order);
+  }
+  
+  async updateConversationInterface(id: number, data: Partial<ConversationInterface>): Promise<void> {
+    await db
+      .update(conversationInterfaces)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(eq(conversationInterfaces.id, id));
+  }
+  
+  async deleteConversationInterface(id: number): Promise<void> {
+    await db.delete(conversationInterfaces).where(eq(conversationInterfaces.id, id));
+  }
 }
 
 export const storage = new DatabaseStorage();
