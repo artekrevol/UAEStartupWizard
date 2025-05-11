@@ -13,6 +13,7 @@ import DocumentManagement from "@/pages/DocumentManagement";
 import PremiumAssistant from "@/pages/premium-assistant";
 import AIProductManager from "@/pages/AIProductManager";
 import EnrichmentWorkflowPage from "@/pages/enrichment-workflow";
+import UserInteractionsPage from "@/pages/admin/user-interactions";
 import { ProtectedRoute } from "./lib/protected-route";
 import ErrorBoundary from "@/components/error-boundary";
 import { useEffect } from "react";
@@ -32,6 +33,7 @@ function Router() {
       <ProtectedRoute path="/free-zones" component={FreeZonesPage} />
       <ProtectedRoute path="/free-zone/:id" component={FreeZonePage} />
       <ProtectedRoute path="/admin" component={AdminPage} />
+      <ProtectedRoute path="/admin/user-interactions" component={UserInteractionsPage} />
       <ProtectedRoute path="/documents" component={DocumentManagement} />
       <ProtectedRoute path="/premium-assistant" component={PremiumAssistant} />
       <ProtectedRoute path="/ai-product-manager" component={AIProductManager} />
