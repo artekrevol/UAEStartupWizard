@@ -38,17 +38,17 @@ export default function CompletionStep({
 
   // Track completion on mount
   useEffect(() => {
-    trackUserAction({
-      interactionType: 'business_setup_complete',
-      component: 'CompletionStep',
-      elementId: 'wizardCompletion',
-      interactionValue: JSON.stringify({
+    trackUserAction(
+      'business_setup_complete',
+      'CompletionStep',
+      {
+        elementId: 'wizardCompletion',
         businessType: businessSetupData.businessType,
         industrySector: businessSetupData.industrySector,
         selectedFreeZone: businessSetupData.selectedFreeZone,
         legalStructure: businessSetupData.legalStructure
-      })
-    });
+      }
+    );
     
     // Update the timeline if not already set
     if (!businessSetupData.timeline) {
@@ -77,17 +77,17 @@ export default function CompletionStep({
   const handleDashboard = () => {
     navigate('/');
     
-    trackUserAction({
-      interactionType: 'button_click',
-      component: 'CompletionStep',
-      elementId: 'dashboardButton'
-    });
+    trackUserAction(
+      'button_click',
+      'CompletionStep',
+      { elementId: 'dashboardButton' }
+    );
   };
 
   const handleDocuments = () => {
     navigate('/documents');
     
-    trackUserInteraction({
+    trackUserAction({
       interactionType: 'button_click',
       component: 'CompletionStep',
       elementId: 'documentsButton'
@@ -97,7 +97,7 @@ export default function CompletionStep({
   const handleSupport = () => {
     navigate('/support');
     
-    trackUserInteraction({
+    trackUserAction({
       interactionType: 'button_click',
       component: 'CompletionStep',
       elementId: 'supportButton'
@@ -106,7 +106,7 @@ export default function CompletionStep({
 
   const handleDownloadSummary = () => {
     // This would eventually generate a PDF summary
-    trackUserInteraction({
+    trackUserAction({
       interactionType: 'document_download',
       component: 'CompletionStep',
       elementId: 'downloadSummaryButton'
