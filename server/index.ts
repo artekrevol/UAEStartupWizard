@@ -68,6 +68,34 @@ app.use((req, res, next) => {
   next();
 });
 
+// Global unhandled promise rejection handler
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Promise Rejection:', reason);
+  
+  // Log to issues_log table if it's a known error that we want to track
+  if (reason instanceof Error) {
+    try {
+      const errorMessage = reason.message || 'Unknown error';
+      const stack = reason.stack || '';
+      
+      // Use the SQL client directly to avoid circular dependencies
+      // This is a fire-and-forget operation, as we don't want to block the process
+      import('./storage').then(({ storage }) => {
+        storage.createIssue({
+          type: 'error',
+          severity: 'high',
+          message: `Unhandled Promise Rejection: ${errorMessage}`,
+          stack_trace: stack,
+          component: 'system',
+          metadata: { unhandled: true }
+        }).catch((err: Error) => console.error('Failed to log unhandled rejection:', err));
+      }).catch((err: Error) => console.error('Failed to import storage module:', err));
+    } catch (loggingError) {
+      console.error('Error while logging unhandled rejection:', loggingError);
+    }
+  }
+});
+
 (async () => {
   const server = await registerRoutes(app);
 
