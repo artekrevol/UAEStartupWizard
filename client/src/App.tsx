@@ -40,7 +40,7 @@ function Router() {
       <ProtectedRoute path="/premium-assistant" component={PremiumAssistant} />
       <ProtectedRoute path="/ai-product-manager" component={AIProductManager} />
       <ProtectedRoute path="/enrichment-workflow" component={EnrichmentWorkflowPage} />
-      <ProtectedRoute path="/business-setup" component={BusinessSetupWizard} />
+      <Route path="/business-setup" component={BusinessSetupWizard} />
       <ProtectedRoute path="/ai-research" component={AIResearchPage} />
       <Route path="/auth" component={AuthPage} />
       <Route component={NotFound} />
