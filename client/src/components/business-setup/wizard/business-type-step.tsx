@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { trackUserAction } from '@/lib/user-tracker';
-import { Building2, Briefcase, Store, Factory, BuildingCommunity } from 'lucide-react';
+import { Building2, Briefcase, Store, Factory, Building } from 'lucide-react';
 
 interface BusinessTypeOption {
   id: string;
@@ -42,7 +42,7 @@ const businessTypeOptions: BusinessTypeOption[] = [
     id: 'corporate',
     label: 'Corporate Entity',
     description: 'For large established businesses and holding companies',
-    icon: <BuildingCommunity className="h-8 w-8" />
+    icon: <Building className="h-8 w-8" />
   },
 ];
 
@@ -66,12 +66,14 @@ export default function BusinessTypeStep({
     updateBusinessSetupData('businessType', typeId);
     
     // Track selection
-    trackUserAction({
-      interactionType: 'business_setup_selection',
-      component: 'BusinessTypeStep',
-      elementId: 'businessTypeOption',
-      interactionValue: typeId
-    });
+    trackUserAction(
+      'business_setup_selection',
+      'BusinessTypeStep',
+      {
+        elementId: 'businessTypeOption',
+        interactionValue: typeId
+      }
+    );
     
     // Auto progress after selection
     setTimeout(onNext, 500);

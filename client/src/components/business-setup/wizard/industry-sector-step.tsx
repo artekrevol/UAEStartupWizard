@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { trackUserInteraction } from '@/lib/user-tracker';
+import { trackUserAction } from '@/lib/user-tracker';
 import { Loader2, Search } from 'lucide-react';
 
 // Common industry sectors
@@ -58,12 +58,14 @@ export default function IndustrySectorStep({
     updateBusinessSetupData('industrySector', industry);
     
     // Track selection
-    trackUserInteraction({
-      interactionType: 'business_setup_selection',
-      component: 'IndustrySectorStep',
-      elementId: 'industrySectorOption',
-      interactionValue: industry
-    });
+    trackUserAction(
+      'business_setup_selection',
+      'IndustrySectorStep',
+      {
+        elementId: 'industrySectorOption',
+        interactionValue: industry
+      }
+    );
     
     // Auto progress after selection
     setTimeout(onNext, 500);
@@ -74,12 +76,14 @@ export default function IndustrySectorStep({
     
     // Track search
     if (e.target.value.length > 2) {
-      trackUserInteraction({
-        interactionType: 'search',
-        component: 'IndustrySectorStep',
-        elementId: 'industrySectorSearch',
-        interactionValue: e.target.value
-      });
+      trackUserAction(
+        'search',
+        'IndustrySectorStep',
+        {
+          elementId: 'industrySectorSearch',
+          interactionValue: e.target.value
+        }
+      );
     }
   };
 
