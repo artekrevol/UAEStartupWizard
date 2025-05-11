@@ -2420,5 +2420,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   };
   
+  // Helper function to create and send notifications
+  const sendNotification = (
+    title: string, 
+    message: string, 
+    options: { 
+      type?: 'success' | 'info' | 'warning' | 'error',
+      userId?: number // If provided, send only to this user
+    } = {}
+  ) => {
+    const { type = 'info', userId } = options;
+    
+    const notificationData = {
+      type: "notification",
+      notification: {
+        id: `notification-${Date.now()}`,
+        type,
+        title,
+        message,
+        timestamp: Date.now()
+      }
+    };
+    
+    if (userId) {
+      global.sendUserWebSocketMessage(userId, notificationData);
+    } else {
+      global.broadcastWebSocketMessage(notificationData);
+    }
+    
+    return notificationData.notification;
+  };
+  
+  // Test endpoint to send a notification to all users (requires admin)
+  app.post("/api/test-notification", requireAdmin, (req, res) => {
+    const { title, message, type = "info", userId } = req.body;
+    
+    if (!title || !message) {
+      return res.status(400).json({ error: "Title and message are required" });
+    }
+    
+    const notification = sendNotification(title, message, { 
+      type: type as 'success' | 'info' | 'warning' | 'error',
+      userId: userId ? parseInt(userId) : undefined
+    });
+    
+    res.status(200).json({ success: true, notification });
+  });
+  
+  // Personal notification endpoint (authenticated users can only send to themselves)
+  app.post("/api/notifications/self", (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    
+    const { title, message, type = "info" } = req.body;
+    
+    if (!title || !message) {
+      return res.status(400).json({ error: "Title and message are required" });
+    }
+    
+    const notification = sendNotification(title, message, { 
+      type: type as 'success' | 'info' | 'warning' | 'error',
+      userId: req.user.id
+    });
+    
+    res.status(200).json({ success: true, notification });
+  });
+  
   return httpServer;
 }

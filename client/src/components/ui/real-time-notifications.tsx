@@ -30,11 +30,6 @@ export function RealTimeNotifications() {
   const { status, addMessageHandler, subscribeToNotifications } = useWebSocket({
     onOpen: () => {
       console.log('WebSocket connection established');
-      
-      // Subscribe to notifications if user is logged in
-      if (user) {
-        subscribeToNotifications(user.id);
-      }
     },
     onClose: () => {
       console.log('WebSocket connection closed');
@@ -43,14 +38,18 @@ export function RealTimeNotifications() {
 
   // Subscribe to user-specific notifications when user changes
   useEffect(() => {
-    if (status === 'connected' && user) {
+    if (status === 'connected' && user && user.id) {
+      console.log(`Subscribing user ${user.id} to notifications`);
       subscribeToNotifications(user.id);
     }
   }, [status, user, subscribeToNotifications]);
 
   // Handle incoming notifications
   useEffect(() => {
-    if (!user) return;
+    // Wait for user to be authenticated
+    if (!user || !user.id) return;
+    
+    console.log('Setting up notification handler for user', user.id);
     
     // Set up notification handler
     const removeHandler = addMessageHandler('notification', (data) => {
@@ -117,6 +116,11 @@ export function RealTimeNotifications() {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  // Don't render if user is not authenticated
+  if (!user) {
+    return null;
+  }
+  
   return (
     <Popover>
       <PopoverTrigger asChild>
