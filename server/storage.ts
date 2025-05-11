@@ -257,6 +257,146 @@ export class DatabaseStorage implements IStorage {
       })
       .where(eq(users.id, userId));
   }
+  
+  async setEmailVerificationToken(userId: number, token: string, expiresIn: number = 24): Promise<void> {
+    // Set token and expire date (default 24 hours from now)
+    const expiryDate = new Date();
+    expiryDate.setHours(expiryDate.getHours() + expiresIn);
+    
+    await db
+      .update(users)
+      .set({ 
+        email_verification_token: token,
+        email_verification_expires: expiryDate,
+        updated_at: new Date()
+      })
+      .where(eq(users.id, userId));
+  }
+  
+  async verifyEmail(userId: number): Promise<void> {
+    await db
+      .update(users)
+      .set({ 
+        email_verified: true,
+        email_verification_token: null,
+        email_verification_expires: null,
+        updated_at: new Date()
+      })
+      .where(eq(users.id, userId));
+  }
+  
+  async getUserByVerificationToken(token: string): Promise<User | undefined> {
+    const now = new Date();
+    
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(
+        and(
+          eq(users.email_verification_token, token),
+          sql`${users.email_verification_expires} > ${now}`
+        )
+      );
+    
+    return user;
+  }
+  
+  async setPasswordResetToken(userId: number, token: string, expiresIn: number = 1): Promise<void> {
+    // Set token and expire date (default 1 hour from now)
+    const expiryDate = new Date();
+    expiryDate.setHours(expiryDate.getHours() + expiresIn);
+    
+    await db
+      .update(users)
+      .set({ 
+        reset_password_token: token,
+        reset_password_expires: expiryDate,
+        updated_at: new Date()
+      })
+      .where(eq(users.id, userId));
+  }
+  
+  async getUserByResetToken(token: string): Promise<User | undefined> {
+    const now = new Date();
+    
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(
+        and(
+          eq(users.reset_password_token, token),
+          sql`${users.reset_password_expires} > ${now}`
+        )
+      );
+    
+    return user;
+  }
+  
+  async resetPassword(userId: number, password: string): Promise<void> {
+    await db
+      .update(users)
+      .set({ 
+        password,
+        reset_password_token: null,
+        reset_password_expires: null,
+        updated_at: new Date()
+      })
+      .where(eq(users.id, userId));
+  }
+  
+  async setRefreshToken(userId: number, token: string): Promise<void> {
+    await db
+      .update(users)
+      .set({ 
+        refresh_token: token,
+        updated_at: new Date()
+      })
+      .where(eq(users.id, userId));
+  }
+  
+  async clearRefreshToken(userId: number): Promise<void> {
+    await db
+      .update(users)
+      .set({ 
+        refresh_token: null,
+        updated_at: new Date()
+      })
+      .where(eq(users.id, userId));
+  }
+  
+  async setRememberMe(userId: number, rememberMe: boolean): Promise<void> {
+    await db
+      .update(users)
+      .set({ 
+        remember_me: rememberMe,
+        updated_at: new Date()
+      })
+      .where(eq(users.id, userId));
+  }
+  
+  async acceptTerms(userId: number): Promise<void> {
+    await db
+      .update(users)
+      .set({ 
+        terms_accepted: true,
+        terms_accepted_at: new Date(),
+        updated_at: new Date()
+      })
+      .where(eq(users.id, userId));
+  }
+  
+  async upgradeUserToPremium(userId: number): Promise<void> {
+    await db
+      .update(users)
+      .set({ 
+        role: 'premium_user',
+        subscription_tier: 'premium',
+        subscription_status: 'active',
+        subscription_expiry: sql`NOW() + INTERVAL '1 year'`,
+        updated_at: new Date()
+      })
+      .where(eq(users.id, userId));
+  }
 
   async getBusinessSetup(userId: number): Promise<BusinessSetup | undefined> {
     const [setup] = await db

@@ -105,3 +105,79 @@ export function createValidator<T>(schema: z.ZodSchema<T>) {
     }
   };
 }
+
+/**
+ * Middleware to validate email verification requests
+ */
+export function validateEmailVerification(req: Request, res: Response, next: NextFunction) {
+  try {
+    emailVerificationSchema.parse(req.body);
+    next();
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ 
+        message: 'Validation error', 
+        errors: error.errors 
+      });
+    }
+    next(error);
+  }
+}
+
+/**
+ * Middleware to validate password reset request
+ */
+export function validatePasswordResetRequest(req: Request, res: Response, next: NextFunction) {
+  try {
+    passwordResetRequestSchema.parse(req.body);
+    next();
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ 
+        message: 'Validation error', 
+        errors: error.errors 
+      });
+    }
+    next(error);
+  }
+}
+
+/**
+ * Middleware to validate password reset
+ */
+export function validatePasswordReset(req: Request, res: Response, next: NextFunction) {
+  try {
+    passwordResetSchema.parse(req.body);
+    next();
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ 
+        message: 'Validation error', 
+        errors: error.errors 
+      });
+    }
+    next(error);
+  }
+}
+
+/**
+ * Middleware to validate JWT refresh token request
+ */
+export const refreshTokenSchema = z.object({
+  refreshToken: z.string().min(1, "Refresh token is required"),
+});
+
+export function validateRefreshToken(req: Request, res: Response, next: NextFunction) {
+  try {
+    refreshTokenSchema.parse(req.body);
+    next();
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ 
+        message: 'Validation error', 
+        errors: error.errors 
+      });
+    }
+    next(error);
+  }
+}
