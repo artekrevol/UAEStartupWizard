@@ -15,8 +15,8 @@ import {
 import { insertUserInteractionSchema } from '@shared/schema';
 import { z } from 'zod';
 
-// Admin middleware for protected routes
-import { isAdmin } from '../middleware/authMiddleware';
+// Auth middleware for protected routes
+import { requireAdmin } from '../middleware/authMiddleware';
 
 const router = Router();
 
@@ -58,7 +58,7 @@ router.post('/', async (req, res) => {
  * Get user interactions (admin only)
  * GET /api/user-interactions
  */
-router.get('/', isAdmin, async (req, res) => {
+router.get('/', requireAdmin, async (req, res) => {
   try {
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 50;
@@ -102,7 +102,7 @@ router.get('/', isAdmin, async (req, res) => {
  * Get user interaction statistics (admin only)
  * GET /api/user-interactions/stats
  */
-router.get('/stats', isAdmin, async (req, res) => {
+router.get('/stats', requireAdmin, async (req, res) => {
   try {
     const timeframe = (req.query.timeframe as any) || 'day';
     
@@ -137,7 +137,7 @@ router.get('/stats', isAdmin, async (req, res) => {
  * Delete old user interactions (admin only)
  * DELETE /api/user-interactions/old
  */
-router.delete('/old', isAdmin, async (req, res) => {
+router.delete('/old', requireAdmin, async (req, res) => {
   try {
     // Default to 90 days if not specified
     const daysToKeep = Number(req.query.daysToKeep) || 90;
