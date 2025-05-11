@@ -76,6 +76,65 @@ const mockIndustries = [
   'Real Estate'
 ];
 
+// Document mock data
+interface Document {
+  id: number;
+  title: string;
+  content?: string;
+  documentType: string;
+  freeZoneId?: number;
+  category?: string;
+  subcategory?: string;
+  fileFormat?: string;
+  language?: string;
+  lastUpdated?: string;
+  fileSize?: number;
+  filePath?: string;
+  [key: string]: any; // Allow additional fields
+}
+
+const mockDocuments: Document[] = [
+  {
+    id: 1,
+    title: 'DMCC Business License Guide',
+    documentType: 'guide',
+    freeZoneId: 1,
+    category: 'Business Setup',
+    subcategory: 'Licensing',
+    fileFormat: 'pdf',
+    language: 'English',
+    lastUpdated: new Date().toISOString(),
+    fileSize: 1024,
+    filePath: '/docs/dmcc/business-license-guide.pdf'
+  },
+  {
+    id: 2,
+    title: 'JAFZA Company Registration Process',
+    documentType: 'procedure',
+    freeZoneId: 2,
+    category: 'Business Setup',
+    subcategory: 'Registration',
+    fileFormat: 'pdf',
+    language: 'English',
+    lastUpdated: new Date().toISOString(),
+    fileSize: 2048,
+    filePath: '/docs/jafza/registration-process.pdf'
+  },
+  {
+    id: 3,
+    title: 'SAIF Zone License Application Form',
+    documentType: 'form',
+    freeZoneId: 3,
+    category: 'Forms',
+    subcategory: 'Applications',
+    fileFormat: 'pdf',
+    language: 'English',
+    lastUpdated: new Date().toISOString(),
+    fileSize: 512,
+    filePath: '/docs/saif-zone/license-application.pdf'
+  }
+];
+
 /**
  * Creates and starts a mock API server for testing
  */
@@ -246,6 +305,101 @@ export function startMockApiServer(port = 5001): Promise<Server> {
     };
     
     res.status(200).json({ success: true, notification });
+  });
+  
+  // Document endpoints
+  app.get('/api/documents', (req, res) => {
+    res.json(mockDocuments);
+  });
+  
+  app.get('/api/documents/:id', (req, res) => {
+    const { id } = req.params;
+    const document = mockDocuments.find(doc => doc.id === Number(id));
+    
+    if (document) {
+      res.json(document);
+    } else {
+      res.status(404).json({ message: 'Document not found' });
+    }
+  });
+  
+  app.get('/api/documents/search', (req, res) => {
+    const { query } = req.query;
+    
+    if (!query) {
+      return res.json(mockDocuments);
+    }
+    
+    const filteredDocs = mockDocuments.filter(doc => 
+      doc.title.toLowerCase().includes(String(query).toLowerCase()) || 
+      (doc.content && doc.content.toLowerCase().includes(String(query).toLowerCase())) ||
+      (doc.category && doc.category.toLowerCase().includes(String(query).toLowerCase())) ||
+      (doc.subcategory && doc.subcategory.toLowerCase().includes(String(query).toLowerCase()))
+    );
+    
+    res.json(filteredDocs);
+  });
+  
+  app.get('/api/documents/by-freezone/:freeZoneId', (req, res) => {
+    const { freeZoneId } = req.params;
+    const filteredDocs = mockDocuments.filter(doc => doc.freeZoneId === Number(freeZoneId));
+    res.json(filteredDocs);
+  });
+  
+  app.post('/api/documents/validate', (req, res) => {
+    // Check for user authentication (mock)
+    const isAuthenticated = req.headers['x-auth-user'] === 'true';
+    
+    if (!isAuthenticated) {
+      return res.status(401).json({ message: 'Unauthorized - Login required' });
+    }
+    
+    const { documentId, documentType, validationResult } = req.body;
+    
+    if (!documentId || !validationResult) {
+      return res.status(400).json({ error: 'Document ID and validation result are required' });
+    }
+    
+    // Mock successful validation
+    const document = mockDocuments.find(doc => doc.id === Number(documentId));
+    
+    if (!document) {
+      return res.status(404).json({ message: 'Document not found' });
+    }
+    
+    // Update document with validation result
+    document.validationResult = validationResult;
+    document.validatedAt = new Date().toISOString();
+    
+    res.status(200).json({ success: true, document });
+  });
+  
+  app.post('/api/documents/upload', (req, res) => {
+    // Check for user authentication (mock)
+    const isAuthenticated = req.headers['x-auth-user'] === 'true';
+    
+    if (!isAuthenticated) {
+      return res.status(401).json({ message: 'Unauthorized - Login required' });
+    }
+    
+    // Mock successful upload
+    const newDocument = {
+      id: mockDocuments.length + 1,
+      title: req.body.title || 'Uploaded Document',
+      documentType: req.body.documentType || 'upload',
+      freeZoneId: req.body.freeZoneId ? Number(req.body.freeZoneId) : undefined,
+      category: req.body.category || 'Uploads',
+      subcategory: req.body.subcategory,
+      fileFormat: req.body.fileFormat || 'pdf',
+      language: 'English',
+      lastUpdated: new Date().toISOString(),
+      fileSize: 1024,
+      filePath: `/uploads/document-${mockDocuments.length + 1}.pdf`
+    };
+    
+    mockDocuments.push(newDocument);
+    
+    res.status(201).json({ success: true, document: newDocument });
   });
   
   // Health check endpoint
