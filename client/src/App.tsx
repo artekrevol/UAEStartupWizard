@@ -14,6 +14,7 @@ import PremiumAssistant from "@/pages/premium-assistant";
 import AIProductManager from "@/pages/AIProductManager";
 import EnrichmentWorkflowPage from "@/pages/enrichment-workflow";
 import UserInteractionsPage from "@/pages/admin/user-interactions";
+import BusinessSetupWizard from "@/pages/business-setup-wizard";
 import { ProtectedRoute } from "./lib/protected-route";
 import ErrorBoundary from "@/components/error-boundary";
 import { useEffect } from "react";
@@ -38,6 +39,7 @@ function Router() {
       <ProtectedRoute path="/premium-assistant" component={PremiumAssistant} />
       <ProtectedRoute path="/ai-product-manager" component={AIProductManager} />
       <ProtectedRoute path="/enrichment-workflow" component={EnrichmentWorkflowPage} />
+      <ProtectedRoute path="/business-setup" component={BusinessSetupWizard} />
       <Route path="/auth" component={AuthPage} />
       <Route component={NotFound} />
     </Switch>
