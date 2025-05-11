@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { trackUserInteraction } from '@/lib/user-tracker';
+import { trackUserAction } from '@/lib/user-tracker';
 import { Loader2, Search, Tag, CheckCircle2, HelpCircle } from 'lucide-react';
 import {
   Popover,
@@ -95,7 +95,7 @@ export default function BusinessActivityStep({
     updateBusinessSetupData('businessActivity', activity.name);
     
     // Track selection
-    trackUserInteraction({
+    trackUserAction({
       interactionType: 'business_setup_selection',
       component: 'BusinessActivityStep',
       elementId: 'businessActivityOption',
@@ -111,7 +111,7 @@ export default function BusinessActivityStep({
     
     // Track search
     if (e.target.value.length > 2) {
-      trackUserInteraction({
+      trackUserAction({
         interactionType: 'search',
         component: 'BusinessActivityStep',
         elementId: 'businessActivitySearch',

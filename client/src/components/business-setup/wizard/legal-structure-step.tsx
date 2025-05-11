@@ -3,7 +3,7 @@ import { BusinessSetupData } from '@/pages/business-setup-wizard';
 import { Card, CardContent, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { trackUserInteraction } from '@/lib/user-tracker';
+import { trackUserAction } from '@/lib/user-tracker';
 import { Shield, Users, User, Building, Landmark, Info } from 'lucide-react';
 import { LEGAL_FORMS } from '@shared/schema';
 import {
@@ -172,7 +172,7 @@ export default function LegalStructureStep({
     updateBusinessSetupData('legalStructure', legalForm);
     
     // Track selection
-    trackUserInteraction({
+    trackUserAction({
       interactionType: 'business_setup_selection',
       component: 'LegalStructureStep',
       elementId: 'legalStructureOption',

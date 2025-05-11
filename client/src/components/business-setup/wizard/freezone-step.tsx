@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { trackUserInteraction } from '@/lib/user-tracker';
+import { trackUserAction } from '@/lib/user-tracker';
 import { Loader2, Search, MapPin, DollarSign, Building, Info, ArrowUpDown, HelpCircle } from 'lucide-react';
 import {
   Tooltip,
@@ -127,7 +127,7 @@ export default function FreezoneStep({
     updateBusinessSetupData('selectedFreeZone', freezoneId);
     
     // Track selection
-    trackUserInteraction({
+    trackUserAction({
       interactionType: 'business_setup_selection',
       component: 'FreezoneStep',
       elementId: 'freezoneOption',
@@ -143,7 +143,7 @@ export default function FreezoneStep({
     
     // Track search
     if (e.target.value.length > 2) {
-      trackUserInteraction({
+      trackUserAction({
         interactionType: 'search',
         component: 'FreezoneStep',
         elementId: 'freezoneSearch',

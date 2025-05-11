@@ -66,7 +66,7 @@ export default function BusinessTypeStep({
     updateBusinessSetupData('businessType', typeId);
     
     // Track selection
-    trackUserInteraction({
+    trackUserAction({
       interactionType: 'business_setup_selection',
       component: 'BusinessTypeStep',
       elementId: 'businessTypeOption',

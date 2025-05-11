@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
-import { trackUserInteraction } from '@/lib/user-tracker';
+import { trackUserAction } from '@/lib/user-tracker';
 import { FileText, Download, CheckCircle, Loader2, AlertTriangle, Link2 } from 'lucide-react';
 import {
   Accordion,
