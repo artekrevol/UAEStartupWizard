@@ -1650,10 +1650,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       const document = await storage.createDocument(documentData);
+      
+      // Send notification about successful document upload
+      sendNotification(
+        'Document Uploaded Successfully',
+        `Your document "${documentData.title}" has been uploaded and is being processed.`,
+        { type: 'success', userId: req.user!.id }
+      );
+      
       res.status(201).json(document);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error occurred';
       console.error("Error uploading document:", error);
+      
+      // Send error notification
+      if (req.user) {
+        sendNotification(
+          'Document Upload Failed',
+          `There was a problem uploading your document: ${message}`,
+          { type: 'error', userId: req.user.id }
+        );
+      }
+      
       res.status(500).json({ message });
     }
   });
@@ -1667,11 +1685,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid document ID" });
       }
       
+      // Get document details before update
+      const document = await storage.getDocument(id);
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+      
+      // Update the document
       await storage.updateDocument(id, req.body);
+      
+      // Send notification about document update
+      sendNotification(
+        'Document Updated',
+        `Your document "${document.title}" has been updated successfully.`,
+        { type: 'success', userId: req.user!.id }
+      );
+      
       res.sendStatus(200);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error occurred';
       console.error("Error updating document:", error);
+      
+      // Send error notification
+      if (req.user) {
+        sendNotification(
+          'Document Update Failed',
+          `There was a problem updating the document: ${message}`,
+          { type: 'error', userId: req.user.id }
+        );
+      }
+      
       res.status(500).json({ message });
     }
   });
@@ -1685,11 +1728,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid document ID" });
       }
       
+      // Get document details before deletion
+      const document = await storage.getDocument(id);
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+      
+      // Delete the document
       await storage.deleteDocument(id);
+      
+      // Send notification about document deletion
+      sendNotification(
+        'Document Deleted',
+        `Document "${document.title}" has been deleted.`,
+        { type: 'info', userId: req.user!.id }
+      );
+      
       res.sendStatus(204);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error occurred';
       console.error("Error deleting document:", error);
+      
+      // Send error notification
+      if (req.user) {
+        sendNotification(
+          'Document Deletion Failed',
+          `There was a problem deleting the document: ${message}`,
+          { type: 'error', userId: req.user.id }
+        );
+      }
+      
       res.status(500).json({ message });
     }
   });
