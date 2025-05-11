@@ -2,6 +2,17 @@ import { pgTable, serial, text, integer, timestamp, jsonb, boolean, uniqueIndex,
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { z } from 'zod';
 
+// User roles enum
+export const USER_ROLES = [
+  "user",
+  "premium_user",
+  "admin",
+  "super_admin"
+] as const;
+
+// Define user role enum
+export const userRolesEnum = pgEnum('user_roles', USER_ROLES);
+
 // Define interaction types enum
 export const INTERACTION_TYPES = [
   "page_view",
@@ -45,11 +56,23 @@ export const LEGAL_FORMS = [
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
   username: text('username').notNull(),
+  email: text('email').notNull(),
   password: text('password').notNull(),
-  role: text('role').default('user'),
+  role: userRolesEnum('role').default('user'),
   company_name: text('company_name'),
+  first_name: text('first_name'),
+  last_name: text('last_name'),
+  phone: text('phone'),
+  profile_image: text('profile_image'),
+  preferences: jsonb('preferences').default({}),
+  last_login: timestamp('last_login'),
+  subscription_tier: text('subscription_tier').default('free'),
+  subscription_status: text('subscription_status'),
+  subscription_expiry: timestamp('subscription_expiry'),
   progress: integer('progress').default(0),
   created_at: timestamp('created_at').defaultNow(),
+  updated_at: timestamp('updated_at').defaultNow(),
+  active: boolean('active').default(true),
 });
 
 // Free Zones
@@ -304,6 +327,83 @@ export const userInteractions = pgTable('user_interactions', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
+// API Gateways
+export const apiGateways = pgTable('api_gateways', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  description: text('description'),
+  baseUrl: text('base_url').notNull(),
+  authType: text('auth_type').default('jwt'),
+  status: text('status').default('active'),
+  rateLimitPerMinute: integer('rate_limit_per_minute').default(100),
+  accessRoles: jsonb('access_roles').default([]),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// API Routes
+export const apiRoutes = pgTable('api_routes', {
+  id: serial('id').primaryKey(),
+  gatewayId: integer('gateway_id').references(() => apiGateways.id),
+  path: text('path').notNull(),
+  method: text('method').notNull(),
+  description: text('description'),
+  requiredRoles: jsonb('required_roles').default([]),
+  isPublic: boolean('is_public').default(false),
+  serviceId: text('service_id'),
+  rateLimitPerMinute: integer('rate_limit_per_minute'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Admin Dashboards
+export const adminDashboards = pgTable('admin_dashboards', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  description: text('description'),
+  icon: text('icon'),
+  path: text('path').notNull(),
+  category: text('category'),
+  requiredRoles: jsonb('required_roles').default(['admin', 'super_admin']),
+  order: integer('order').default(0),
+  isActive: boolean('is_active').default(true),
+  components: jsonb('components').default([]),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Admin Dashboard Widgets
+export const adminDashboardWidgets = pgTable('admin_dashboard_widgets', {
+  id: serial('id').primaryKey(),
+  dashboardId: integer('dashboard_id').references(() => adminDashboards.id),
+  name: text('name').notNull(),
+  type: text('type').notNull(), // chart, table, metrics, etc.
+  dataSource: text('data_source'),
+  dataQuery: text('data_query'),
+  refreshInterval: integer('refresh_interval'), // in seconds
+  position: jsonb('position').default({}), // x, y, w, h
+  config: jsonb('config').default({}),
+  requiredRoles: jsonb('required_roles').default(['admin']),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Conversation Interfaces
+export const conversationInterfaces = pgTable('conversation_interfaces', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  description: text('description'),
+  steps: jsonb('steps').default([]),
+  initialMessage: text('initial_message'),
+  theme: jsonb('theme').default({}),
+  category: text('category'),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+  analytics: jsonb('analytics').default({}),
+});
+
 // Schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertFreeZoneSchema = createInsertSchema(freeZones).omit({ id: true });
@@ -324,6 +424,11 @@ export const insertMessageSchema = createInsertSchema(messages).omit({ id: true 
 export const insertWebResearchItemSchema = createInsertSchema(webResearchItems).omit({ id: true });
 export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({ id: true });
 export const insertUserInteractionSchema = createInsertSchema(userInteractions).omit({ id: true });
+export const insertApiGatewaySchema = createInsertSchema(apiGateways).omit({ id: true });
+export const insertApiRouteSchema = createInsertSchema(apiRoutes).omit({ id: true });
+export const insertAdminDashboardSchema = createInsertSchema(adminDashboards).omit({ id: true });
+export const insertAdminDashboardWidgetSchema = createInsertSchema(adminDashboardWidgets).omit({ id: true });
+export const insertConversationInterfaceSchema = createInsertSchema(conversationInterfaces).omit({ id: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -345,6 +450,11 @@ export type Message = typeof messages.$inferSelect;
 export type WebResearchItem = typeof webResearchItems.$inferSelect;
 export type ActivityLog = typeof activityLogs.$inferSelect;
 export type UserInteraction = typeof userInteractions.$inferSelect;
+export type ApiGateway = typeof apiGateways.$inferSelect;
+export type ApiRoute = typeof apiRoutes.$inferSelect;
+export type AdminDashboard = typeof adminDashboards.$inferSelect;
+export type AdminDashboardWidget = typeof adminDashboardWidgets.$inferSelect;
+export type ConversationInterface = typeof conversationInterfaces.$inferSelect;
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertFreeZone = z.infer<typeof insertFreeZoneSchema>;
@@ -365,3 +475,8 @@ export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type InsertWebResearchItem = z.infer<typeof insertWebResearchItemSchema>;
 export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
 export type InsertUserInteraction = z.infer<typeof insertUserInteractionSchema>;
+export type InsertApiGateway = z.infer<typeof insertApiGatewaySchema>;
+export type InsertApiRoute = z.infer<typeof insertApiRouteSchema>;
+export type InsertAdminDashboard = z.infer<typeof insertAdminDashboardSchema>;
+export type InsertAdminDashboardWidget = z.infer<typeof insertAdminDashboardWidgetSchema>;
+export type InsertConversationInterface = z.infer<typeof insertConversationInterfaceSchema>;
