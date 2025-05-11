@@ -49,6 +49,7 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   updateUserProgress(userId: number, progress: number): Promise<void>;
   getBusinessSetup(userId: number): Promise<BusinessSetup | undefined>;
+  getBusinessSetupById(id: number): Promise<BusinessSetup | undefined>;
   createBusinessSetup(setup: Omit<BusinessSetup, "id">): Promise<BusinessSetup>;
   updateBusinessSetup(id: number, setup: Partial<BusinessSetup>): Promise<void>;
   
@@ -158,6 +159,14 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(businessSetup)
       .where(eq(businessSetup.userId, userId));
+    return setup;
+  }
+  
+  async getBusinessSetupById(id: number): Promise<BusinessSetup | undefined> {
+    const [setup] = await db
+      .select()
+      .from(businessSetup)
+      .where(eq(businessSetup.id, id));
     return setup;
   }
 

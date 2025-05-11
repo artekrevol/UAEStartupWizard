@@ -217,6 +217,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update user progress based on the calculated score
       await storage.updateUserProgress(req.user!.id, score.progress);
 
+      // Send notification about the new business setup
+      sendNotification(
+        'Business Setup Created',
+        `Your business setup for "${setup.businessName || 'New Business'}" has been created successfully`,
+        { type: 'success', userId: req.user!.id }
+      );
+
       console.log("Created business setup:", setup);
       console.log("Calculated business score:", score);
 
@@ -338,9 +345,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
     try {
-      await storage.updateBusinessSetup(parseInt(req.params.id), req.body);
+      const setupId = parseInt(req.params.id);
+      const userId = req.user!.id;
+      
+      // Get the current setup to compare changes
+      const currentSetup = await storage.getBusinessSetupById(setupId);
+      if (!currentSetup) {
+        return res.status(404).json({ message: "Business setup not found" });
+      }
+      
+      // Verify ownership
+      if (currentSetup.userId !== userId) {
+        return res.status(403).json({ message: "You don't have permission to update this business setup" });
+      }
+      
+      // Update the business setup
+      await storage.updateBusinessSetup(setupId, req.body);
+      
+      // Check for changes that require notifications
+      if (req.body.approvalStatus && currentSetup.approvalStatus !== req.body.approvalStatus) {
+        // Approval status change notification
+        sendNotification(
+          'Business Setup Status Updated',
+          `Your business setup "${currentSetup.businessName || 'Unnamed Business'}" approval status changed to ${req.body.approvalStatus}`,
+          { type: 'info', userId }
+        );
+      } else if (Object.keys(req.body).length > 0) {
+        // General update notification
+        sendNotification(
+          'Business Setup Updated',
+          `Your business setup has been updated successfully`,
+          { type: 'success', userId }
+        );
+      }
+      
       res.sendStatus(200);
     } catch (error: unknown) {
+      console.error("Error updating business setup:", error);
       const message = error instanceof Error ? error.message : 'Unknown error occurred';
       res.status(500).json({ message });
     }
