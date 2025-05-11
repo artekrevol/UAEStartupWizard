@@ -86,7 +86,7 @@ export default function DocumentRequirementsStep({
     });
     
     // Track interaction
-    trackUserInteraction({
+    trackUserAction({
       interactionType: 'business_setup_requirement_acknowledgment',
       component: 'DocumentRequirementsStep',
       elementId: `requirement-${requirementId}`,
@@ -114,7 +114,7 @@ export default function DocumentRequirementsStep({
   // Function to handle download (placeholder for now)
   const handleDownload = (requirementId: string) => {
     // This would eventually link to actual document templates
-    trackUserInteraction({
+    trackUserAction({
       interactionType: 'document_download',
       component: 'DocumentRequirementsStep',
       elementId: `download-${requirementId}`,
@@ -124,7 +124,7 @@ export default function DocumentRequirementsStep({
   // Handle continuing to next step
   const handleContinue = () => {
     // Track acknowledgment
-    trackUserInteraction({
+    trackUserAction({
       interactionType: 'business_setup_step_complete',
       component: 'DocumentRequirementsStep',
       elementId: 'continueButton',
@@ -252,7 +252,7 @@ export default function DocumentRequirementsStep({
                                     rel="noopener noreferrer"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      trackUserInteraction({
+                                      trackUserAction({
                                         interactionType: 'external_link_click',
                                         component: 'DocumentRequirementsStep',
                                         elementId: `external-link-${requirement.id}`,

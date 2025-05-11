@@ -5,7 +5,7 @@ import { BusinessSetupData } from '@/pages/business-setup-wizard';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { trackUserInteraction } from '@/lib/user-tracker';
+import { trackUserAction } from '@/lib/user-tracker';
 import { 
   CheckCircle, 
   Calendar, 
@@ -38,7 +38,7 @@ export default function CompletionStep({
 
   // Track completion on mount
   useEffect(() => {
-    trackUserInteraction({
+    trackUserAction({
       interactionType: 'business_setup_complete',
       component: 'CompletionStep',
       elementId: 'wizardCompletion',
@@ -77,7 +77,7 @@ export default function CompletionStep({
   const handleDashboard = () => {
     navigate('/');
     
-    trackUserInteraction({
+    trackUserAction({
       interactionType: 'button_click',
       component: 'CompletionStep',
       elementId: 'dashboardButton'
