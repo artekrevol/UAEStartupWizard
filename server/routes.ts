@@ -20,6 +20,8 @@ import { spawn } from 'child_process';
 import { registerAIProductManagerRoutes } from "./ai-product-manager/register-routes";
 import { registerDocumentFetcherRoutes } from "./document-fetcher-routes";
 import enrichmentRoutes from "./enrichment-routes";
+import userInteractionRoutes from "./routes/userInteractionRoutes";
+import { captureApiInteractions } from "./middleware/userInteractionMiddleware";
 
 // Middleware to check if user is admin
 function requireAdmin(req: Request, res: Response, next: NextFunction) {
@@ -46,6 +48,9 @@ const ESTABLISHMENT_STEPS = [
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
   
+  // Apply user interaction tracking middleware globally
+  app.use(captureApiInteractions);
+  
   // Register AI Product Manager routes
   registerAIProductManagerRoutes(app);
   
@@ -54,6 +59,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Register Document Enrichment routes
   app.use(enrichmentRoutes);
+  
+  // Register User Interaction routes
+  app.use('/api/user-interactions', userInteractionRoutes);
 
   // Fetch business categories
   app.get("/api/business-categories", async (req, res) => {
