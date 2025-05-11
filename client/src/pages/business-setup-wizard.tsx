@@ -163,12 +163,14 @@ export default function BusinessSetupWizard() {
       setCurrentStep(prev => prev - 1);
       
       // Track going back
-      trackUserInteraction({
-        interactionType: 'business_setup_step_back',
-        component: 'BusinessSetupWizard',
-        elementId: 'backButton',
-        interactionValue: steps[currentStep].title
-      });
+      trackUserAction(
+        'business_setup_step_back',
+        'BusinessSetupWizard',
+        {
+          elementId: 'backButton',
+          interactionValue: steps[currentStep].title
+        }
+      );
     }
   };
 
@@ -176,11 +178,13 @@ export default function BusinessSetupWizard() {
     navigate('/');
     
     // Track exit
-    trackUserInteraction({
-      interactionType: 'business_setup_exit',
-      component: 'BusinessSetupWizard',
-      elementId: 'exitButton'
-    });
+    trackUserAction(
+      'business_setup_exit',
+      'BusinessSetupWizard',
+      {
+        elementId: 'exitButton'
+      }
+    );
   };
 
   if (isLoadingSetup) {
