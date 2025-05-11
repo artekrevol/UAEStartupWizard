@@ -127,12 +127,14 @@ export default function FreezoneStep({
     updateBusinessSetupData('selectedFreeZone', freezoneId);
     
     // Track selection
-    trackUserAction({
-      interactionType: 'business_setup_selection',
-      component: 'FreezoneStep',
-      elementId: 'freezoneOption',
-      interactionValue: freezoneId.toString()
-    });
+    trackUserAction(
+      'business_setup_selection',
+      'FreezoneStep',
+      {
+        elementId: 'freezoneOption',
+        interactionValue: freezoneId.toString()
+      }
+    );
     
     // Auto progress after selection with slight delay
     setTimeout(onNext, 500);
@@ -143,12 +145,14 @@ export default function FreezoneStep({
     
     // Track search
     if (e.target.value.length > 2) {
-      trackUserAction({
-        interactionType: 'search',
-        component: 'FreezoneStep',
-        elementId: 'freezoneSearch',
-        interactionValue: e.target.value
-      });
+      trackUserAction(
+        'search',
+        'FreezoneStep',
+        {
+          elementId: 'freezoneSearch',
+          interactionValue: e.target.value
+        }
+      );
     }
   };
 

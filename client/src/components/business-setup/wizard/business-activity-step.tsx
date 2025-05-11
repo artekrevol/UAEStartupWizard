@@ -95,12 +95,14 @@ export default function BusinessActivityStep({
     updateBusinessSetupData('businessActivity', activity.name);
     
     // Track selection
-    trackUserAction({
-      interactionType: 'business_setup_selection',
-      component: 'BusinessActivityStep',
-      elementId: 'businessActivityOption',
-      interactionValue: activity.name
-    });
+    trackUserAction(
+      'business_setup_selection',
+      'BusinessActivityStep',
+      {
+        elementId: 'businessActivityOption',
+        interactionValue: activity.name
+      }
+    );
     
     // Auto progress after selection
     setTimeout(onNext, 500);
@@ -111,12 +113,14 @@ export default function BusinessActivityStep({
     
     // Track search
     if (e.target.value.length > 2) {
-      trackUserAction({
-        interactionType: 'search',
-        component: 'BusinessActivityStep',
-        elementId: 'businessActivitySearch',
-        interactionValue: e.target.value
-      });
+      trackUserAction(
+        'search',
+        'BusinessActivityStep',
+        {
+          elementId: 'businessActivitySearch',
+          interactionValue: e.target.value
+        }
+      );
     }
   };
 
