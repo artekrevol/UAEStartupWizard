@@ -16,16 +16,18 @@ import {
 
 interface BusinessActivity {
   id: number;
-  categoryId?: number;
+  category_id?: number | null;
   name: string;
-  code?: string;
-  description?: string;
-  requirements?: string;
-  feeStructure?: Record<string, any>;
-  applicableIn?: any[];
-  restrictions?: string;
-  approvalTime?: string;
-  approvalRequirements?: string;
+  description: string | null;
+  required_docs?: string | null;
+  minimum_capital?: string | null;
+  fees?: string | null;
+  approval_requirements?: string | null;
+  activity_code?: string | null;
+  name_arabic?: string | null;
+  description_arabic?: string | null;
+  industry_group?: string | null;
+  isic_activity?: boolean;
 }
 
 interface BusinessActivityStepProps {
@@ -72,23 +74,9 @@ export default function BusinessActivityStep({
   const activities = activitiesResponse?.activities || [];
   const totalActivities = activitiesResponse?.pagination?.total || 0;
 
-  // Check if an activity is applicable in the selected free zone
-  const isApplicableInFreeZone = (activity: BusinessActivity): boolean => {
-    if (!selectedFreeZoneId) return true;
-    
-    if (!activity.applicableIn || activity.applicableIn.length === 0) {
-      return true; // If no data, assume applicable
-    }
-    
-    return activity.applicableIn.some(item => 
-      typeof item === 'number' 
-        ? item === selectedFreeZoneId
-        : item.freeZoneId === selectedFreeZoneId
-    );
-  };
-
-  // Filter activities that are applicable in the selected free zone
-  const applicableActivities = activities.filter(isApplicableInFreeZone);
+  // Since our current data doesn't have direct applicability info, 
+  // we'll assume all activities from the filtered list are applicable
+  const applicableActivities = activities;
 
   const handleSelect = (activity: BusinessActivity) => {
     setSelectedActivity(activity.name);
@@ -163,14 +151,14 @@ export default function BusinessActivityStep({
                     <div className="flex justify-between items-start">
                       <div>
                         <Label className="text-base font-medium">{activity.name}</Label>
-                        {activity.code && (
+                        {activity.activity_code && (
                           <Badge variant="outline" className="ml-2">
-                            {activity.code}
+                            {activity.activity_code}
                           </Badge>
                         )}
                       </div>
                       
-                      {activity.requirements && (
+                      {activity.required_docs && (
                         <Popover>
                           <PopoverTrigger asChild>
                             <Button size="icon" variant="ghost" className="h-8 w-8">
@@ -181,7 +169,7 @@ export default function BusinessActivityStep({
                             <div className="space-y-2">
                               <h4 className="font-medium leading-none">Requirements</h4>
                               <p className="text-sm text-muted-foreground">
-                                {activity.requirements}
+                                {activity.required_docs}
                               </p>
                             </div>
                           </PopoverContent>
@@ -196,17 +184,17 @@ export default function BusinessActivityStep({
                     )}
                     
                     <div className="flex flex-wrap gap-2 text-sm">
-                      {activity.approvalTime && (
+                      {activity.approval_requirements && (
                         <Badge variant="outline" className="flex gap-1 items-center">
                           <CheckCircle2 className="h-3 w-3" />
-                          Approval: {activity.approvalTime}
+                          Approval: {activity.approval_requirements}
                         </Badge>
                       )}
                       
-                      {activity.categoryId && (
+                      {activity.category_id && (
                         <Badge variant="outline" className="flex gap-1 items-center">
                           <Tag className="h-3 w-3" />
-                          Category ID: {activity.categoryId}
+                          Category ID: {activity.category_id}
                         </Badge>
                       )}
                     </div>

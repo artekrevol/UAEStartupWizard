@@ -300,13 +300,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (searchQuery) {
         query = query.where(
           sql`${businessActivities.name} ILIKE ${'%' + searchQuery + '%'} OR 
-              ${businessActivities.activityCode} ILIKE ${'%' + searchQuery + '%'}`
+              ${businessActivities.description} ILIKE ${'%' + searchQuery + '%'}`
         );
       }
       
       if (industryGroup) {
+        // Use the industry_group column directly without the property access dot notation
         query = query.where(
-          sql`${businessActivities.industryGroup} ILIKE ${'%' + industryGroup + '%'}`
+          sql`${businessActivities.industry_group} ILIKE ${'%' + industryGroup + '%'}`
         );
       }
       
@@ -317,13 +318,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (searchQuery) {
         countQuery.where(
           sql`${businessActivities.name} ILIKE ${'%' + searchQuery + '%'} OR 
-              ${businessActivities.activityCode} ILIKE ${'%' + searchQuery + '%'}`
+              ${businessActivities.description} ILIKE ${'%' + searchQuery + '%'}`
         );
       }
       
       if (industryGroup) {
+        // Use the industry_group column directly
         countQuery.where(
-          sql`${businessActivities.industryGroup} ILIKE ${'%' + industryGroup + '%'}`
+          sql`${businessActivities.industry_group} ILIKE ${'%' + industryGroup + '%'}`
         );
       }
       
