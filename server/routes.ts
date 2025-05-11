@@ -2560,6 +2560,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return notificationData.notification;
   };
   
+  // Function to send system-wide notifications (admin announcements)
+  const sendSystemNotification = (
+    title: string, 
+    message: string, 
+    options: { 
+      type?: 'success' | 'info' | 'warning' | 'error',
+      severity?: 'low' | 'medium' | 'high',
+      logToDatabase?: boolean,
+    } = {}
+  ) => {
+    const { 
+      type = 'info', 
+      severity = type === 'error' ? 'high' : (type === 'warning' ? 'medium' : 'low'),
+      logToDatabase = true 
+    } = options;
+    
+    const notificationData = {
+      type: "notification",
+      notification: {
+        id: `system-notification-${Date.now()}`,
+        type,
+        title: `[SYSTEM] ${title}`,
+        message,
+        timestamp: Date.now(),
+        isSystem: true
+      }
+    };
+    
+    // Broadcast to all connected users
+    global.broadcastWebSocketMessage(notificationData);
+    
+    // Optionally log to database (issues log)
+    if (logToDatabase) {
+      storage.createIssue({
+        userId: null,
+        type: 'system_notification',
+        severity,
+        message: `${title}: ${message}`,
+        details: JSON.stringify(notificationData),
+        resolved: false,
+        createdAt: new Date(),
+        resolvedAt: null,
+        stackTrace: null
+      }).catch(err => console.error('Failed to log system notification:', err));
+    }
+    
+    return notificationData.notification;
+  };
+  
   // Test endpoint to send a notification to all users (requires admin)
   app.post("/api/test-notification", requireAdmin, (req, res) => {
     const { title, message, type = "info", userId } = req.body;
@@ -2572,6 +2621,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       type: type as 'success' | 'info' | 'warning' | 'error',
       userId: userId ? parseInt(userId) : undefined
     });
+    
+    res.status(200).json({ success: true, notification });
+  });
+  
+  // Endpoint for admins to send system-wide notifications
+  app.post("/api/system-notification", requireAdmin, (req, res) => {
+    const { title, message, type = "info", severity, logToDatabase = true } = req.body;
+    
+    if (!title || !message) {
+      return res.status(400).json({ error: "Title and message are required" });
+    }
+    
+    const notification = sendSystemNotification(title, message, { 
+      type: type as 'success' | 'info' | 'warning' | 'error', 
+      severity: severity as 'low' | 'medium' | 'high', 
+      logToDatabase 
+    });
+    
+    // Log the admin who sent this notification
+    console.log(`System notification sent by admin (${req.user!.username}): ${title}`);
     
     res.status(200).json({ success: true, notification });
   });

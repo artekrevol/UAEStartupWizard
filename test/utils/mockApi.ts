@@ -165,6 +165,89 @@ export function startMockApiServer(port = 5001): Promise<Server> {
     res.json(mockIndustries);
   });
   
+  // Mock notification endpoints
+  app.post('/api/test-notification', (req, res) => {
+    // Check for admin authorization (mock)
+    const hasAdminAuth = req.headers['x-admin-auth'] === 'true';
+    
+    if (!hasAdminAuth) {
+      return res.status(401).json({ message: 'Unauthorized - Admin access required' });
+    }
+    
+    const { title, message, type, userId } = req.body;
+    
+    if (!title || !message) {
+      return res.status(400).json({ error: 'Title and message are required' });
+    }
+    
+    // Mock successful notification
+    const notification = {
+      id: `notification-${Date.now()}`,
+      type: type || 'info',
+      title,
+      message,
+      timestamp: Date.now(),
+      sent: true
+    };
+    
+    res.status(200).json({ success: true, notification });
+  });
+  
+  app.post('/api/system-notification', (req, res) => {
+    // Check for admin authorization (mock)
+    const hasAdminAuth = req.headers['x-admin-auth'] === 'true';
+    
+    if (!hasAdminAuth) {
+      return res.status(401).json({ message: 'Unauthorized - Admin access required' });
+    }
+    
+    const { title, message, type, severity, logToDatabase } = req.body;
+    
+    if (!title || !message) {
+      return res.status(400).json({ error: 'Title and message are required' });
+    }
+    
+    // Mock successful system notification
+    const notification = {
+      id: `system-notification-${Date.now()}`,
+      type: type || 'info',
+      title: `[SYSTEM] ${title}`,
+      message,
+      timestamp: Date.now(),
+      isSystem: true,
+      sent: true
+    };
+    
+    res.status(200).json({ success: true, notification });
+  });
+  
+  app.post('/api/notifications/self', (req, res) => {
+    // Check for user authentication (mock)
+    const isAuthenticated = req.headers['x-auth-user'] === 'true';
+    
+    if (!isAuthenticated) {
+      return res.status(401).json({ message: 'Unauthorized - Login required' });
+    }
+    
+    const { title, message, type } = req.body;
+    
+    if (!title || !message) {
+      return res.status(400).json({ error: 'Title and message are required' });
+    }
+    
+    // Mock successful self notification
+    const notification = {
+      id: `notification-${Date.now()}`,
+      type: type || 'info',
+      title,
+      message,
+      timestamp: Date.now(),
+      sent: true
+    };
+    
+    res.status(200).json({ success: true, notification });
+  });
+  
   // Health check endpoint
   app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
