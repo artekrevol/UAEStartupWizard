@@ -60,17 +60,48 @@ export default function FreezoneStep({
     if (!industryFilter) return 50; // Neutral score if no industry selected
     
     // Check if this free zone supports the selected industry
-    const industries = Object.keys(freeZone.industries || {});
+    let industries: string[] = [];
+    
+    // Handle different data structures - some may have industries as array, others as object
+    if (Array.isArray(freeZone.industries)) {
+      industries = freeZone.industries;
+    } else if (freeZone.industries && typeof freeZone.industries === 'object') {
+      industries = Object.keys(freeZone.industries);
+    }
     
     if (industries.length === 0) return 50; // No data available
     
-    const matchingIndustries = industries.filter(industry => 
-      industry.toLowerCase().includes(industryFilter.toLowerCase()) ||
-      industryFilter.toLowerCase().includes(industry.toLowerCase())
-    );
+    const matchingIndustries = industries.filter(industry => {
+      if (typeof industry !== 'string') return false;
+      
+      return industry.toLowerCase().includes(industryFilter.toLowerCase()) ||
+             industryFilter.toLowerCase().includes(industry.toLowerCase());
+    });
     
     if (matchingIndustries.length > 0) {
       return 90; // High score for industry match
+    }
+    
+    // Check for specific free zones that are known for certain industries
+    // This is a fallback when the data doesn't explicitly list industries
+    const knownForIndustry: Record<string, string[]> = {
+      'Technology': ['Dubai Internet City', 'Dubai Silicon Oasis', 'Dubai Outsource City'],
+      'Media': ['Dubai Media City', 'Sharjah Media City', 'twofour54'],
+      'Healthcare': ['Dubai Healthcare City', 'Dubai Biotech Research Park'],
+      'Education': ['Dubai Knowledge Park', 'Dubai International Academic City'],
+      'Manufacturing': ['Jebel Ali Free Zone', 'Dubai Industrial City', 'KIZAD'],
+      'Finance': ['Dubai International Financial Centre', 'Abu Dhabi Global Market'],
+      'Logistics': ['Dubai South', 'Dubai Airport Freezone', 'Jebel Ali Free Zone']
+    };
+    
+    // Check if this freezone is known for the selected industry
+    for (const [knownIndustry, freeZoneNames] of Object.entries(knownForIndustry)) {
+      if (knownIndustry.toLowerCase().includes(industryFilter.toLowerCase()) || 
+          industryFilter.toLowerCase().includes(knownIndustry.toLowerCase())) {
+        if (freeZoneNames.some(name => freeZone.name.includes(name))) {
+          return 85; // Good score for known industry match
+        }
+      }
     }
     
     // Fallback to general popularity

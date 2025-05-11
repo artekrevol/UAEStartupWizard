@@ -748,19 +748,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint to get all free zones
-  app.get("/api/free-zones", async (req, res) => {
-    try {
-      const allFreeZones = await db.select().from(freeZones);
-      res.json(allFreeZones);
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Unknown error occurred';
-      console.error("Error fetching free zones:", error);
-      res.status(500).json({ message });
-    }
-  });
-
-  // Endpoint to get a specific free zone by ID
+  // Endpoint to get a specific free zone by ID (Removed duplicate endpoint)
   app.get("/api/free-zones/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id, 10);
