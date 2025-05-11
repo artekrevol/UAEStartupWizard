@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { trackUserInteraction } from '@/lib/user-tracker';
+import { trackUserAction } from '@/lib/user-tracker';
 import BusinessTypeStep from '@/components/business-setup/wizard/business-type-step';
 import IndustrySectorStep from '@/components/business-setup/wizard/industry-sector-step';
 import FreezoneStep from '@/components/business-setup/wizard/freezone-step';
@@ -74,12 +74,14 @@ export default function BusinessSetupWizard() {
       });
       
       // Track successful save
-      trackUserInteraction({
-        interactionType: 'business_setup_progress',
-        component: 'BusinessSetupWizard',
-        elementId: 'saveProgress',
-        success: true
-      });
+      trackUserAction(
+        'business_setup_progress',
+        'BusinessSetupWizard',
+        {
+          elementId: 'saveProgress',
+          success: true
+        }
+      );
     },
     onError: (error: Error) => {
       toast({
@@ -89,13 +91,15 @@ export default function BusinessSetupWizard() {
       });
       
       // Track error
-      trackUserInteraction({
-        interactionType: 'business_setup_progress',
-        component: 'BusinessSetupWizard',
-        elementId: 'saveProgress',
-        success: false,
-        interactionValue: error.message
-      });
+      trackUserAction(
+        'business_setup_progress',
+        'BusinessSetupWizard',
+        {
+          elementId: 'saveProgress',
+          success: false,
+          interactionValue: error.message
+        }
+      );
     },
   });
 
@@ -142,12 +146,14 @@ export default function BusinessSetupWizard() {
       setCurrentStep(prev => prev + 1);
       
       // Track step completion
-      trackUserInteraction({
-        interactionType: 'business_setup_step_complete',
-        component: 'BusinessSetupWizard',
-        elementId: 'nextButton',
-        interactionValue: steps[currentStep].title
-      });
+      trackUserAction(
+        'business_setup_step_complete',
+        'BusinessSetupWizard',
+        {
+          elementId: 'nextButton',
+          interactionValue: steps[currentStep].title
+        }
+      );
     }
   };
 
