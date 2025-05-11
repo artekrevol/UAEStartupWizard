@@ -189,14 +189,28 @@ export const templateSubmissions = pgTable('template_submissions', {
 export const businessSetup = pgTable('business_setup', {
   id: serial('id').primaryKey(),
   userId: integer('user_id').notNull().references(() => users.id),
+  // Introduction & primary goal fields
+  primaryGoal: text('primary_goal'),
+  
+  // Core business fields
   businessType: text('business_type'),
   businessName: text('business_name'),
   businessActivity: text('business_activity'),
+  
+  // Location fields
+  educationComplete: boolean('education_complete').default(false),
+  locationPreference: text('location_preference'),
+  locationPriorities: jsonb('location_priorities').default([]),
+  locationRecommendation: text('location_recommendation'),
   selectedFreeZone: integer('selected_free_zone').references(() => freeZones.id),
+  
+  // Additional fields
+  legalStructure: text('legal_structure'),
   budget: text('budget'),
   timeline: text('timeline'),
   requirements: jsonb('requirements').default({}),
   progress: jsonb('progress').default({}),
+  lastCompletedStep: integer('last_completed_step').default(0),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
