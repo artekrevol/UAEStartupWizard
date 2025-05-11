@@ -42,11 +42,11 @@ export default function AIResearchPage() {
 
     try {
       setIsLoading(true);
-      trackUserAction({ 
-        action: "research_search", 
-        category: "ai_research",
-        details: { query: searchQuery }
-      });
+      trackUserAction(
+        "research_search",
+        "AI Research", 
+        { query: searchQuery }
+      );
 
       // Simulate API call - in production, this would call the actual API
       // You'll need to implement the real API endpoint

@@ -21,6 +21,7 @@ import { registerAIProductManagerRoutes } from "./ai-product-manager/register-ro
 import { registerDocumentFetcherRoutes } from "./document-fetcher-routes";
 import enrichmentRoutes from "./enrichment-routes";
 import userInteractionRoutes from "./routes/userInteractionRoutes";
+import aiResearchRoutes from "./routes/ai-research-routes";
 import { captureApiInteractions } from "./middleware/userInteractionMiddleware";
 
 // Middleware to check if user is admin
@@ -62,6 +63,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Register User Interaction routes
   app.use('/api/user-interactions', userInteractionRoutes);
+  
+  // Register AI Research routes
+  app.use('/api/ai-research', aiResearchRoutes);
 
   // Fetch business categories
   app.get("/api/business-categories", async (req, res) => {
