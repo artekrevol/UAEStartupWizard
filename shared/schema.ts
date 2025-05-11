@@ -2,6 +2,31 @@ import { pgTable, serial, text, integer, timestamp, jsonb, boolean, uniqueIndex,
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { z } from 'zod';
 
+// Define interaction types enum
+export const INTERACTION_TYPES = [
+  "page_view",
+  "button_click", 
+  "form_submit",
+  "form_abandon",
+  "document_view",
+  "document_download",
+  "document_upload",
+  "search",
+  "filter_use",
+  "compare_freezones",
+  "login",
+  "logout",
+  "registration",
+  "business_setup_start",
+  "business_setup_complete",
+  "business_setup_abandon",
+  "notification_click",
+  "external_link_click",
+  "error_encounter",
+  "feature_use",
+  "support_request"
+] as const;
+
 // Constants for legal forms in UAE
 export const LEGAL_FORMS = [
   "LLC",
@@ -258,6 +283,27 @@ export const activityLogs = pgTable('activity_logs', {
   created_at: timestamp('created_at').defaultNow(),
 });
 
+// User Interactions
+export const userInteractions = pgTable('user_interactions', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id),
+  username: text('username'),
+  sessionId: text('session_id'),
+  interactionType: text('interaction_type').notNull(),
+  pageUrl: text('page_url'),
+  component: text('component'),
+  elementId: text('element_id'),
+  elementText: text('element_text'),
+  interactionValue: text('interaction_value'),
+  metadata: jsonb('metadata').default({}),
+  userAgent: text('user_agent'),
+  ipAddress: text('ip_address'),
+  deviceType: text('device_type'),
+  duration: integer('duration'),
+  success: boolean('success'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
 // Schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertFreeZoneSchema = createInsertSchema(freeZones).omit({ id: true });
@@ -277,6 +323,7 @@ export const insertConversationSchema = createInsertSchema(conversations).omit({
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true });
 export const insertWebResearchItemSchema = createInsertSchema(webResearchItems).omit({ id: true });
 export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({ id: true });
+export const insertUserInteractionSchema = createInsertSchema(userInteractions).omit({ id: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -297,6 +344,7 @@ export type Conversation = typeof conversations.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type WebResearchItem = typeof webResearchItems.$inferSelect;
 export type ActivityLog = typeof activityLogs.$inferSelect;
+export type UserInteraction = typeof userInteractions.$inferSelect;
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertFreeZone = z.infer<typeof insertFreeZoneSchema>;
@@ -316,3 +364,4 @@ export type InsertConversation = z.infer<typeof insertConversationSchema>;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type InsertWebResearchItem = z.infer<typeof insertWebResearchItemSchema>;
 export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
+export type InsertUserInteraction = z.infer<typeof insertUserInteractionSchema>;
