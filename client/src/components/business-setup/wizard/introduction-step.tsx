@@ -98,51 +98,53 @@ export default function IntroductionStep({
   if (showIntro) {
     return (
       <motion.div 
-        className="space-y-8 max-w-2xl mx-auto text-center"
+        className="space-y-10 max-w-2xl mx-auto text-center"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <h1 className="text-3xl font-bold tracking-tight md:text-4xl">
-          Welcome to the UAE Business Setup Wizard
-        </h1>
+        <div className="space-y-4">
+          <h1 className="text-3xl font-bold tracking-tight md:text-4xl text-gray-900">
+            Welcome to the UAE Business Setup Wizard
+          </h1>
+          
+          <p className="text-lg text-gray-600 max-w-xl mx-auto">
+            We'll guide you through the process of establishing your business in the UAE with a few simple questions.
+          </p>
+        </div>
         
-        <p className="text-lg text-muted-foreground">
-          We'll guide you through the process of establishing your business in the UAE with a few simple questions.
-        </p>
-        
-        <div className="flex justify-center mt-8">
+        <div className="flex justify-center">
           <motion.div
-            className="grid grid-cols-2 gap-4 max-w-xl"
+            className="grid grid-cols-1 sm:grid-cols-2 gap-5 max-w-xl w-full"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
           >
-            <Card className="bg-primary/5 border-primary/20">
-              <CardContent className="p-4 text-left">
-                <h3 className="font-medium text-base">Step-by-Step Guidance</h3>
-                <p className="text-sm text-muted-foreground">Clear instructions at each stage of the process</p>
+            <Card className="bg-white border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+              <CardContent className="p-5 text-left">
+                <h3 className="font-medium text-base text-gray-900">Step-by-Step Guidance</h3>
+                <p className="text-sm text-gray-500 mt-1">Clear instructions at each stage of the process</p>
               </CardContent>
             </Card>
             
-            <Card className="bg-primary/5 border-primary/20">
-              <CardContent className="p-4 text-left">
-                <h3 className="font-medium text-base">Expert Recommendations</h3>
-                <p className="text-sm text-muted-foreground">Tailored suggestions based on your specific needs</p>
+            <Card className="bg-white border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+              <CardContent className="p-5 text-left">
+                <h3 className="font-medium text-base text-gray-900">Expert Recommendations</h3>
+                <p className="text-sm text-gray-500 mt-1">Tailored suggestions based on your specific needs</p>
               </CardContent>
             </Card>
             
-            <Card className="bg-primary/5 border-primary/20">
-              <CardContent className="p-4 text-left">
-                <h3 className="font-medium text-base">Save & Resume</h3>
-                <p className="text-sm text-muted-foreground">Return to your application at any time</p>
+            <Card className="bg-white border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+              <CardContent className="p-5 text-left">
+                <h3 className="font-medium text-base text-gray-900">Save & Resume</h3>
+                <p className="text-sm text-gray-500 mt-1">Return to your application at any time</p>
               </CardContent>
             </Card>
             
-            <Card className="bg-primary/5 border-primary/20">
-              <CardContent className="p-4 text-left">
-                <h3 className="font-medium text-base">Document Checklist</h3>
-                <p className="text-sm text-muted-foreground">Comprehensive list of everything you'll need</p>
+            <Card className="bg-white border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+              <CardContent className="p-5 text-left">
+                <h3 className="font-medium text-base text-gray-900">Document Checklist</h3>
+                <p className="text-sm text-gray-500 mt-1">Comprehensive list of everything you'll need</p>
               </CardContent>
             </Card>
           </motion.div>
@@ -150,34 +152,34 @@ export default function IntroductionStep({
         
         <Button 
           size="lg"
-          className="mt-8" 
+          className="mt-6 rounded-full px-8 py-6 text-base shadow-sm"
           onClick={handleNext}
         >
           Get Started
-          <ArrowRight className="ml-2 h-4 w-4" />
+          <ArrowRight className="ml-2 h-5 w-5" />
         </Button>
       </motion.div>
     );
   }
 
   return (
-    <div className="space-y-8 max-w-2xl mx-auto">
+    <div className="space-y-10 max-w-3xl mx-auto">
       <motion.div 
-        className="space-y-2 text-center"
+        className="space-y-3 text-center"
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <h1 className="text-3xl font-bold tracking-tight md:text-4xl">
+        <h1 className="text-3xl font-bold tracking-tight md:text-4xl text-gray-900">
           What's your primary goal for establishing a business in the UAE?
         </h1>
-        <p className="text-muted-foreground text-lg mt-3">
+        <p className="text-gray-600 text-lg mt-2 max-w-2xl mx-auto">
           This helps us recommend the most appropriate business setup options for your needs
         </p>
       </motion.div>
 
       <motion.div 
-        className="space-y-3 mt-8"
+        className="space-y-4 mt-8"
         variants={container}
         initial="hidden"
         animate="show"
@@ -186,22 +188,24 @@ export default function IntroductionStep({
           <motion.div key={option.id} variants={item}>
             <Card 
               className={`cursor-pointer transition-all hover:border-primary hover:shadow-md ${
-                selectedGoal === option.id ? 'border-2 border-primary bg-primary/5 shadow-md' : ''
+                selectedGoal === option.id 
+                  ? 'border-2 border-primary bg-white shadow-lg' 
+                  : 'border border-gray-100 bg-white shadow-sm'
               }`}
               onClick={() => handleSelect(option.id)}
             >
-              <CardContent className="p-4 sm:p-6">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                  <div className={`rounded-lg p-3 ${
+              <CardContent className="p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-5">
+                  <div className={`rounded-xl p-4 ${
                     selectedGoal === option.id 
-                      ? 'bg-primary text-primary-foreground' 
-                      : 'bg-muted'
+                      ? 'bg-primary text-white' 
+                      : 'bg-gray-50 text-gray-500'
                   }`}>
                     {option.icon}
                   </div>
-                  <div className="space-y-1 flex-1">
-                    <Label className="text-lg font-medium">{option.label}</Label>
-                    <p className="text-muted-foreground text-sm sm:text-base">{option.description}</p>
+                  <div className="space-y-2 flex-1">
+                    <Label className="text-lg font-medium text-gray-900">{option.label}</Label>
+                    <p className="text-gray-600 text-base">{option.description}</p>
                   </div>
                 </div>
               </CardContent>

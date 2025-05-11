@@ -29,22 +29,22 @@ interface StepIndicatorProps {
 
 function StepIndicator({ currentStep, totalSteps, visitedSteps }: StepIndicatorProps) {
   return (
-    <div className="flex items-center gap-2">
-      <div className="flex space-x-1">
+    <div className="flex items-center gap-3">
+      <div className="flex space-x-1.5">
         {Array.from({ length: totalSteps }).map((_, index) => (
           <div
             key={index}
-            className={`h-2 w-2 rounded-full transition-all duration-300 ${
+            className={`h-1.5 rounded-full transition-all duration-300 ${
               index === currentStep
-                ? 'bg-primary w-4' // Current step: larger and primary color
+                ? 'bg-primary w-5' // Current step: longer and primary color
                 : visitedSteps.includes(index)
-                ? 'bg-primary/60' // Visited steps: primary color with opacity
-                : 'bg-gray-200' // Unvisited steps: gray
+                ? 'w-3 bg-primary/50' // Visited steps: primary color with opacity
+                : 'w-3 bg-gray-200' // Unvisited steps: gray
             }`}
           />
         ))}
       </div>
-      <span className="text-xs text-muted-foreground">
+      <span className="text-xs font-medium text-gray-500">
         {currentStep + 1}/{totalSteps}
       </span>
     </div>
@@ -78,8 +78,7 @@ export default function BusinessSetupWizard() {
   }, [currentStep, visitedSteps]);
   
   const steps = [
-    { title: "Introduction", component: IntroductionStep },
-    { title: "Your Goal", component: IntroductionStep, condition: () => true },
+    { title: "Introduction & Goal", component: IntroductionStep },
     { title: "Business Type", component: BusinessTypeStep, condition: () => !!businessSetupData.primaryGoal },
     { title: "Industry Sector", component: IndustrySectorStep, condition: () => !!businessSetupData.businessType },
     { title: "Location Info", component: BusinessLocationEducationStep, condition: () => !!businessSetupData.industrySector },
@@ -137,12 +136,12 @@ export default function BusinessSetupWizard() {
   const progress = ((currentStep + 1) / steps.length) * 100;
 
   return (
-    <div className="flex flex-col min-h-screen bg-gradient-to-b from-white to-gray-50">
+    <div className="flex flex-col min-h-screen bg-[#FCFCFD]">
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 bg-white/80 backdrop-blur-sm border-b z-10 py-3 px-4">
-        <div className="max-w-3xl mx-auto w-full flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={handleExit} className="text-muted-foreground">
+      <header className="fixed top-0 left-0 right-0 bg-white/90 backdrop-blur-xl z-10 py-4 px-5 shadow-sm">
+        <div className="max-w-4xl mx-auto w-full flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={handleExit} className="text-gray-600 hover:bg-gray-100 rounded-lg">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Exit
             </Button>
@@ -151,7 +150,7 @@ export default function BusinessSetupWizard() {
               variant="ghost" 
               size="sm" 
               onClick={handleSaveProgress}
-              className="text-muted-foreground"
+              className="text-gray-600 hover:bg-gray-100 rounded-lg"
             >
               <Bookmark className="mr-2 h-4 w-4" />
               <span className="hidden sm:inline">Save progress</span>
@@ -164,14 +163,14 @@ export default function BusinessSetupWizard() {
             visitedSteps={visitedSteps} 
           />
         </div>
-        <div className="max-w-3xl mx-auto w-full mt-1">
+        <div className="max-w-4xl mx-auto w-full mt-2">
           <Progress value={progress} className="h-1" />
         </div>
       </header>
 
       {/* Main content */}
-      <main className="flex-1 pt-20 pb-28 flex items-center justify-center">
-        <div className="w-full max-w-2xl mx-auto px-4">
+      <main className="flex-1 pt-24 pb-28 flex items-center justify-center">
+        <div className="w-full max-w-3xl mx-auto px-5">
           <AnimatePresence mode="wait" initial={false} custom={direction}>
             <motion.div
               key={currentStep}
@@ -193,13 +192,13 @@ export default function BusinessSetupWizard() {
       </main>
 
       {/* Navigation footer */}
-      <footer className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-sm border-t z-10 py-4 px-4">
-        <div className="max-w-3xl mx-auto w-full flex items-center justify-between">
+      <footer className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl z-10 py-5 px-5 shadow-[0_-1px_3px_rgba(0,0,0,0.05)]">
+        <div className="max-w-4xl mx-auto w-full flex items-center justify-between">
           <Button
             variant="outline"
             onClick={handleBack}
             disabled={currentStep === 0}
-            className="rounded-full"
+            className="rounded-full border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-colors"
           >
             <ChevronLeft className="mr-2 h-4 w-4" />
             Back
@@ -209,7 +208,7 @@ export default function BusinessSetupWizard() {
             <Button 
               onClick={handleNext}
               disabled={!canProceedToNextStep()}
-              className="rounded-full transition-all"
+              className="rounded-full transition-all bg-primary hover:bg-primary/90 shadow-sm"
             >
               Next
               <ChevronRight className="ml-2 h-4 w-4" />
@@ -217,7 +216,7 @@ export default function BusinessSetupWizard() {
           ) : (
             <Button 
               onClick={handleExit}
-              className="rounded-full bg-green-600 hover:bg-green-700"
+              className="rounded-full bg-emerald-600 hover:bg-emerald-700 shadow-sm"
             >
               Finish
               <CheckCircle className="ml-2 h-4 w-4" />
