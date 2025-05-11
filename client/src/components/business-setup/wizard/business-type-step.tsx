@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { BusinessSetupData } from '@/pages/business-setup-wizard';
+import { BusinessSetupData } from '@/hooks/useBusinessSetup';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
+import { motion } from 'framer-motion';
 import { trackUserAction } from '@/lib/user-tracker';
 import { Building2, Briefcase, Store, Factory, Building } from 'lucide-react';
 
@@ -76,41 +76,74 @@ export default function BusinessTypeStep({
     );
     
     // Auto progress after selection
-    setTimeout(onNext, 500);
+    setTimeout(onNext, 800);
+  };
+
+  // Animation variants for staggered animation
+  const container = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1
+      }
+    }
+  };
+  
+  const item = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
   };
 
   return (
-    <div className="space-y-8">
-      <div className="space-y-2 text-center">
-        <h1 className="text-3xl font-bold">What type of business are you establishing?</h1>
-        <p className="text-muted-foreground">
+    <div className="space-y-8 max-w-2xl mx-auto">
+      <motion.div 
+        className="space-y-2 text-center"
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+      >
+        <h1 className="text-3xl font-bold tracking-tight md:text-4xl">
+          What type of business are you establishing?
+        </h1>
+        <p className="text-muted-foreground text-lg mt-3">
           This helps us tailor your setup experience to your specific business needs
         </p>
-      </div>
+      </motion.div>
 
-      <div className="space-y-4">
+      <motion.div 
+        className="space-y-3 mt-8"
+        variants={container}
+        initial="hidden"
+        animate="show"
+      >
         {businessTypeOptions.map((option) => (
-          <Card 
-            key={option.id}
-            className={`cursor-pointer transition-all hover:border-primary hover:shadow-md ${
-              selectedType === option.id ? 'border-2 border-primary bg-primary/5' : ''
-            }`}
-            onClick={() => handleSelect(option.id)}
-          >
-            <CardContent className="p-6">
-              <div className="flex items-start gap-4">
-                <div className={`rounded-lg p-2 ${selectedType === option.id ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                  {option.icon}
+          <motion.div key={option.id} variants={item}>
+            <Card 
+              className={`cursor-pointer transition-all hover:border-primary hover:shadow-md ${
+                selectedType === option.id ? 'border-2 border-primary bg-primary/5 shadow-md' : ''
+              }`}
+              onClick={() => handleSelect(option.id)}
+            >
+              <CardContent className="p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                  <div className={`rounded-lg p-3 ${
+                    selectedType === option.id 
+                      ? 'bg-primary text-primary-foreground' 
+                      : 'bg-muted'
+                  }`}>
+                    {option.icon}
+                  </div>
+                  <div className="space-y-1 flex-1">
+                    <Label className="text-lg font-medium">{option.label}</Label>
+                    <p className="text-muted-foreground text-sm sm:text-base">{option.description}</p>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-lg font-medium">{option.label}</Label>
-                  <p className="text-muted-foreground">{option.description}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
     </div>
   );
 }
