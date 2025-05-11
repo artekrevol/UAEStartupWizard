@@ -1,4 +1,4 @@
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql, count } from "drizzle-orm";
 import { db } from "./db";
 import {
   users,
@@ -12,6 +12,12 @@ import {
   issuesLog,
   documentTypes,
   saifZoneForms,
+  userInteractions,
+  apiGateways,
+  apiRoutes,
+  adminDashboards,
+  adminDashboardWidgets,
+  conversationInterfaces,
   type User,
   type InsertUser,
   type BusinessSetup,
@@ -33,6 +39,18 @@ import {
   type InsertMessage,
   type IssuesLog,
   type InsertIssuesLog,
+  type UserInteraction,
+  type InsertUserInteraction,
+  type ApiGateway,
+  type InsertApiGateway,
+  type ApiRoute,
+  type InsertApiRoute,
+  type AdminDashboard, 
+  type InsertAdminDashboard,
+  type AdminDashboardWidget,
+  type InsertAdminDashboardWidget,
+  type ConversationInterface,
+  type InsertConversationInterface
 } from "../shared/schema";
 
 // For backward compatibility with existing code
@@ -46,8 +64,12 @@ const PostgresSessionStore = connectPg(session);
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  getUsersByRole(role: string): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: number, user: Partial<User>): Promise<void>;
   updateUserProgress(userId: number, progress: number): Promise<void>;
+  updateUserLastLogin(userId: number): Promise<void>;
   getBusinessSetup(userId: number): Promise<BusinessSetup | undefined>;
   getBusinessSetupById(id: number): Promise<BusinessSetup | undefined>;
   createBusinessSetup(setup: Omit<BusinessSetup, "id">): Promise<BusinessSetup>;
@@ -119,6 +141,56 @@ export interface IStorage {
   updateIssue(id: number, issue: Partial<IssuesLog>): Promise<void>;
   resolveIssue(id: number): Promise<void>;
   
+  // User Interaction methods
+  createUserInteraction(interaction: InsertUserInteraction): Promise<UserInteraction>;
+  getUserInteraction(id: number): Promise<UserInteraction | undefined>;
+  getUserInteractionsByUser(userId: number, limit?: number): Promise<UserInteraction[]>;
+  getUserInteractionsByType(type: string, limit?: number): Promise<UserInteraction[]>;
+  getUserInteractionStats(startDate?: Date, endDate?: Date): Promise<any>;
+  deleteUserInteraction(id: number): Promise<void>;
+  
+  // API Gateway methods
+  createApiGateway(gateway: InsertApiGateway): Promise<ApiGateway>;
+  getApiGateway(id: number): Promise<ApiGateway | undefined>;
+  getApiGatewayByName(name: string): Promise<ApiGateway | undefined>;
+  getAllApiGateways(): Promise<ApiGateway[]>;
+  updateApiGateway(id: number, gateway: Partial<ApiGateway>): Promise<void>;
+  deleteApiGateway(id: number): Promise<void>;
+  
+  // API Route methods
+  createApiRoute(route: InsertApiRoute): Promise<ApiRoute>;
+  getApiRoute(id: number): Promise<ApiRoute | undefined>;
+  getApiRoutesByGateway(gatewayId: number): Promise<ApiRoute[]>;
+  getApiRoutesByPath(path: string): Promise<ApiRoute[]>;
+  getAllApiRoutes(): Promise<ApiRoute[]>;
+  updateApiRoute(id: number, route: Partial<ApiRoute>): Promise<void>;
+  deleteApiRoute(id: number): Promise<void>;
+  
+  // Admin Dashboard methods
+  createAdminDashboard(dashboard: InsertAdminDashboard): Promise<AdminDashboard>;
+  getAdminDashboard(id: number): Promise<AdminDashboard | undefined>;
+  getAdminDashboardByPath(path: string): Promise<AdminDashboard | undefined>;
+  getAllAdminDashboards(): Promise<AdminDashboard[]>;
+  getAdminDashboardsByRole(role: string): Promise<AdminDashboard[]>;
+  updateAdminDashboard(id: number, dashboard: Partial<AdminDashboard>): Promise<void>;
+  deleteAdminDashboard(id: number): Promise<void>;
+  
+  // Admin Dashboard Widget methods
+  createAdminDashboardWidget(widget: InsertAdminDashboardWidget): Promise<AdminDashboardWidget>;
+  getAdminDashboardWidget(id: number): Promise<AdminDashboardWidget | undefined>;
+  getAdminDashboardWidgetsByDashboard(dashboardId: number): Promise<AdminDashboardWidget[]>;
+  updateAdminDashboardWidget(id: number, widget: Partial<AdminDashboardWidget>): Promise<void>;
+  deleteAdminDashboardWidget(id: number): Promise<void>;
+  
+  // Conversation Interface methods
+  createConversationInterface(interface: InsertConversationInterface): Promise<ConversationInterface>;
+  getConversationInterface(id: number): Promise<ConversationInterface | undefined>;
+  getConversationInterfaceByName(name: string): Promise<ConversationInterface | undefined>;
+  getAllConversationInterfaces(): Promise<ConversationInterface[]>;
+  getActiveConversationInterfaces(): Promise<ConversationInterface[]>;
+  updateConversationInterface(id: number, interface: Partial<ConversationInterface>): Promise<void>;
+  deleteConversationInterface(id: number): Promise<void>;
+  
   sessionStore: session.Store;
 }
 
@@ -142,15 +214,47 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user;
+  }
+
+  async getUsersByRole(role: string): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.role, role));
+  }
+
   async createUser(insertUser: InsertUser): Promise<User> {
     const [user] = await db.insert(users).values(insertUser).returning();
     return user;
   }
 
+  async updateUser(id: number, userData: Partial<User>): Promise<void> {
+    await db
+      .update(users)
+      .set({
+        ...userData,
+        updated_at: new Date()
+      })
+      .where(eq(users.id, id));
+  }
+
   async updateUserProgress(userId: number, progress: number): Promise<void> {
     await db
       .update(users)
-      .set({ progress })
+      .set({ 
+        progress,
+        updated_at: new Date()
+      })
+      .where(eq(users.id, userId));
+  }
+  
+  async updateUserLastLogin(userId: number): Promise<void> {
+    await db
+      .update(users)
+      .set({ 
+        last_login: new Date(),
+        updated_at: new Date()
+      })
       .where(eq(users.id, userId));
   }
 
@@ -473,11 +577,93 @@ export class DatabaseStorage implements IStorage {
       .set(form)
       .where(eq(saifZoneForms.id, id));
   }
-
-  async deleteSaifZoneForm(id: number): Promise<void> {
+  
+  // API Gateway methods implementation
+  async createApiGateway(gateway: InsertApiGateway): Promise<ApiGateway> {
+    const [createdGateway] = await db
+      .insert(apiGateways)
+      .values(gateway)
+      .returning();
+    return createdGateway;
+  }
+  
+  async getApiGateway(id: number): Promise<ApiGateway | undefined> {
+    const [gateway] = await db.select().from(apiGateways).where(eq(apiGateways.id, id));
+    return gateway;
+  }
+  
+  async getApiGatewayByName(name: string): Promise<ApiGateway | undefined> {
+    const [gateway] = await db.select().from(apiGateways).where(eq(apiGateways.name, name));
+    return gateway;
+  }
+  
+  async getAllApiGateways(): Promise<ApiGateway[]> {
+    return await db.select().from(apiGateways).orderBy(apiGateways.name);
+  }
+  
+  async updateApiGateway(id: number, gateway: Partial<ApiGateway>): Promise<void> {
     await db
-      .delete(saifZoneForms)
-      .where(eq(saifZoneForms.id, id));
+      .update(apiGateways)
+      .set({
+        ...gateway,
+        updatedAt: new Date(),
+      })
+      .where(eq(apiGateways.id, id));
+  }
+  
+  async deleteApiGateway(id: number): Promise<void> {
+    await db.delete(apiGateways).where(eq(apiGateways.id, id));
+  }
+  
+  // API Route methods implementation
+  async createApiRoute(route: InsertApiRoute): Promise<ApiRoute> {
+    const [createdRoute] = await db
+      .insert(apiRoutes)
+      .values(route)
+      .returning();
+    return createdRoute;
+  }
+  
+  async getApiRoute(id: number): Promise<ApiRoute | undefined> {
+    const [route] = await db.select().from(apiRoutes).where(eq(apiRoutes.id, id));
+    return route;
+  }
+  
+  async getApiRoutesByGateway(gatewayId: number): Promise<ApiRoute[]> {
+    return await db
+      .select()
+      .from(apiRoutes)
+      .where(eq(apiRoutes.gatewayId, gatewayId))
+      .orderBy(apiRoutes.path);
+  }
+  
+  async getApiRoutesByPath(path: string): Promise<ApiRoute[]> {
+    return await db
+      .select()
+      .from(apiRoutes)
+      .where(eq(apiRoutes.path, path));
+  }
+  
+  async getAllApiRoutes(): Promise<ApiRoute[]> {
+    return await db.select().from(apiRoutes);
+  }
+  
+  async updateApiRoute(id: number, route: Partial<ApiRoute>): Promise<void> {
+    await db
+      .update(apiRoutes)
+      .set({
+        ...route,
+        updatedAt: new Date(),
+      })
+      .where(eq(apiRoutes.id, id));
+  }
+  
+  async deleteApiRoute(id: number): Promise<void> {
+    await db.delete(apiRoutes).where(eq(apiRoutes.id, id));
+  }
+  
+  async deleteSaifZoneForm(id: number): Promise<void> {
+    await db.delete(saifZoneForms).where(eq(saifZoneForms.id, id));
   }
 
   // Conversation management methods implementation
