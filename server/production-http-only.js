@@ -7,7 +7,36 @@ import path from 'path';
 // Force environment variables
 process.env.PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = '1';
 process.env.SCRAPER_HTTP_ONLY_MODE = 'true';
+process.env.USE_HTTP_ONLY_SCRAPER = 'true'; 
 process.env.NODE_ENV = 'production';
+
+// Mock Playwright to prevent any attempts to use it
+try {
+  // This will intercept any attempt to import playwright
+  global.playwright = {
+    chromium: {
+      launch: () => {
+        console.log('[HTTP-ONLY MODE] Playwright browser launch prevented');
+        throw new Error('Playwright is disabled in HTTP-only mode');
+      }
+    },
+    firefox: {
+      launch: () => {
+        console.log('[HTTP-ONLY MODE] Playwright browser launch prevented');
+        throw new Error('Playwright is disabled in HTTP-only mode');
+      }
+    },
+    webkit: {
+      launch: () => {
+        console.log('[HTTP-ONLY MODE] Playwright browser launch prevented');
+        throw new Error('Playwright is disabled in HTTP-only mode');
+      }
+    }
+  };
+  console.log('[HTTP-ONLY MODE] Playwright mocking enabled');
+} catch (e) {
+  console.log('[HTTP-ONLY MODE] Failed to set up Playwright mocking:', e.message);
+}
 
 const app = express();
 
