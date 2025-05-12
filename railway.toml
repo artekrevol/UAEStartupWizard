@@ -6,5 +6,4 @@ buildCommand = "npm install && npm run build-no-playwright"
 startCommand = "cross-env NODE_ENV=production SCRAPER_HTTP_ONLY_MODE=true node dist/production-http-only.js"
 healthcheckPath = "/healthz"
 healthcheckTimeout = 300
-restartPolicyType = "on-failure"
-restartPolicyMaxRetries = 10
+restartPolicy = "always"
