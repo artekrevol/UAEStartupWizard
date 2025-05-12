@@ -74,8 +74,7 @@ export default function IndustrySectorStep({
       }
     );
     
-    // Auto progress after selection
-    setTimeout(onNext, 800);
+    // Removed auto progress to give user time to review their selection
   };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -141,6 +140,24 @@ export default function IndustrySectorStep({
           autoFocus={focusInput}
         />
       </motion.div>
+
+      {selectedIndustry && (
+        <motion.div
+          className="flex justify-end mt-4"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <Button 
+            size="lg" 
+            onClick={onNext}
+            className="gap-2"
+          >
+            Continue
+            <MoveRight className="h-4 w-4" />
+          </Button>
+        </motion.div>
+      )}
 
       <AnimatePresence>
         {isIndustryGroupsLoading ? (
