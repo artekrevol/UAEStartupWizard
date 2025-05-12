@@ -1,6 +1,6 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "npm run build"
+buildCommand = "npm run build && npx playwright install chromium --with-deps"
 
 [deploy]
 startCommand = "npm start"
@@ -11,3 +11,7 @@ restartPolicyMaxRetries = 3
 
 [environment]
 NODE_ENV = "production"
+
+[nixpacks]
+# Ensure all system deps for Playwright are available
+features = ["chromium"]
