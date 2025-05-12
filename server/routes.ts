@@ -306,9 +306,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (industryGroup) {
         // Use the categoryId to filter by industry group instead of non-existent industry_group column
-        query = query.where(
-          sql`${businessActivities.categoryId} = ${parseInt(industryGroup) || 0}`
-        );
+        const industryGroupId = parseInt(industryGroup) || 0;
+        query = query.where(eq(businessActivities.categoryId, industryGroupId));
       }
       
       // Get count for pagination
@@ -323,10 +322,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       if (industryGroup) {
-        // Use the industry_group column directly
-        countQuery.where(
-          sql`${businessActivities.industry_group} ILIKE ${'%' + industryGroup + '%'}`
-        );
+        // Use the categoryId to filter by industry group
+        const industryGroupId = parseInt(industryGroup) || 0;
+        countQuery.where(eq(businessActivities.categoryId, industryGroupId));
       }
       
       const [countResult] = await countQuery;
