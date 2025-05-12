@@ -52,9 +52,7 @@ fi
 
 # Step 4: Set environment variables
 echo -e "\n${YELLOW}[Step 4/10]${NC} Setting up environment variables..."
-railway variables set NODE_ENV=production
-railway variables set RAILWAY_ENVIRONMENT=true
-railway variables set SCRAPER_HTTP_ONLY_MODE=true
+railway variables --set "NODE_ENV=production" --set "RAILWAY_ENVIRONMENT=true" --set "SCRAPER_HTTP_ONLY_MODE=true"
 
 echo -e "\n${YELLOW}Do you want to set up your OpenAI API key? (y/n)${NC}"
 read setup_openai
@@ -62,21 +60,24 @@ read setup_openai
 if [ "$setup_openai" = "y" ]; then
     echo -e "${YELLOW}Enter your OpenAI API key:${NC}"
     read -s openai_key
-    railway variables set OPENAI_API_KEY="$openai_key"
+    railway variables --set "OPENAI_API_KEY=$openai_key"
     echo -e "${GREEN}OpenAI API key set.${NC}"
 fi
 
 # Step 5: Create PostgreSQL database service
 echo -e "\n${YELLOW}[Step 5/10]${NC} Setting up PostgreSQL database..."
 echo -e "${YELLOW}Creating a new PostgreSQL database service...${NC}"
-railway service create --name postgresql
+echo -e "${YELLOW}Please select 'Database' and then 'PostgreSQL' from the menu options...${NC}"
+railway add
+# User should select Database and then PostgreSQL from the interactive menu
+echo -e "${GREEN}PostgreSQL database service has been added to your project.${NC}"
+echo -e "${YELLOW}Checking if DATABASE_URL environment variable was created...${NC}"
+railway variables | grep -q "DATABASE_URL"
 if [ $? -ne 0 ]; then
-    echo -e "${RED}Failed to create PostgreSQL database service. Please check Railway CLI commands.${NC}"
-    echo -e "${YELLOW}Attempting alternative method...${NC}"
-    railway add
-    # User should select PostgreSQL from the interactive menu
+    echo -e "${RED}DATABASE_URL environment variable not found. Database might not have been created correctly.${NC}"
+    echo -e "${YELLOW}You may need to manually add a PostgreSQL database in the Railway dashboard.${NC}"
 else
-    echo -e "${GREEN}PostgreSQL database service created successfully.${NC}"
+    echo -e "${GREEN}DATABASE_URL environment variable found. Database created successfully!${NC}"
 fi
 
 # Step 6: Verify the railway.toml file is correct
