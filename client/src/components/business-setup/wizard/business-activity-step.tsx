@@ -47,9 +47,27 @@ export default function BusinessActivityStep({
   );
 
   // Get values from previous steps
-  const industryFilter = businessSetupData.industrySector || '';
+  const industryName = businessSetupData.industrySector || '';
   const selectedFreeZoneId = businessSetupData.selectedFreeZone;
-
+  
+  // Map common industry names to industry IDs
+  // This is a temporary solution until we have a proper mapping in the database
+  const industryNameToId: Record<string, number> = {
+    'Manufacturing': 1,
+    'Technology & IT': 2,
+    'Financial Services': 3,
+    'Retail & E-commerce': 4,
+    'Professional Services': 5,
+    'Healthcare': 6,
+    'Real Estate': 7,
+    'Hospitality & Tourism': 8,
+    'Education': 9,
+    'Media & Entertainment': 10
+  };
+  
+  // Get industry ID from the name, default to 1 (Manufacturing) if not found
+  const industryId = industryNameToId[industryName] || 1;
+  
   // Query to fetch business activities
   const { data: activitiesResponse, isLoading } = useQuery<{
     activities: BusinessActivity[];
@@ -61,13 +79,13 @@ export default function BusinessActivityStep({
     };
   }>({
     queryKey: ['/api/isic-activities', { 
-      industry: industryFilter, 
+      industry: industryId, 
       freeZoneId: selectedFreeZoneId,
       q: searchQuery,
       limit: 100 
     }],
     // Only fetch if industry is selected or if there's a search query
-    enabled: !!industryFilter || !!searchQuery,
+    enabled: !!industryName || !!searchQuery,
   });
   
   // Extract activities from the response
@@ -138,76 +156,89 @@ export default function BusinessActivityStep({
       ) : (
         <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2 -mr-2">
           {applicableActivities.length > 0 ? (
-            applicableActivities.map((activity) => (
-              <Card
-                key={activity.id}
-                className={`cursor-pointer transition-all hover:border-primary hover:shadow-md ${
-                  selectedActivity === activity.name ? 'border-2 border-primary bg-primary/5' : ''
-                }`}
-                onClick={() => handleSelect(activity)}
-              >
-                <CardContent className="p-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <Label className="text-base font-medium">{activity.name}</Label>
-                        {activity.activity_code && (
-                          <Badge variant="outline" className="ml-2">
-                            {activity.activity_code}
-                          </Badge>
+            <>
+              <div className="text-center mb-4">
+                <p className="text-sm text-muted-foreground">
+                  Showing {applicableActivities.length} activities for{" "}
+                  <Badge variant="secondary" className="font-normal">
+                    {industryName || "All Industries"}
+                  </Badge>
+                </p>
+              </div>
+              
+              {applicableActivities.map((activity) => (
+                <Card
+                  key={activity.id}
+                  className={`cursor-pointer transition-all hover:border-primary hover:shadow-md ${
+                    selectedActivity === activity.name ? 'border-2 border-primary bg-primary/5' : ''
+                  }`}
+                  onClick={() => handleSelect(activity)}
+                >
+                  <CardContent className="p-4">
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <Label className="text-base font-medium">{activity.name}</Label>
+                          {activity.code && (
+                            <Badge variant="outline" className="ml-2">
+                              {activity.code}
+                            </Badge>
+                          )}
+                        </div>
+                        
+                        {activity.required_docs && (
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button size="icon" variant="ghost" className="h-8 w-8">
+                                <HelpCircle className="h-4 w-4" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-80">
+                              <div className="space-y-2">
+                                <h4 className="font-medium leading-none">Requirements</h4>
+                                <p className="text-sm text-muted-foreground">
+                                  {activity.required_docs}
+                                </p>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
                         )}
                       </div>
                       
-                      {activity.required_docs && (
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button size="icon" variant="ghost" className="h-8 w-8">
-                              <HelpCircle className="h-4 w-4" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-80">
-                            <div className="space-y-2">
-                              <h4 className="font-medium leading-none">Requirements</h4>
-                              <p className="text-sm text-muted-foreground">
-                                {activity.required_docs}
-                              </p>
-                            </div>
-                          </PopoverContent>
-                        </Popover>
-                      )}
-                    </div>
-                    
-                    {activity.description && (
-                      <CardDescription className="line-clamp-2">
-                        {activity.description}
-                      </CardDescription>
-                    )}
-                    
-                    <div className="flex flex-wrap gap-2 text-sm">
-                      {activity.approval_requirements && (
-                        <Badge variant="outline" className="flex gap-1 items-center">
-                          <CheckCircle2 className="h-3 w-3" />
-                          Approval: {activity.approval_requirements}
-                        </Badge>
+                      {activity.description && (
+                        <CardDescription className="line-clamp-2">
+                          {activity.description}
+                        </CardDescription>
                       )}
                       
-                      {activity.category_id && (
-                        <Badge variant="outline" className="flex gap-1 items-center">
-                          <Tag className="h-3 w-3" />
-                          Category ID: {activity.category_id}
-                        </Badge>
-                      )}
+                      <div className="flex flex-wrap gap-2 text-sm">
+                        {activity.approvalRequirements && (
+                          <Badge variant="outline" className="flex gap-1 items-center">
+                            <CheckCircle2 className="h-3 w-3" />
+                            Approval: {activity.approvalRequirements}
+                          </Badge>
+                        )}
+                        
+                        {activity.categoryId && (
+                          <Badge variant="outline" className="flex gap-1 items-center">
+                            <Tag className="h-3 w-3" />
+                            Category ID: {activity.categoryId}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
+                  </CardContent>
+                </Card>
+              ))}
+            </>
           ) : (
             <div className="text-center py-8">
               <p className="text-muted-foreground">
                 {searchQuery 
                   ? "No matching business activities found" 
-                  : "Enter search terms to find business activities"}
+                  : industryName 
+                    ? `No activities found for industry "${industryName}". Try searching instead.`
+                    : "Enter search terms to find business activities"}
               </p>
               {searchQuery && (
                 <Button
