@@ -2,6 +2,42 @@ import { pgTable, serial, text, integer, timestamp, jsonb, boolean, uniqueIndex,
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { z } from 'zod';
 
+// User roles enum
+export const USER_ROLES = [
+  "user",
+  "premium_user",
+  "admin",
+  "super_admin"
+] as const;
+
+// Define user role enum
+export const userRolesEnum = pgEnum('user_roles', USER_ROLES);
+
+// Define interaction types enum
+export const INTERACTION_TYPES = [
+  "page_view",
+  "button_click", 
+  "form_submit",
+  "form_abandon",
+  "document_view",
+  "document_download",
+  "document_upload",
+  "search",
+  "filter_use",
+  "compare_freezones",
+  "login",
+  "logout",
+  "registration",
+  "business_setup_start",
+  "business_setup_complete",
+  "business_setup_abandon",
+  "notification_click",
+  "external_link_click",
+  "error_encounter",
+  "feature_use",
+  "support_request"
+] as const;
+
 // Constants for legal forms in UAE
 export const LEGAL_FORMS = [
   "LLC",
@@ -20,11 +56,32 @@ export const LEGAL_FORMS = [
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
   username: text('username').notNull(),
+  email: text('email').notNull(),
   password: text('password').notNull(),
-  role: text('role').default('user'),
+  role: userRolesEnum('role').default('user'),
+  email_verified: boolean('email_verified').default(false),
+  email_verification_token: text('email_verification_token'),
+  email_verification_expires: timestamp('email_verification_expires'),
+  reset_password_token: text('reset_password_token'),
+  reset_password_expires: timestamp('reset_password_expires'),
+  terms_accepted: boolean('terms_accepted').default(false),
+  terms_accepted_at: timestamp('terms_accepted_at'),
+  remember_me: boolean('remember_me').default(false),
+  refresh_token: text('refresh_token'),
   company_name: text('company_name'),
+  first_name: text('first_name'),
+  last_name: text('last_name'),
+  phone: text('phone'),
+  profile_image: text('profile_image'),
+  preferences: jsonb('preferences').default({}),
+  last_login: timestamp('last_login'),
+  subscription_tier: text('subscription_tier').default('free'),
+  subscription_status: text('subscription_status'),
+  subscription_expiry: timestamp('subscription_expiry'),
   progress: integer('progress').default(0),
   created_at: timestamp('created_at').defaultNow(),
+  updated_at: timestamp('updated_at').defaultNow(),
+  active: boolean('active').default(true),
 });
 
 // Free Zones
@@ -57,6 +114,12 @@ export const businessActivities = pgTable('business_activities', {
   restrictions: text('restrictions'),
   approvalTime: text('approval_time'),
   approvalRequirements: text('approval_requirements'),
+  industry_group: text('industry_group'),
+  minimum_capital: text('minimum_capital'),
+  fees: text('fees'),
+  name_arabic: text('name_arabic'),
+  description_arabic: text('description_arabic'),
+  isic_activity: boolean('isic_activity').default(false),
 });
 
 // Business Activity Categories
@@ -132,14 +195,28 @@ export const templateSubmissions = pgTable('template_submissions', {
 export const businessSetup = pgTable('business_setup', {
   id: serial('id').primaryKey(),
   userId: integer('user_id').notNull().references(() => users.id),
+  // Introduction & primary goal fields
+  primaryGoal: text('primary_goal'),
+  
+  // Core business fields
   businessType: text('business_type'),
   businessName: text('business_name'),
   businessActivity: text('business_activity'),
+  
+  // Location fields
+  educationComplete: boolean('education_complete').default(false),
+  locationPreference: text('location_preference'),
+  locationPriorities: jsonb('location_priorities').default([]),
+  locationRecommendation: text('location_recommendation'),
   selectedFreeZone: integer('selected_free_zone').references(() => freeZones.id),
+  
+  // Additional fields
+  legalStructure: text('legal_structure'),
   budget: text('budget'),
   timeline: text('timeline'),
   requirements: jsonb('requirements').default({}),
   progress: jsonb('progress').default({}),
+  lastCompletedStep: integer('last_completed_step').default(0),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
@@ -258,6 +335,104 @@ export const activityLogs = pgTable('activity_logs', {
   created_at: timestamp('created_at').defaultNow(),
 });
 
+// User Interactions
+export const userInteractions = pgTable('user_interactions', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id),
+  username: text('username'),
+  sessionId: text('session_id'),
+  interactionType: text('interaction_type').notNull(),
+  pageUrl: text('page_url'),
+  component: text('component'),
+  elementId: text('element_id'),
+  elementText: text('element_text'),
+  interactionValue: text('interaction_value'),
+  metadata: jsonb('metadata').default({}),
+  userAgent: text('user_agent'),
+  ipAddress: text('ip_address'),
+  deviceType: text('device_type'),
+  duration: integer('duration'),
+  success: boolean('success'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+// API Gateways
+export const apiGateways = pgTable('api_gateways', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  description: text('description'),
+  baseUrl: text('base_url').notNull(),
+  authType: text('auth_type').default('jwt'),
+  status: text('status').default('active'),
+  rateLimitPerMinute: integer('rate_limit_per_minute').default(100),
+  accessRoles: jsonb('access_roles').default([]),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// API Routes
+export const apiRoutes = pgTable('api_routes', {
+  id: serial('id').primaryKey(),
+  gatewayId: integer('gateway_id').references(() => apiGateways.id),
+  path: text('path').notNull(),
+  method: text('method').notNull(),
+  description: text('description'),
+  requiredRoles: jsonb('required_roles').default([]),
+  isPublic: boolean('is_public').default(false),
+  serviceId: text('service_id'),
+  rateLimitPerMinute: integer('rate_limit_per_minute'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Admin Dashboards
+export const adminDashboards = pgTable('admin_dashboards', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  description: text('description'),
+  icon: text('icon'),
+  path: text('path').notNull(),
+  category: text('category'),
+  requiredRoles: jsonb('required_roles').default(['admin', 'super_admin']),
+  order: integer('order').default(0),
+  isActive: boolean('is_active').default(true),
+  components: jsonb('components').default([]),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Admin Dashboard Widgets
+export const adminDashboardWidgets = pgTable('admin_dashboard_widgets', {
+  id: serial('id').primaryKey(),
+  dashboardId: integer('dashboard_id').references(() => adminDashboards.id),
+  name: text('name').notNull(),
+  type: text('type').notNull(), // chart, table, metrics, etc.
+  dataSource: text('data_source'),
+  dataQuery: text('data_query'),
+  refreshInterval: integer('refresh_interval'), // in seconds
+  position: jsonb('position').default({}), // x, y, w, h
+  config: jsonb('config').default({}),
+  requiredRoles: jsonb('required_roles').default(['admin']),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+// Conversation Interfaces
+export const conversationInterfaces = pgTable('conversation_interfaces', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  description: text('description'),
+  steps: jsonb('steps').default([]),
+  initialMessage: text('initial_message'),
+  theme: jsonb('theme').default({}),
+  category: text('category'),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+  analytics: jsonb('analytics').default({}),
+});
+
 // Schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertFreeZoneSchema = createInsertSchema(freeZones).omit({ id: true });
@@ -277,6 +452,12 @@ export const insertConversationSchema = createInsertSchema(conversations).omit({
 export const insertMessageSchema = createInsertSchema(messages).omit({ id: true });
 export const insertWebResearchItemSchema = createInsertSchema(webResearchItems).omit({ id: true });
 export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({ id: true });
+export const insertUserInteractionSchema = createInsertSchema(userInteractions).omit({ id: true });
+export const insertApiGatewaySchema = createInsertSchema(apiGateways).omit({ id: true });
+export const insertApiRouteSchema = createInsertSchema(apiRoutes).omit({ id: true });
+export const insertAdminDashboardSchema = createInsertSchema(adminDashboards).omit({ id: true });
+export const insertAdminDashboardWidgetSchema = createInsertSchema(adminDashboardWidgets).omit({ id: true });
+export const insertConversationInterfaceSchema = createInsertSchema(conversationInterfaces).omit({ id: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -297,6 +478,12 @@ export type Conversation = typeof conversations.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type WebResearchItem = typeof webResearchItems.$inferSelect;
 export type ActivityLog = typeof activityLogs.$inferSelect;
+export type UserInteraction = typeof userInteractions.$inferSelect;
+export type ApiGateway = typeof apiGateways.$inferSelect;
+export type ApiRoute = typeof apiRoutes.$inferSelect;
+export type AdminDashboard = typeof adminDashboards.$inferSelect;
+export type AdminDashboardWidget = typeof adminDashboardWidgets.$inferSelect;
+export type ConversationInterface = typeof conversationInterfaces.$inferSelect;
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertFreeZone = z.infer<typeof insertFreeZoneSchema>;
@@ -316,3 +503,9 @@ export type InsertConversation = z.infer<typeof insertConversationSchema>;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type InsertWebResearchItem = z.infer<typeof insertWebResearchItemSchema>;
 export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
+export type InsertUserInteraction = z.infer<typeof insertUserInteractionSchema>;
+export type InsertApiGateway = z.infer<typeof insertApiGatewaySchema>;
+export type InsertApiRoute = z.infer<typeof insertApiRouteSchema>;
+export type InsertAdminDashboard = z.infer<typeof insertAdminDashboardSchema>;
+export type InsertAdminDashboardWidget = z.infer<typeof insertAdminDashboardWidgetSchema>;
+export type InsertConversationInterface = z.infer<typeof insertConversationInterfaceSchema>;

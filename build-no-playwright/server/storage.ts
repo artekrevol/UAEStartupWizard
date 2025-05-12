@@ -1,4 +1,4 @@
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql, count } from "drizzle-orm";
 import { db } from "./db";
 import {
   users,
@@ -12,6 +12,12 @@ import {
   issuesLog,
   documentTypes,
   saifZoneForms,
+  userInteractions,
+  apiGateways,
+  apiRoutes,
+  adminDashboards,
+  adminDashboardWidgets,
+  conversationInterfaces,
   type User,
   type InsertUser,
   type BusinessSetup,
@@ -33,6 +39,18 @@ import {
   type InsertMessage,
   type IssuesLog,
   type InsertIssuesLog,
+  type UserInteraction,
+  type InsertUserInteraction,
+  type ApiGateway,
+  type InsertApiGateway,
+  type ApiRoute,
+  type InsertApiRoute,
+  type AdminDashboard, 
+  type InsertAdminDashboard,
+  type AdminDashboardWidget,
+  type InsertAdminDashboardWidget,
+  type ConversationInterface,
+  type InsertConversationInterface
 } from "../shared/schema";
 
 // For backward compatibility with existing code
@@ -46,9 +64,14 @@ const PostgresSessionStore = connectPg(session);
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  getUsersByRole(role: string): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: number, user: Partial<User>): Promise<void>;
   updateUserProgress(userId: number, progress: number): Promise<void>;
+  updateUserLastLogin(userId: number): Promise<void>;
   getBusinessSetup(userId: number): Promise<BusinessSetup | undefined>;
+  getBusinessSetupById(id: number): Promise<BusinessSetup | undefined>;
   createBusinessSetup(setup: Omit<BusinessSetup, "id">): Promise<BusinessSetup>;
   updateBusinessSetup(id: number, setup: Partial<BusinessSetup>): Promise<void>;
   
@@ -118,6 +141,56 @@ export interface IStorage {
   updateIssue(id: number, issue: Partial<IssuesLog>): Promise<void>;
   resolveIssue(id: number): Promise<void>;
   
+  // User Interaction methods
+  createUserInteraction(interaction: InsertUserInteraction): Promise<UserInteraction>;
+  getUserInteraction(id: number): Promise<UserInteraction | undefined>;
+  getUserInteractionsByUser(userId: number, limit?: number): Promise<UserInteraction[]>;
+  getUserInteractionsByType(type: string, limit?: number): Promise<UserInteraction[]>;
+  getUserInteractionStats(startDate?: Date, endDate?: Date): Promise<any>;
+  deleteUserInteraction(id: number): Promise<void>;
+  
+  // API Gateway methods
+  createApiGateway(gateway: InsertApiGateway): Promise<ApiGateway>;
+  getApiGateway(id: number): Promise<ApiGateway | undefined>;
+  getApiGatewayByName(name: string): Promise<ApiGateway | undefined>;
+  getAllApiGateways(): Promise<ApiGateway[]>;
+  updateApiGateway(id: number, gateway: Partial<ApiGateway>): Promise<void>;
+  deleteApiGateway(id: number): Promise<void>;
+  
+  // API Route methods
+  createApiRoute(route: InsertApiRoute): Promise<ApiRoute>;
+  getApiRoute(id: number): Promise<ApiRoute | undefined>;
+  getApiRoutesByGateway(gatewayId: number): Promise<ApiRoute[]>;
+  getApiRoutesByPath(path: string): Promise<ApiRoute[]>;
+  getAllApiRoutes(): Promise<ApiRoute[]>;
+  updateApiRoute(id: number, route: Partial<ApiRoute>): Promise<void>;
+  deleteApiRoute(id: number): Promise<void>;
+  
+  // Admin Dashboard methods
+  createAdminDashboard(dashboard: InsertAdminDashboard): Promise<AdminDashboard>;
+  getAdminDashboard(id: number): Promise<AdminDashboard | undefined>;
+  getAdminDashboardByPath(path: string): Promise<AdminDashboard | undefined>;
+  getAllAdminDashboards(): Promise<AdminDashboard[]>;
+  getAdminDashboardsByRole(role: string): Promise<AdminDashboard[]>;
+  updateAdminDashboard(id: number, dashboard: Partial<AdminDashboard>): Promise<void>;
+  deleteAdminDashboard(id: number): Promise<void>;
+  
+  // Admin Dashboard Widget methods
+  createAdminDashboardWidget(widget: InsertAdminDashboardWidget): Promise<AdminDashboardWidget>;
+  getAdminDashboardWidget(id: number): Promise<AdminDashboardWidget | undefined>;
+  getAdminDashboardWidgetsByDashboard(dashboardId: number): Promise<AdminDashboardWidget[]>;
+  updateAdminDashboardWidget(id: number, widget: Partial<AdminDashboardWidget>): Promise<void>;
+  deleteAdminDashboardWidget(id: number): Promise<void>;
+  
+  // Conversation Interface methods
+  createConversationInterface(interface: InsertConversationInterface): Promise<ConversationInterface>;
+  getConversationInterface(id: number): Promise<ConversationInterface | undefined>;
+  getConversationInterfaceByName(name: string): Promise<ConversationInterface | undefined>;
+  getAllConversationInterfaces(): Promise<ConversationInterface[]>;
+  getActiveConversationInterfaces(): Promise<ConversationInterface[]>;
+  updateConversationInterface(id: number, interface: Partial<ConversationInterface>): Promise<void>;
+  deleteConversationInterface(id: number): Promise<void>;
+  
   sessionStore: session.Store;
 }
 
@@ -141,15 +214,187 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user;
+  }
+
+  async getUsersByRole(role: string): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.role, role));
+  }
+
   async createUser(insertUser: InsertUser): Promise<User> {
     const [user] = await db.insert(users).values(insertUser).returning();
     return user;
   }
 
+  async updateUser(id: number, userData: Partial<User>): Promise<void> {
+    await db
+      .update(users)
+      .set({
+        ...userData,
+        updated_at: new Date()
+      })
+      .where(eq(users.id, id));
+  }
+
   async updateUserProgress(userId: number, progress: number): Promise<void> {
     await db
       .update(users)
-      .set({ progress })
+      .set({ 
+        progress,
+        updated_at: new Date()
+      })
+      .where(eq(users.id, userId));
+  }
+  
+  async updateUserLastLogin(userId: number): Promise<void> {
+    await db
+      .update(users)
+      .set({ 
+        last_login: new Date(),
+        updated_at: new Date()
+      })
+      .where(eq(users.id, userId));
+  }
+  
+  async setEmailVerificationToken(userId: number, token: string, expiresIn: number = 24): Promise<void> {
+    // Set token and expire date (default 24 hours from now)
+    const expiryDate = new Date();
+    expiryDate.setHours(expiryDate.getHours() + expiresIn);
+    
+    await db
+      .update(users)
+      .set({ 
+        email_verification_token: token,
+        email_verification_expires: expiryDate,
+        updated_at: new Date()
+      })
+      .where(eq(users.id, userId));
+  }
+  
+  async verifyEmail(userId: number): Promise<void> {
+    await db
+      .update(users)
+      .set({ 
+        email_verified: true,
+        email_verification_token: null,
+        email_verification_expires: null,
+        updated_at: new Date()
+      })
+      .where(eq(users.id, userId));
+  }
+  
+  async getUserByVerificationToken(token: string): Promise<User | undefined> {
+    const now = new Date();
+    
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(
+        and(
+          eq(users.email_verification_token, token),
+          sql`${users.email_verification_expires} > ${now}`
+        )
+      );
+    
+    return user;
+  }
+  
+  async setPasswordResetToken(userId: number, token: string, expiresIn: number = 1): Promise<void> {
+    // Set token and expire date (default 1 hour from now)
+    const expiryDate = new Date();
+    expiryDate.setHours(expiryDate.getHours() + expiresIn);
+    
+    await db
+      .update(users)
+      .set({ 
+        reset_password_token: token,
+        reset_password_expires: expiryDate,
+        updated_at: new Date()
+      })
+      .where(eq(users.id, userId));
+  }
+  
+  async getUserByResetToken(token: string): Promise<User | undefined> {
+    const now = new Date();
+    
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(
+        and(
+          eq(users.reset_password_token, token),
+          sql`${users.reset_password_expires} > ${now}`
+        )
+      );
+    
+    return user;
+  }
+  
+  async resetPassword(userId: number, password: string): Promise<void> {
+    await db
+      .update(users)
+      .set({ 
+        password,
+        reset_password_token: null,
+        reset_password_expires: null,
+        updated_at: new Date()
+      })
+      .where(eq(users.id, userId));
+  }
+  
+  async setRefreshToken(userId: number, token: string): Promise<void> {
+    await db
+      .update(users)
+      .set({ 
+        refresh_token: token,
+        updated_at: new Date()
+      })
+      .where(eq(users.id, userId));
+  }
+  
+  async clearRefreshToken(userId: number): Promise<void> {
+    await db
+      .update(users)
+      .set({ 
+        refresh_token: null,
+        updated_at: new Date()
+      })
+      .where(eq(users.id, userId));
+  }
+  
+  async setRememberMe(userId: number, rememberMe: boolean): Promise<void> {
+    await db
+      .update(users)
+      .set({ 
+        remember_me: rememberMe,
+        updated_at: new Date()
+      })
+      .where(eq(users.id, userId));
+  }
+  
+  async acceptTerms(userId: number): Promise<void> {
+    await db
+      .update(users)
+      .set({ 
+        terms_accepted: true,
+        terms_accepted_at: new Date(),
+        updated_at: new Date()
+      })
+      .where(eq(users.id, userId));
+  }
+  
+  async upgradeUserToPremium(userId: number): Promise<void> {
+    await db
+      .update(users)
+      .set({ 
+        role: 'premium_user',
+        subscription_tier: 'premium',
+        subscription_status: 'active',
+        subscription_expiry: sql`NOW() + INTERVAL '1 year'`,
+        updated_at: new Date()
+      })
       .where(eq(users.id, userId));
   }
 
@@ -158,6 +403,14 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(businessSetup)
       .where(eq(businessSetup.userId, userId));
+    return setup;
+  }
+  
+  async getBusinessSetupById(id: number): Promise<BusinessSetup | undefined> {
+    const [setup] = await db
+      .select()
+      .from(businessSetup)
+      .where(eq(businessSetup.id, id));
     return setup;
   }
 
@@ -464,11 +717,93 @@ export class DatabaseStorage implements IStorage {
       .set(form)
       .where(eq(saifZoneForms.id, id));
   }
-
-  async deleteSaifZoneForm(id: number): Promise<void> {
+  
+  // API Gateway methods implementation
+  async createApiGateway(gateway: InsertApiGateway): Promise<ApiGateway> {
+    const [createdGateway] = await db
+      .insert(apiGateways)
+      .values(gateway)
+      .returning();
+    return createdGateway;
+  }
+  
+  async getApiGateway(id: number): Promise<ApiGateway | undefined> {
+    const [gateway] = await db.select().from(apiGateways).where(eq(apiGateways.id, id));
+    return gateway;
+  }
+  
+  async getApiGatewayByName(name: string): Promise<ApiGateway | undefined> {
+    const [gateway] = await db.select().from(apiGateways).where(eq(apiGateways.name, name));
+    return gateway;
+  }
+  
+  async getAllApiGateways(): Promise<ApiGateway[]> {
+    return await db.select().from(apiGateways).orderBy(apiGateways.name);
+  }
+  
+  async updateApiGateway(id: number, gateway: Partial<ApiGateway>): Promise<void> {
     await db
-      .delete(saifZoneForms)
-      .where(eq(saifZoneForms.id, id));
+      .update(apiGateways)
+      .set({
+        ...gateway,
+        updatedAt: new Date(),
+      })
+      .where(eq(apiGateways.id, id));
+  }
+  
+  async deleteApiGateway(id: number): Promise<void> {
+    await db.delete(apiGateways).where(eq(apiGateways.id, id));
+  }
+  
+  // API Route methods implementation
+  async createApiRoute(route: InsertApiRoute): Promise<ApiRoute> {
+    const [createdRoute] = await db
+      .insert(apiRoutes)
+      .values(route)
+      .returning();
+    return createdRoute;
+  }
+  
+  async getApiRoute(id: number): Promise<ApiRoute | undefined> {
+    const [route] = await db.select().from(apiRoutes).where(eq(apiRoutes.id, id));
+    return route;
+  }
+  
+  async getApiRoutesByGateway(gatewayId: number): Promise<ApiRoute[]> {
+    return await db
+      .select()
+      .from(apiRoutes)
+      .where(eq(apiRoutes.gatewayId, gatewayId))
+      .orderBy(apiRoutes.path);
+  }
+  
+  async getApiRoutesByPath(path: string): Promise<ApiRoute[]> {
+    return await db
+      .select()
+      .from(apiRoutes)
+      .where(eq(apiRoutes.path, path));
+  }
+  
+  async getAllApiRoutes(): Promise<ApiRoute[]> {
+    return await db.select().from(apiRoutes);
+  }
+  
+  async updateApiRoute(id: number, route: Partial<ApiRoute>): Promise<void> {
+    await db
+      .update(apiRoutes)
+      .set({
+        ...route,
+        updatedAt: new Date(),
+      })
+      .where(eq(apiRoutes.id, id));
+  }
+  
+  async deleteApiRoute(id: number): Promise<void> {
+    await db.delete(apiRoutes).where(eq(apiRoutes.id, id));
+  }
+  
+  async deleteSaifZoneForm(id: number): Promise<void> {
+    await db.delete(saifZoneForms).where(eq(saifZoneForms.id, id));
   }
 
   // Conversation management methods implementation
@@ -651,6 +986,136 @@ export class DatabaseStorage implements IStorage {
         resolvedAt: new Date()
       })
       .where(eq(issuesLog.id, id));
+  }
+
+  // Admin Dashboard methods implementation
+  async createAdminDashboard(dashboard: InsertAdminDashboard): Promise<AdminDashboard> {
+    const [createdDashboard] = await db
+      .insert(adminDashboards)
+      .values(dashboard)
+      .returning();
+    return createdDashboard;
+  }
+  
+  async getAdminDashboard(id: number): Promise<AdminDashboard | undefined> {
+    const [dashboard] = await db.select().from(adminDashboards).where(eq(adminDashboards.id, id));
+    return dashboard;
+  }
+  
+  async getAdminDashboardByPath(path: string): Promise<AdminDashboard | undefined> {
+    const [dashboard] = await db.select().from(adminDashboards).where(eq(adminDashboards.path, path));
+    return dashboard;
+  }
+  
+  async getAllAdminDashboards(): Promise<AdminDashboard[]> {
+    return await db
+      .select()
+      .from(adminDashboards)
+      .where(eq(adminDashboards.isActive, true))
+      .orderBy(adminDashboards.order);
+  }
+  
+  async getAdminDashboardsByRole(role: string): Promise<AdminDashboard[]> {
+    return await db
+      .select()
+      .from(adminDashboards)
+      .orderBy(adminDashboards.order);
+    // Note: We need to filter by role in the application layer as requiredRoles is a JSONB field
+  }
+  
+  async updateAdminDashboard(id: number, dashboard: Partial<AdminDashboard>): Promise<void> {
+    await db
+      .update(adminDashboards)
+      .set({
+        ...dashboard,
+        updatedAt: new Date(),
+      })
+      .where(eq(adminDashboards.id, id));
+  }
+  
+  async deleteAdminDashboard(id: number): Promise<void> {
+    await db.delete(adminDashboards).where(eq(adminDashboards.id, id));
+  }
+  
+  // Admin Dashboard Widget methods implementation
+  async createAdminDashboardWidget(widget: InsertAdminDashboardWidget): Promise<AdminDashboardWidget> {
+    const [createdWidget] = await db
+      .insert(adminDashboardWidgets)
+      .values(widget)
+      .returning();
+    return createdWidget;
+  }
+  
+  async getAdminDashboardWidget(id: number): Promise<AdminDashboardWidget | undefined> {
+    const [widget] = await db.select().from(adminDashboardWidgets).where(eq(adminDashboardWidgets.id, id));
+    return widget;
+  }
+  
+  async getAdminDashboardWidgetsByDashboard(dashboardId: number): Promise<AdminDashboardWidget[]> {
+    return await db
+      .select()
+      .from(adminDashboardWidgets)
+      .where(eq(adminDashboardWidgets.dashboardId, dashboardId))
+      .orderBy(adminDashboardWidgets.order);
+  }
+  
+  async updateAdminDashboardWidget(id: number, widget: Partial<AdminDashboardWidget>): Promise<void> {
+    await db
+      .update(adminDashboardWidgets)
+      .set({
+        ...widget,
+        updatedAt: new Date(),
+      })
+      .where(eq(adminDashboardWidgets.id, id));
+  }
+  
+  async deleteAdminDashboardWidget(id: number): Promise<void> {
+    await db.delete(adminDashboardWidgets).where(eq(adminDashboardWidgets.id, id));
+  }
+  
+  // Conversation Interface methods implementation
+  async createConversationInterface(interfaceData: InsertConversationInterface): Promise<ConversationInterface> {
+    const [createdInterface] = await db
+      .insert(conversationInterfaces)
+      .values(interfaceData)
+      .returning();
+    return createdInterface;
+  }
+  
+  async getConversationInterface(id: number): Promise<ConversationInterface | undefined> {
+    const [conversationInterface] = await db.select().from(conversationInterfaces).where(eq(conversationInterfaces.id, id));
+    return conversationInterface;
+  }
+  
+  async getConversationInterfaceByName(name: string): Promise<ConversationInterface | undefined> {
+    const [conversationInterface] = await db.select().from(conversationInterfaces).where(eq(conversationInterfaces.name, name));
+    return conversationInterface;
+  }
+  
+  async getAllConversationInterfaces(): Promise<ConversationInterface[]> {
+    return await db.select().from(conversationInterfaces);
+  }
+  
+  async getActiveConversationInterfaces(): Promise<ConversationInterface[]> {
+    return await db
+      .select()
+      .from(conversationInterfaces)
+      .where(eq(conversationInterfaces.isActive, true))
+      .orderBy(conversationInterfaces.order);
+  }
+  
+  async updateConversationInterface(id: number, data: Partial<ConversationInterface>): Promise<void> {
+    await db
+      .update(conversationInterfaces)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(eq(conversationInterfaces.id, id));
+  }
+  
+  async deleteConversationInterface(id: number): Promise<void> {
+    await db.delete(conversationInterfaces).where(eq(conversationInterfaces.id, id));
   }
 }
 

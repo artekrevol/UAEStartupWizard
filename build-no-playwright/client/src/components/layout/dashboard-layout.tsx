@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { useLocation } from "wouter";
+import { RealTimeNotifications } from "@/components/ui/real-time-notifications";
 import { 
   LogOut, 
   LayoutDashboard, 
@@ -11,7 +12,7 @@ import {
   ShieldAlert,
   Bot,
   Database,
-  Search
+  Search as SearchIcon // Renamed to avoid conflicts
 } from "lucide-react";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -34,7 +35,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 UAE Business Setup
               </span>
             </div>
-            <div className="flex items-center">
+            <div className="flex items-center space-x-2">
+              {/* Real-time notifications component */}
+              <RealTimeNotifications />
+              
               <Button
                 variant="ghost"
                 size="sm"
@@ -118,7 +122,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               className="w-full justify-start"
               onClick={() => setLocation("/ai-research")}
             >
-              <Search className="mr-2 h-5 w-5" />
+              <SearchIcon className="mr-2 h-5 w-5" />
               AI Research
             </Button>
             

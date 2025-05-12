@@ -13,12 +13,22 @@ import { useEffect } from "react";
 
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
+  
+  // Get redirectTo from URL query parameters
+  const getRedirectPath = () => {
+    if (typeof window !== 'undefined') {
+      const searchParams = new URLSearchParams(window.location.search);
+      return searchParams.get('redirectTo') || '/';
+    }
+    return '/';
+  };
 
   // Use useEffect to navigate after render instead of during render
   useEffect(() => {
     if (user) {
-      setLocation("/");
+      // Redirect to the specified page or home page
+      setLocation(getRedirectPath());
     }
   }, [user, setLocation]);
   
@@ -150,14 +160,16 @@ function LoginForm({
 function RegisterForm({
   onSubmit,
 }: {
-  onSubmit: (data: { username: string; password: string; companyName?: string }) => void;
+  onSubmit: (data: { username: string; email: string; password: string; companyName?: string; terms_accepted: boolean }) => void;
 }) {
   const form = useForm({
     resolver: zodResolver(insertUserSchema),
     defaultValues: {
       username: "",
+      email: "",
       password: "",
       companyName: "",
+      terms_accepted: true,
     },
   });
 
@@ -172,6 +184,20 @@ function RegisterForm({
               <Label>Username</Label>
               <FormControl>
                 <Input {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="email"
+          render={({ field }) => (
+            <FormItem>
+              <Label>Email</Label>
+              <FormControl>
+                <Input type="email" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -202,6 +228,29 @@ function RegisterForm({
                 <Input {...field} />
               </FormControl>
               <FormMessage />
+            </FormItem>
+          )}
+        />
+        
+        <FormField
+          control={form.control}
+          name="terms_accepted"
+          render={({ field }) => (
+            <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+              <FormControl>
+                <input
+                  type="checkbox"
+                  checked={field.value}
+                  onChange={field.onChange}
+                  className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                />
+              </FormControl>
+              <div className="space-y-1 leading-none">
+                <Label>
+                  I accept the <a href="#" className="text-primary">Terms and Conditions</a>
+                </Label>
+                <FormMessage />
+              </div>
             </FormItem>
           )}
         />
