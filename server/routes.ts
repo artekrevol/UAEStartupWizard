@@ -305,9 +305,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       if (industryGroup) {
-        // Use the industry_group column directly without the property access dot notation
+        // Use the categoryId to filter by industry group instead of non-existent industry_group column
         query = query.where(
-          sql`${businessActivities.industry_group} ILIKE ${'%' + industryGroup + '%'}`
+          sql`${businessActivities.categoryId} = ${parseInt(industryGroup) || 0}`
         );
       }
       

@@ -106,10 +106,11 @@ app.get('*', (req, res) => {
 });
 
 // Start the server
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 3000;
 httpServer.listen({
   port,
-  host: "0.0.0.0",
+  host: "0.0.0.0", // Important: Must bind to all network interfaces for Replit
 }, () => {
-  console.log(`Production server running on port ${port}`);
+  console.log(`Production server running on port ${port} (0.0.0.0)`);
+  console.log(`For Replit deployments, this will be accessible via the external port 80`);
 });
