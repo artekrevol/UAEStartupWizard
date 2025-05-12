@@ -215,8 +215,7 @@ export default function FreezoneStep({
       }
     );
     
-    // Auto progress after selection with slight delay
-    setTimeout(onNext, 500);
+    // Removed auto-progression to give user control
   };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -246,6 +245,24 @@ export default function FreezoneStep({
           UAE Free Zones offer specific benefits for different business types
         </p>
       </div>
+
+      {selectedFreeZone && (
+        <motion.div
+          className="flex justify-end mt-4"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <Button 
+            size="lg" 
+            onClick={onNext}
+            className="gap-2"
+          >
+            Continue
+            <ArrowRight className="h-4 w-4" />
+          </Button>
+        </motion.div>
+      )}
 
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row gap-2 sm:items-center justify-between">

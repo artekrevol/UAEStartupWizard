@@ -181,8 +181,7 @@ export default function LegalStructureStep({
       }
     );
     
-    // Auto progress after selection
-    setTimeout(onNext, 800);
+    // Removed auto-progression to give user control
   };
 
   return (
