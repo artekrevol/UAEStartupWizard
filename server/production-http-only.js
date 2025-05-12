@@ -21,6 +21,16 @@ app.use(express.static(path.join(process.cwd(), 'dist/public')));
 registerRoutes(app);
 
 const port = process.env.PORT || 5000;
-app.listen(port, '0.0.0.0', () => {
+const server = app.listen(port, '0.0.0.0', () => {
   console.log(`Production server running on port ${port}`);
+}).on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`Port ${port} is already in use. Trying alternate port...`);
+    const altPort = parseInt(port) + 1;
+    app.listen(altPort, '0.0.0.0', () => {
+      console.log(`Server running on alternate port ${altPort}`);
+    });
+  } else {
+    console.error('Server error:', err);
+  }
 });
