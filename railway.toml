@@ -1,9 +1,9 @@
 [build]
 builder = "nixpacks"
-buildCommand = "npm install"
+buildCommand = "npm install && npm run build-no-playwright"
 
 [deploy]
-startCommand = "npm start"
+startCommand = "cross-env NODE_ENV=production SCRAPER_HTTP_ONLY_MODE=true node dist/production-http-only.js"
 healthcheckPath = "/healthz"
 healthcheckTimeout = 300
 restartPolicyType = "on-failure"
