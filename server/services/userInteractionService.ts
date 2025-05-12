@@ -15,11 +15,27 @@ import { eq, and, desc, like, sql } from 'drizzle-orm';
  */
 export async function recordUserInteraction(interaction: InsertUserInteraction) {
   try {
-    const [result] = await db.insert(userInteractions).values(interaction).returning();
-    return result;
+    // Use a try-catch block with fallback for HTTP-only mode
+    try {
+      const resolvedDb = await (db as any).get?.() || db;
+      const [result] = await resolvedDb.insert(userInteractions).values(interaction).returning();
+      return result;
+    } catch (dbError) {
+      // If we're in HTTP-only mode or have database issues, return a placeholder
+      if (process.env.SCRAPER_HTTP_ONLY_MODE === 'true') {
+        console.warn('Database interaction skipped in HTTP-only mode');
+        return { id: -1, ...interaction };
+      }
+      throw dbError;
+    }
   } catch (error) {
     console.error('Error recording user interaction:', error);
-    throw error;
+    // Don't throw the error in production to prevent cascading failures
+    if (process.env.NODE_ENV !== 'production') {
+      throw error;
+    }
+    // Return a fallback object with -1 as ID to indicate error
+    return { id: -1, ...interaction };
   }
 }
 
@@ -39,6 +55,26 @@ export async function getUserInteractions(
   }
 ) {
   try {
+    // Try to resolve the database
+    let resolvedDb;
+    try {
+      resolvedDb = await (db as any).get?.() || db;
+    } catch (dbError) {
+      if (process.env.SCRAPER_HTTP_ONLY_MODE === 'true') {
+        console.warn('Database interaction skipped in HTTP-only mode');
+        return {
+          data: [],
+          pagination: {
+            page,
+            limit,
+            total: 0,
+            totalPages: 0
+          }
+        };
+      }
+      throw dbError;
+    }
+    
     const offset = (page - 1) * limit;
     
     // Build filter conditions
@@ -70,8 +106,8 @@ export async function getUserInteractions(
     
     // Execute query
     const baseQuery = conditions.length > 0 
-      ? db.select().from(userInteractions).where(and(...conditions))
-      : db.select().from(userInteractions);
+      ? resolvedDb.select().from(userInteractions).where(and(...conditions))
+      : resolvedDb.select().from(userInteractions);
       
     const data = await baseQuery
       .orderBy(desc(userInteractions.createdAt))
@@ -79,7 +115,7 @@ export async function getUserInteractions(
       .offset(offset);
     
     // Get total count for pagination
-    const countResult = await db
+    const countResult = await resolvedDb
       .select({ count: sql<number>`count(*)` })
       .from(userInteractions)
       .where(conditions.length > 0 ? and(...conditions) : undefined);
@@ -97,6 +133,20 @@ export async function getUserInteractions(
     };
   } catch (error) {
     console.error('Error fetching user interactions:', error);
+    
+    // In production, return empty data instead of throwing
+    if (process.env.NODE_ENV === 'production') {
+      return {
+        data: [],
+        pagination: {
+          page,
+          limit,
+          total: 0,
+          totalPages: 0
+        }
+      };
+    }
+    
     throw error;
   }
 }
@@ -114,6 +164,23 @@ export async function getUserInteractionStats(
   }
 ) {
   try {
+    // Try to resolve the database
+    let resolvedDb;
+    try {
+      resolvedDb = await (db as any).get?.() || db;
+    } catch (dbError) {
+      if (process.env.SCRAPER_HTTP_ONLY_MODE === 'true') {
+        console.warn('Database interaction skipped in HTTP-only mode');
+        return {
+          interactionTypeStats: [],
+          timeStats: [],
+          userStats: [],
+          totalInteractions: 0
+        };
+      }
+      throw dbError;
+    }
+
     // Build filter conditions
     let conditions = [] as any[];
     
@@ -134,7 +201,7 @@ export async function getUserInteractionStats(
     }
     
     // Get statistics based on interaction type
-    const interactionTypeStats = await db
+    const interactionTypeStats = await resolvedDb
       .select({
         type: userInteractions.interactionType,
         count: sql<number>`count(*)`,
@@ -163,7 +230,7 @@ export async function getUserInteractionStats(
         timeGrouping = sql`date_trunc('hour', ${userInteractions.createdAt})`;
     }
     
-    const timeStats = await db
+    const timeStats = await resolvedDb
       .select({
         time: timeGrouping,
         count: sql<number>`count(*)`,
@@ -176,7 +243,7 @@ export async function getUserInteractionStats(
     // Get user statistics if no specific user is filtered
     let userStats = [];
     if (!filters?.userId) {
-      userStats = await db
+      userStats = await resolvedDb
         .select({
           userId: userInteractions.userId,
           username: userInteractions.username,
@@ -193,10 +260,21 @@ export async function getUserInteractionStats(
       interactionTypeStats,
       timeStats,
       userStats,
-      totalInteractions: interactionTypeStats.reduce((sum, stat) => sum + Number(stat.count), 0)
+      totalInteractions: interactionTypeStats.reduce((sum: number, stat: any) => sum + Number(stat.count), 0)
     };
   } catch (error) {
     console.error('Error fetching user interaction statistics:', error);
+    
+    // In production, return empty data instead of throwing
+    if (process.env.NODE_ENV === 'production') {
+      return {
+        interactionTypeStats: [],
+        timeStats: [],
+        userStats: [],
+        totalInteractions: 0
+      };
+    }
+    
     throw error;
   }
 }
@@ -206,7 +284,23 @@ export async function getUserInteractionStats(
  */
 export async function deleteOldUserInteractions(olderThan: Date) {
   try {
-    const result = await db
+    // Try to resolve the database
+    let resolvedDb;
+    try {
+      resolvedDb = await (db as any).get?.() || db;
+    } catch (dbError) {
+      if (process.env.SCRAPER_HTTP_ONLY_MODE === 'true') {
+        console.warn('Database interaction skipped in HTTP-only mode');
+        return { 
+          deletedCount: 0,
+          success: true,
+          skipped: true
+        };
+      }
+      throw dbError;
+    }
+    
+    const result = await resolvedDb
       .delete(userInteractions)
       .where(sql`${userInteractions.createdAt} < ${olderThan}`)
       .returning({ id: userInteractions.id });
@@ -217,6 +311,16 @@ export async function deleteOldUserInteractions(olderThan: Date) {
     };
   } catch (error) {
     console.error('Error deleting old user interactions:', error);
+    
+    // In production, return success with 0 deleted to avoid cascading failures
+    if (process.env.NODE_ENV === 'production') {
+      return { 
+        deletedCount: 0,
+        success: false,
+        error: error.message
+      };
+    }
+    
     throw error;
   }
 }
