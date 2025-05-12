@@ -3,6 +3,6 @@ builder = "nixpacks"
 buildCommand = "npm install && npm run build-no-playwright && node fix-cheerio-import.js"
 
 [deploy]
-startCommand = "cross-env NODE_ENV=production SCRAPER_HTTP_ONLY_MODE=true node dist/production-http-only.js"
+startCommand = "cross-env NODE_ENV=production SCRAPER_HTTP_ONLY_MODE=true PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 node dist/production-http-only.js"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
