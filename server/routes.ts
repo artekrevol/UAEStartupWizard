@@ -331,7 +331,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const totalCount = Number(countResult?.count || 0);
       
       // Get the activities with pagination
+      // Make sure we're only selecting columns that exist in the database
       const activities = await query
+        .select({
+          id: businessActivities.id,
+          name: businessActivities.name,
+          description: businessActivities.description,
+          categoryId: businessActivities.categoryId,
+          // Map activity_code to code in the response for compatibility
+          code: sql`activity_code`
+        })
         .limit(limit)
         .offset(offset)
         .orderBy(businessActivities.name);
