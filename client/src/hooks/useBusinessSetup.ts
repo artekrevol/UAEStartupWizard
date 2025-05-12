@@ -156,7 +156,9 @@ export function useBusinessSetup() {
         
         // Remaining fields
         selectedFreeZone: existingSetup.selectedFreeZone,
+        freeZoneName: existingSetup.freeZoneName || null,
         businessActivity: existingSetup.businessActivity,
+        businessActivityName: existingSetup.businessActivityName || null,
         legalStructure: existingSetup.legalStructure,
         budget: existingSetup.budget,
         timeline: existingSetup.timeline,
