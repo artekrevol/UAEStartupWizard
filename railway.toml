@@ -1,6 +1,6 @@
 [build]
 builder = "nixpacks"
-buildCommand = "npm install && npm run build-no-playwright"
+buildCommand = "npm install && npm run build-no-playwright && node fix-cheerio-import.js"
 
 [deploy]
 startCommand = "cross-env NODE_ENV=production SCRAPER_HTTP_ONLY_MODE=true node dist/production-http-only.js"

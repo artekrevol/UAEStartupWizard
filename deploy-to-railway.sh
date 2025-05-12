@@ -55,7 +55,11 @@ fi
 echo "Deploying application to Railway..."
 railway up
 
-# Step 7: Show deployment URL
+# Step 7: Apply cheerio fix post-deployment
+echo "Applying cheerio import fix..."
+railway run node fix-cheerio-import.js
+
+# Step 8: Show deployment URL
 echo "================================================"
 echo "Deployment complete! Your application is now available at:"
 railway domain

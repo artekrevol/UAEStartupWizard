@@ -1,62 +1,78 @@
 # Railway Deployment Checklist
 
-Use this checklist to ensure your UAE Business Setup Assistant deployment to Railway is successful with all features enabled, including Playwright-based web scraping.
+Use this checklist to guide you through the Railway deployment process after all the fixes we've implemented.
 
-## Deployment Preparation
+## Pre-Deployment
+- [x] Fix railway.toml to remove health check configuration
+- [x] Create fix-cheerio-import.js script for cheerio module import fix
+- [x] Update build command in railway.toml to include cheerio fix
+- [x] Create documentation (RAILWAY_HEALTHCHECK_TROUBLESHOOTING.md, UPDATED_RAILWAY_DEPLOYMENT.md)
 
-- [x] Create railway.toml configuration file
-- [x] Configure Procfile for Railway
-- [x] Update scraper config.js to detect Railway environment
-- [x] Prepare server/production.js for Railway
-- [x] Create comprehensive deployment guide
+## Deployment Steps
 
-## Pre-Deployment Tasks
+1. [ ] Install Railway CLI:
+   ```bash
+   npm install -g @railway/cli
+   ```
 
-- [ ] Push your code to GitHub
-- [ ] Create a Railway account
-- [ ] Gather all required API keys and secrets
+2. [ ] Login to Railway:
+   ```bash
+   railway login
+   ```
+   
+   * When prompted, visit the URL and enter the pairing code shown in the terminal
+   * Wait for the login confirmation
 
-## Railway Setup
+3. [ ] Link to your project:
+   ```bash
+   railway link
+   ```
+   
+   * Select your workspace
+   * Select the UAEStartupWizard project
+   * Select the production environment
 
-- [ ] Create a new project in Railway
-- [ ] Connect your GitHub repository
-- [ ] Add PostgreSQL database to your project 
+4. [ ] Deploy the application:
+   ```bash
+   railway up
+   ```
+   
+   * This will build and deploy your application according to your railway.toml configuration
 
-## Environment Configuration
+5. [ ] Run the cheerio fix if needed:
+   ```bash
+   railway run node fix-cheerio-import.js
+   ```
 
-- [ ] Set required environment variables:
-  - [ ] NODE_ENV=production
-  - [ ] RAILWAY_ENVIRONMENT=true
-  - [ ] OPENAI_API_KEY=your_key_here
-  - [ ] Additional API keys as needed
+6. [ ] Initialize the database if this is a fresh deployment:
+   ```bash
+   railway run node railway-setup.js
+   ```
 
-## Database Migration
+7. [ ] Apply database migrations:
+   ```bash
+   railway run npm run db:push
+   ```
 
-- [ ] After deployment, run database migrations:
-  - [ ] Run initial schema setup
+8. [ ] Verify your deployment:
+   ```bash
+   railway open
+   ```
 
-## Post-Deployment Verification
+## Post-Deployment
 
-- [ ] Check application health at /health endpoint
-- [ ] Verify frontend is accessible
-- [ ] Test API endpoints
-- [ ] Verify Playwright-based scraping is working
-- [ ] Check logs for any errors
+- [ ] Check the application logs for any errors:
+   ```bash
+   railway logs
+   ```
 
-## Common Issues
+- [ ] Monitor the application in the Railway dashboard:
+   ```bash
+   railway dashboard
+   ```
 
-### Playwright installation fails
-- Check railway.toml has `buildCommand` that includes `npx playwright install chromium --with-deps`
-- Ensure the [nixpacks] section includes chromium feature
+## Troubleshooting
 
-### Database connection fails
-- Verify DATABASE_URL is set correctly
-- Check if the database was created properly
+If you encounter any issues during deployment, refer to the `RAILWAY_HEALTHCHECK_TROUBLESHOOTING.md` file for solutions to common problems.
 
-### Application doesn't start
-- Check build logs for errors
-- Verify Procfile has correct start command
-
-### Scraper doesn't use Playwright
-- Make sure RAILWAY_ENVIRONMENT=true is set
-- Check logs to confirm scraper mode detection
+For more detailed deployment instructions, see the `UPDATED_RAILWAY_DEPLOYMENT.md` file.
