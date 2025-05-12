@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { trackUserAction } from '@/lib/user-tracker';
+import { useAuth } from '@/hooks/use-auth';
 import { 
   CheckCircle, 
   Calendar, 
@@ -29,6 +30,7 @@ export default function CompletionStep({
   onNext
 }: CompletionStepProps) {
   const [, navigate] = useLocation();
+  const { user } = useAuth();
   
   // Query to fetch business setup summary
   const { data: freeZone } = useQuery({
@@ -75,32 +77,44 @@ export default function CompletionStep({
   };
 
   const handleDashboard = () => {
-    navigate('/');
+    if (user) {
+      navigate('/');
+    } else {
+      navigate('/auth?redirectTo=/');
+    }
     
     trackUserAction(
       'button_click',
       'CompletionStep',
-      { elementId: 'dashboardButton' }
+      { elementId: 'dashboardButton', authenticated: !!user }
     );
   };
 
   const handleDocuments = () => {
-    navigate('/documents');
+    if (user) {
+      navigate('/documents');
+    } else {
+      navigate('/auth?redirectTo=/documents');
+    }
     
     trackUserAction(
       'button_click',
       'CompletionStep',
-      { elementId: 'documentsButton' }
+      { elementId: 'documentsButton', authenticated: !!user }
     );
   };
 
   const handleSupport = () => {
-    navigate('/support');
+    if (user) {
+      navigate('/support');
+    } else {
+      navigate('/auth?redirectTo=/support');
+    }
     
     trackUserAction(
       'button_click',
       'CompletionStep',
-      { elementId: 'supportButton' }
+      { elementId: 'supportButton', authenticated: !!user }
     );
   };
 
