@@ -179,9 +179,9 @@ export default function BusinessActivityStep({
                       <div className="flex justify-between items-start">
                         <div>
                           <Label className="text-base font-medium">{activity.name}</Label>
-                          {activity.code && (
+                          {activity.activity_code && (
                             <Badge variant="outline" className="ml-2">
-                              {activity.code}
+                              {activity.activity_code}
                             </Badge>
                           )}
                         </div>
@@ -212,17 +212,17 @@ export default function BusinessActivityStep({
                       )}
                       
                       <div className="flex flex-wrap gap-2 text-sm">
-                        {activity.approvalRequirements && (
+                        {activity.approval_requirements && (
                           <Badge variant="outline" className="flex gap-1 items-center">
                             <CheckCircle2 className="h-3 w-3" />
-                            Approval: {activity.approvalRequirements}
+                            Approval: {activity.approval_requirements}
                           </Badge>
                         )}
                         
-                        {activity.categoryId && (
+                        {activity.category_id && (
                           <Badge variant="outline" className="flex gap-1 items-center">
                             <Tag className="h-3 w-3" />
-                            Category ID: {activity.categoryId}
+                            Category ID: {activity.category_id}
                           </Badge>
                         )}
                       </div>

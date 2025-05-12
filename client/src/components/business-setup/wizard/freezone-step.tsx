@@ -60,18 +60,38 @@ export default function FreezoneStep({
     if (!industryFilter) return 50; // Neutral score if no industry selected
     
     // Check if this free zone supports the selected industry
-    let industries: string[] = [];
+    let industriesList: string[] = [];
     
     // Handle different data structures - some may have industries as array, others as object
-    if (Array.isArray(freeZone.industries)) {
-      industries = freeZone.industries;
-    } else if (freeZone.industries && typeof freeZone.industries === 'object') {
-      industries = Object.keys(freeZone.industries);
+    if (freeZone.industries) {
+      if (Array.isArray(freeZone.industries)) {
+        industriesList = freeZone.industries.filter(industry => typeof industry === 'string');
+      } else if (typeof freeZone.industries === 'object') {
+        // Try to get industries from object keys
+        industriesList = Object.keys(freeZone.industries);
+        
+        // Also check if the object has nested arrays of industries
+        Object.values(freeZone.industries).forEach(value => {
+          if (Array.isArray(value)) {
+            industriesList = [...industriesList, ...value.filter(v => typeof v === 'string')];
+          }
+        });
+      }
     }
     
-    if (industries.length === 0) return 50; // No data available
+    if (industriesList.length === 0) {
+      // Try to infer from name and description
+      const nameMatch = freeZone.name.toLowerCase().includes(industryFilter.toLowerCase());
+      const descMatch = freeZone.description?.toLowerCase().includes(industryFilter.toLowerCase()) || false;
+      
+      if (nameMatch) return 85;
+      if (descMatch) return 75;
+      
+      return 50; // No data available
+    }
     
-    const matchingIndustries = industries.filter(industry => {
+    // Check for direct matches in the industries list
+    const matchingIndustries = industriesList.filter(industry => {
       if (typeof industry !== 'string') return false;
       
       return industry.toLowerCase().includes(industryFilter.toLowerCase()) ||
@@ -108,6 +128,34 @@ export default function FreezoneStep({
     return 60;
   };
 
+  // Function to extract cost from freezone data, with fallback values
+  const getFreezoneCost = (freeZone: FreeZone): number => {
+    // Try to get the cost from different formats
+    if (freeZone.setupCost && typeof freeZone.setupCost === 'object') {
+      // If it has min property
+      if ('min' in freeZone.setupCost && typeof freeZone.setupCost.min === 'number') {
+        return freeZone.setupCost.min;
+      }
+      
+      // If it has a starting_from property
+      if ('starting_from' in freeZone.setupCost && typeof freeZone.setupCost.starting_from === 'number') {
+        return freeZone.setupCost.starting_from;
+      }
+    }
+    
+    // Default values based on free zone tiers
+    const premiumFreeZones = ['Dubai International Financial Centre', 'Abu Dhabi Global Market', 'Dubai Healthcare City'];
+    const budgetFreeZones = ['Ajman Free Zone', 'Fujairah Free Zone', 'RAK Free Zone', 'Umm Al Quwain Free Zone'];
+    
+    if (premiumFreeZones.some(name => freeZone.name.includes(name))) {
+      return 75000; // Premium tier default
+    } else if (budgetFreeZones.some(name => freeZone.name.includes(name))) {
+      return 15000; // Budget tier default
+    }
+    
+    return 40000; // Mid-range default
+  };
+
   // Filtered and sorted free zones
   const filteredFreeZones = freeZones
     .filter(freeZone => {
@@ -133,7 +181,7 @@ export default function FreezoneStep({
       if (sortBy === 'name') {
         return a.name.localeCompare(b.name);
       } else if (sortBy === 'cost') {
-        return getCostValue(a) - getCostValue(b);
+        return getFreezoneCost(a) - getFreezoneCost(b);
       } else {
         // Sort by recommendation score
         return getRecommendationScore(b) - getRecommendationScore(a);
@@ -142,15 +190,15 @@ export default function FreezoneStep({
 
   // Helper function to get cost category
   function getCostCategory(freeZone: FreeZone): 'low' | 'medium' | 'high' {
-    const setupCost = freeZone.setupCost?.min || 0;
-    if (setupCost < 20000) return 'low';
-    if (setupCost < 50000) return 'medium';
+    const setupCost = getFreezoneCost(freeZone);
+    if (setupCost < 25000) return 'low';
+    if (setupCost < 60000) return 'medium';
     return 'high';
   }
 
   // Helper function to get numeric cost value for sorting
   function getCostValue(freeZone: FreeZone): number {
-    return freeZone.setupCost?.min || 50000; // Default value if unknown
+    return getFreezoneCost(freeZone);
   }
 
   const handleSelect = (freezoneId: number) => {
