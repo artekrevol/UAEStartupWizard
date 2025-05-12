@@ -310,44 +310,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         query = query.where(eq(businessActivities.categoryId, industryGroupId));
       }
       
-      // Get count for pagination
-      const countQuery = db.select({ count: sql`count(*)` }).from(businessActivities);
+      // Get count for pagination using raw SQL
+      const countResult = await db.execute(sql`
+        SELECT COUNT(*) as count
+        FROM business_activities
+        WHERE ${industryGroup ? sql`category_id = ${parseInt(industryGroup) || 0}` : sql`1=1`}
+        ${searchQuery ? sql`AND (name ILIKE ${'%' + searchQuery + '%'} OR description ILIKE ${'%' + searchQuery + '%'})` : sql``}
+      `);
       
-      // Apply the same filters to count query
-      if (searchQuery) {
-        countQuery.where(
-          sql`${businessActivities.name} ILIKE ${'%' + searchQuery + '%'} OR 
-              ${businessActivities.description} ILIKE ${'%' + searchQuery + '%'}`
-        );
-      }
-      
-      if (industryGroup) {
-        // Use the categoryId to filter by industry group
-        const industryGroupId = parseInt(industryGroup) || 0;
-        countQuery.where(eq(businessActivities.categoryId, industryGroupId));
-      }
-      
-      const [countResult] = await countQuery;
-      const totalCount = Number(countResult?.count || 0);
+      const totalCount = Number(countResult.rows[0]?.count || 0);
       
       // Get the activities with pagination
-      // Make sure we're only selecting columns that exist in the database
-      const activities = await query
-        .select({
-          id: businessActivities.id,
-          name: businessActivities.name,
-          description: businessActivities.description,
-          categoryId: businessActivities.categoryId,
-          // Map activity_code to code in the response for compatibility
-          code: sql`activity_code`
-        })
-        .limit(limit)
-        .offset(offset)
-        .orderBy(businessActivities.name);
+      // Using raw SQL to handle the column name differences
+      const activities = await db.execute(sql`
+        SELECT 
+          id, 
+          name, 
+          description, 
+          category_id as "categoryId", 
+          activity_code as code
+        FROM business_activities
+        WHERE ${industryGroup ? sql`category_id = ${parseInt(industryGroup) || 0}` : sql`1=1`}
+        ${searchQuery ? sql`AND (name ILIKE ${'%' + searchQuery + '%'} OR description ILIKE ${'%' + searchQuery + '%'})` : sql``}
+        ORDER BY name
+        LIMIT ${limit}
+        OFFSET ${offset}
+      `);
       
       // Return with pagination metadata
       res.json({
-        activities,
+        activities: activities.rows || [],
         pagination: {
           total: totalCount,
           page,
