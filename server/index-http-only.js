@@ -6,7 +6,7 @@
  */
 
 import express from "express";
-import { registerRoutes } from "./routes.js";
+import { registerRoutes } from "./routes";
 import path from "path";
 import fs from "fs";
 import compression from "compression";
