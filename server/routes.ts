@@ -137,11 +137,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (industryKeywords.length > 0) {
         const conditions = industryKeywords.map(keyword => 
-          sql`${businessActivities.industryGroup} ILIKE ${'%' + keyword + '%'}`
+          sql`${businessActivities.description} ILIKE ${'%' + keyword + '%'}`
+        );
+        
+        // We can also check the name as fallback
+        const nameConditions = industryKeywords.map(keyword => 
+          sql`${businessActivities.name} ILIKE ${'%' + keyword + '%'}`
         );
         
         // Combine with OR
-        query = query.where(sql`${conditions.join(' OR ')}`);
+        query = query.where(sql`(${conditions.join(' OR ')}) OR (${nameConditions.join(' OR ')})`);
       }
       
       const matchedActivities = await query.limit(20);

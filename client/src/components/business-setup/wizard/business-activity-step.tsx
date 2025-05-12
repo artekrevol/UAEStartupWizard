@@ -16,14 +16,22 @@ import {
 
 interface BusinessActivity {
   id: number;
-  category_id?: number | null;
+  categoryId?: number | null;
+  category_id?: number | null; // Support both versions
   name: string;
   description: string | null;
-  required_docs?: string | null;
+  code?: string | null;
+  activity_code?: string | null; // Support both versions
+  requirements?: string | null;
+  required_docs?: string | null; // Support both versions
+  feeStructure?: Record<string, any> | null;
+  applicableIn?: any[] | null;
+  restrictions?: string | null;
+  approvalTime?: string | null;
+  approvalRequirements?: string | null;
+  approval_requirements?: string | null; // Support both versions
   minimum_capital?: string | null;
   fees?: string | null;
-  approval_requirements?: string | null;
-  activity_code?: string | null;
   name_arabic?: string | null;
   description_arabic?: string | null;
   industry_group?: string | null;
