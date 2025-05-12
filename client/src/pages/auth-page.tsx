@@ -13,12 +13,22 @@ import { useEffect } from "react";
 
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
+  
+  // Get redirectTo from URL query parameters
+  const getRedirectPath = () => {
+    if (typeof window !== 'undefined') {
+      const searchParams = new URLSearchParams(window.location.search);
+      return searchParams.get('redirectTo') || '/';
+    }
+    return '/';
+  };
 
   // Use useEffect to navigate after render instead of during render
   useEffect(() => {
     if (user) {
-      setLocation("/");
+      // Redirect to the specified page or home page
+      setLocation(getRedirectPath());
     }
   }, [user, setLocation]);
   
