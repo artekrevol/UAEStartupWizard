@@ -14,6 +14,15 @@ const app = express();
 // Enable compression
 app.use(compression());
 
+// Health check endpoints
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+app.get('/healthz', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // Serve static files
 app.use(express.static(path.join(process.cwd(), 'dist/public')));
 
@@ -21,16 +30,26 @@ app.use(express.static(path.join(process.cwd(), 'dist/public')));
 registerRoutes(app);
 
 const port = process.env.PORT || 5000;
+
+// Start server with error handling
 const server = app.listen(port, '0.0.0.0', () => {
   console.log(`Production server running on port ${port}`);
+  console.log(`Health check available at: http://localhost:${port}/healthz`);
 }).on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
-    console.error(`Port ${port} is already in use. Trying alternate port...`);
-    const altPort = parseInt(port) + 1;
-    app.listen(altPort, '0.0.0.0', () => {
-      console.log(`Server running on alternate port ${altPort}`);
-    });
+    console.error(`Port ${port} is already in use. Please try a different port.`);
+    process.exit(1); // Exit to allow Railway to retry
   } else {
     console.error('Server error:', err);
+    process.exit(1);
   }
+});
+
+// Handle shutdown gracefully
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, shutting down...');
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
 });
