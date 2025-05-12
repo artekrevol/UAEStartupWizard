@@ -72,8 +72,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const categories = await db
         .select()
-        .from(businessCategories)
-        .where(eq(businessCategories.isActive, true));
+        .from(businessActivityCategories)
+        .where(eq(businessActivityCategories.isActive, true));
       res.json(categories);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -108,8 +108,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // This is a fallback to handle ISIC activities which don't have a category assigned
       const category = await db
         .select()
-        .from(businessCategories)
-        .where(eq(businessCategories.id, categoryId))
+        .from(businessActivityCategories)
+        .where(eq(businessActivityCategories.id, categoryId))
         .limit(1);
         
       if (!category || category.length === 0) {
