@@ -206,6 +206,12 @@ export default function FreezoneStep({
     setSelectedFreeZone(freezoneId);
     updateBusinessSetupData('selectedFreeZone', freezoneId);
     
+    // Find the selected freezone to store its name
+    const selectedZone = freeZones.find(zone => zone.id === freezoneId);
+    if (selectedZone) {
+      updateBusinessSetupData('freeZoneName', selectedZone.name);
+    }
+    
     // Track selection
     trackUserAction(
       'business_setup_selection',

@@ -20,7 +20,9 @@ export type BusinessSetupData = {
   
   // Remaining fields
   selectedFreeZone: number | null;
+  freeZoneName: string | null;
   businessActivity: string | null;
+  businessActivityName: string | null;
   legalStructure: string | null;
   budget: string | null;
   timeline: string | null;
@@ -48,7 +50,9 @@ export function useBusinessSetup() {
     
     // Remaining fields
     selectedFreeZone: null,
+    freeZoneName: null,
     businessActivity: null,
+    businessActivityName: null,
     legalStructure: null,
     budget: null,
     timeline: null,
