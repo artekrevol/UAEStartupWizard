@@ -1,1 +1,1 @@
-web: npm run build && NODE_ENV=production RAILWAY_ENVIRONMENT=true node dist/production.js
+web: npm start

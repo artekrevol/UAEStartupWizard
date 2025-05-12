@@ -1,17 +1,10 @@
 [build]
-builder = "NIXPACKS"
-buildCommand = "npm run build && npx playwright install chromium --with-deps"
+builder = "nixpacks"
+buildCommand = "npm install"
 
 [deploy]
 startCommand = "npm start"
 healthcheckPath = "/healthz"
-healthcheckTimeout = 600
-restartPolicyType = "ON_FAILURE"
-restartPolicyMaxRetries = 5
-
-[environment]
-NODE_ENV = "production"
-
-[nixpacks]
-# Ensure all system deps for Playwright are available
-features = ["chromium"]
+healthcheckTimeout = 300
+restartPolicyType = "on-failure"
+restartPolicyMaxRetries = 10

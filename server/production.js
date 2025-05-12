@@ -25,6 +25,11 @@ process.env.NODE_ENV = 'production';
 const app = express();
 const server = createServer(app);
 
+// Health check endpoint required by Railway
+app.get('/healthz', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
+
 // ADD HEALTH CHECK ENDPOINTS FIRST - before any middleware
 // This ensures they're always accessible even if other middleware fails
 app.get('/health', (req, res) => {
