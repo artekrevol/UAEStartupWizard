@@ -5,9 +5,10 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { trackUserAction } from '@/lib/user-tracker';
-import { Building, Building2, Compass, HelpCircle, Star, SearchCheck, Globe2, Shield, CreditCard } from 'lucide-react';
+import { Building, Building2, Compass, HelpCircle, Star, SearchCheck, Globe2, Shield, CreditCard, BarChart3 } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
+import ComparisonView from '../common/comparison-view';
 
 interface LocationPreferenceStepProps {
   businessSetupData: BusinessSetupData;
@@ -30,6 +31,9 @@ export default function LocationPreferenceStep({
   const [priorities, setPriorities] = useState<string[]>(
     businessSetupData.locationPriorities || []
   );
+  
+  // State for showing comparison view
+  const [showComparison, setShowComparison] = useState(false);
 
   const handleSelect = (preference: string) => {
     setLocationPreference(preference);
@@ -116,6 +120,20 @@ export default function LocationPreferenceStep({
     show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
   };
 
+  const toggleComparison = () => {
+    setShowComparison(prev => !prev);
+    
+    // Track comparison view usage
+    trackUserAction(
+      'business_setup_comparison',
+      'LocationPreferenceStep',
+      {
+        elementId: 'locationComparisonButton',
+        interactionValue: !showComparison ? 'opened' : 'closed'
+      }
+    );
+  };
+
   return (
     <div className="space-y-8 max-w-2xl mx-auto">
       <motion.div 
@@ -130,7 +148,20 @@ export default function LocationPreferenceStep({
         <p className="text-muted-foreground text-lg mt-3">
           Based on your understanding of the options, select your preferred location type
         </p>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="mt-3"
+          onClick={toggleComparison}
+        >
+          <BarChart3 className="mr-2 h-4 w-4" />
+          {showComparison ? 'Hide comparison' : 'Compare options'}
+        </Button>
       </motion.div>
+      
+      {showComparison && (
+        <ComparisonView comparisonType="location" />
+      )}
 
       <AnimatePresence mode="wait">
         {showQuestionnaire ? (

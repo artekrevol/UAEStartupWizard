@@ -17,6 +17,7 @@ import BusinessActivityStep from '@/components/business-setup/wizard/business-ac
 import LegalStructureStep from '@/components/business-setup/wizard/legal-structure-step';
 import DocumentRequirementsStep from '@/components/business-setup/wizard/document-requirements-step';
 import CompletionStep from '@/components/business-setup/wizard/completion-step';
+import CostEstimator from '@/components/business-setup/common/cost-estimator';
 
 // Re-export BusinessSetupData type for other components
 export type { BusinessSetupData };
@@ -186,6 +187,13 @@ export default function BusinessSetupWizard() {
                 updateBusinessSetupData={updateBusinessSetupData}
                 onNext={handleNext}
               />
+              
+              {/* Show cost estimator after user has made location preference selections */}
+              {currentStep >= 4 && businessSetupData.locationPreference && (
+                <div className="mt-8">
+                  <CostEstimator businessSetupData={businessSetupData} />
+                </div>
+              )}
             </motion.div>
           </AnimatePresence>
         </div>
