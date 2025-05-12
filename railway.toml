@@ -4,10 +4,10 @@ buildCommand = "npm run build && npx playwright install chromium --with-deps"
 
 [deploy]
 startCommand = "npm start"
-healthcheckPath = "/health"
-healthcheckTimeout = 300
+healthcheckPath = "/healthz"
+healthcheckTimeout = 600
 restartPolicyType = "ON_FAILURE"
-restartPolicyMaxRetries = 3
+restartPolicyMaxRetries = 5
 
 [environment]
 NODE_ENV = "production"

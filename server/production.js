@@ -25,6 +25,21 @@ process.env.NODE_ENV = 'production';
 const app = express();
 const server = createServer(app);
 
+// ADD HEALTH CHECK ENDPOINTS FIRST - before any middleware
+// This ensures they're always accessible even if other middleware fails
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+app.get('/healthz', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Simple root route for quick testing
+app.get('/', (req, res) => {
+  res.status(200).send('Server is running. Use /healthz for health checks.');
+});
+
 // Apply security middleware
 app.use(helmet({
   contentSecurityPolicy: {
@@ -75,10 +90,8 @@ app.use((req, res, next) => {
   next();
 });
 
-// Add a health check endpoint for Railway
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok' });
-});
+// Health check endpoints are defined at the top of the file to ensure
+// they are always accessible, even if other middleware or route handlers fail
 
 // Register all API routes
 await registerRoutes(app, server);
@@ -93,9 +106,30 @@ app.get('*', (req, res) => {
 
 // Start the server
 const port = process.env.PORT || 5000;
-server.listen({
-  port,
-  host: "0.0.0.0",
-}, () => {
-  console.log(`Production server running on port ${port}`);
-});
+
+// Log environment variables for debugging (without exposing sensitive information)
+console.log(`Environment: ${process.env.NODE_ENV}`);
+console.log(`Railway Environment: ${process.env.RAILWAY_ENVIRONMENT === 'true' ? 'Yes' : 'No'}`);
+console.log(`Using port: ${port}`);
+
+// Start server with additional error handling
+try {
+  server.listen({
+    port,
+    host: "0.0.0.0",
+  }, () => {
+    console.log(`Production server running on port ${port}`);
+    console.log(`Health endpoint available at: http://localhost:${port}/health`);
+    console.log(`Alternative health endpoint available at: http://localhost:${port}/healthz`);
+  });
+  
+  // Handle server errors
+  server.on('error', (err) => {
+    console.error('Server error occurred:', err);
+    if (err.code === 'EADDRINUSE') {
+      console.error(`Port ${port} is already in use. Try using a different port.`);
+    }
+  });
+} catch (err) {
+  console.error('Failed to start server:', err);
+}
