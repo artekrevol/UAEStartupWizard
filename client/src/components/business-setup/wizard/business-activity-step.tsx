@@ -118,8 +118,7 @@ export default function BusinessActivityStep({
       }
     );
     
-    // Auto progress after selection
-    setTimeout(onNext, 500);
+    // Removed auto progress to give user time to review their selection
   };
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -146,6 +145,24 @@ export default function BusinessActivityStep({
           Choose a specific business activity for your license
         </p>
       </div>
+
+      {selectedActivity && (
+        <motion.div
+          className="flex justify-end mt-4"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <Button 
+            size="lg" 
+            onClick={onNext}
+            className="gap-2"
+          >
+            Continue
+            <MoveRight className="h-4 w-4" />
+          </Button>
+        </motion.div>
+      )}
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
