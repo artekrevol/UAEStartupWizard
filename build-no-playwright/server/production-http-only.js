@@ -1,7 +1,13 @@
 
+/**
+ * Production HTTP-Only Server
+ * 
+ * This is a simplified server for production without Playwright dependencies.
+ */
+
 import express from 'express';
 import compression from 'compression';
-import { registerRoutes } from './routes';
+import { registerRoutes } from './routes.js';
 import path from 'path';
 
 // Force environment variables

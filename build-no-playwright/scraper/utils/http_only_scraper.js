@@ -7,7 +7,7 @@
 
 import axios from 'axios';
 import https from 'https';
-import * as cheerio from 'cheerio';
+import cheerio from 'cheerio';
 import fs from 'fs';
 import path from 'path';
 import { constants } from 'crypto';
