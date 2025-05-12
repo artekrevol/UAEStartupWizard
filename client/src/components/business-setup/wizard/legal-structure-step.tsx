@@ -4,7 +4,8 @@ import { Card, CardContent, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { trackUserAction } from '@/lib/user-tracker';
-import { Shield, Users, User, Building, Landmark, Info } from 'lucide-react';
+import { Shield, Users, User, Building, Landmark, Info, ArrowRight } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { LEGAL_FORMS } from '@shared/schema';
 import {
   Tooltip,
@@ -192,6 +193,19 @@ export default function LegalStructureStep({
           The legal structure affects ownership, liability, and operations of your business
         </p>
       </div>
+      
+      {selectedLegalForm && (
+        <div className="flex justify-end mt-4">
+          <Button 
+            size="lg" 
+            onClick={onNext}
+            className="gap-2"
+          >
+            Continue
+            <ArrowRight className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
 
       <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2 -mr-2">
         {sortedLegalForms.map((legalForm) => {

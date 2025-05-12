@@ -181,17 +181,17 @@ export default function CompletionStep({
               
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">Free Zone</p>
-                <p className="font-medium">{freeZone?.name || 'Selected Free Zone'}</p>
+                <p className="font-medium">{freeZone?.name || businessSetupData.freeZoneName || 'Selected Free Zone'}</p>
               </div>
               
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">Business Activity</p>
-                <p className="font-medium">{businessSetupData.businessActivity}</p>
+                <p className="font-medium">{businessSetupData.businessActivityName || businessSetupData.businessActivity || 'Selected Business Activity'}</p>
               </div>
               
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">Legal Structure</p>
-                <p className="font-medium">{businessSetupData.legalStructure}</p>
+                <p className="font-medium">{businessSetupData.legalStructure || 'Selected Legal Structure'}</p>
               </div>
               
               <div className="space-y-2">

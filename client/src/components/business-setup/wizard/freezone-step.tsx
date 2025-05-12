@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { trackUserAction } from '@/lib/user-tracker';
-import { Loader2, Search, MapPin, DollarSign, Building, Info, ArrowUpDown, HelpCircle } from 'lucide-react';
+import { Loader2, Search, MapPin, DollarSign, Building, Info, ArrowUpDown, HelpCircle, ArrowRight } from 'lucide-react';
+import { motion } from 'framer-motion';
 import {
   Tooltip,
   TooltipContent,

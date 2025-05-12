@@ -7,7 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { trackUserAction } from '@/lib/user-tracker';
-import { Loader2, Search, Tag, CheckCircle2, HelpCircle } from 'lucide-react';
+import { Loader2, Search, Tag, CheckCircle2, HelpCircle, MoveRight } from 'lucide-react';
+import { motion } from 'framer-motion';
 import {
   Popover,
   PopoverContent,
@@ -106,7 +107,8 @@ export default function BusinessActivityStep({
 
   const handleSelect = (activity: BusinessActivity) => {
     setSelectedActivity(activity.name);
-    updateBusinessSetupData('businessActivity', activity.name);
+    updateBusinessSetupData('businessActivity', activity.id.toString());
+    updateBusinessSetupData('businessActivityName', activity.name);
     
     // Track selection
     trackUserAction(
