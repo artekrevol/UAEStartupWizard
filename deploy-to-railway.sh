@@ -19,9 +19,9 @@ railway login
 
 # Step 3: Link to existing project or create new one
 echo "Checking Railway projects..."
-if railway list 2>&1 | grep -q "No projects found"; then
-    echo "No projects found. Creating a new project..."
-    railway init
+if ! railway project list &> /dev/null; then
+    echo "No projects found or need to select a project. Creating a new project..."
+    railway project create
 else
     echo "Projects found. Please select a project to deploy to:"
     railway link
@@ -29,8 +29,9 @@ fi
 
 # Step 4: Set environment variables
 echo "Setting up environment variables..."
-railway vars set NODE_ENV=production
-railway vars set RAILWAY_ENVIRONMENT=true
+railway variables set NODE_ENV=production
+railway variables set RAILWAY_ENVIRONMENT=true
+railway variables set SCRAPER_HTTP_ONLY_MODE=true
 
 echo "Do you want to set up your OpenAI API key? (y/n)"
 read setup_openai
@@ -38,35 +39,40 @@ read setup_openai
 if [ "$setup_openai" = "y" ]; then
     echo "Enter your OpenAI API key:"
     read openai_key
-    railway vars set OPENAI_API_KEY="$openai_key"
+    railway variables set OPENAI_API_KEY="$openai_key"
 fi
 
-# Step 5: Add a PostgreSQL database if not already added
-echo "Checking for PostgreSQL database..."
-if ! railway service ls 2>&1 | grep -q "postgresql"; then
-    echo "PostgreSQL not found. Adding PostgreSQL database..."
-    railway add --plugin postgresql
-    echo "PostgreSQL database added."
-else
-    echo "PostgreSQL database already exists."
-fi
+# Step 5: Add a PostgreSQL database
+echo "Setting up PostgreSQL database..."
+echo "Creating a new PostgreSQL database service..."
+railway service create postgresql
+echo "PostgreSQL database service created."
 
 # Step 6: Deploy the application
 echo "Deploying application to Railway..."
 railway up
 
-# Step 7: Apply cheerio fix post-deployment
+# Step 7: Wait a moment for deployment to complete
+echo "Waiting for deployment to complete..."
+sleep 10
+
+# Step 8: Apply cheerio fix post-deployment
 echo "Applying cheerio import fix..."
 railway run node fix-cheerio-import.js
 
-# Step 8: Show deployment URL
+# Step 9: Run database setup
+echo "Running database setup..."
+railway run node railway-setup.js
+
+# Step 10: Show deployment URL
 echo "================================================"
 echo "Deployment complete! Your application is now available at:"
 railway domain
 
 echo ""
 echo "Next steps:"
-echo "1. Check your deployment using the verify-railway-deployment.js script"
+echo "1. Check your deployment using 'railway status'"
 echo "2. Migrate your database schema using 'railway run npm run db:push'"
-echo "3. Monitor your deployment in the Railway dashboard"
+echo "3. Monitor your deployment logs with 'railway logs'"
+echo "4. Open your application with 'railway open'"
 echo "================================================"
