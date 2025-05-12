@@ -187,14 +187,14 @@ export default function BusinessActivityStep({
                       <div className="flex justify-between items-start">
                         <div>
                           <Label className="text-base font-medium">{activity.name}</Label>
-                          {activity.activity_code && (
+                          {(activity.activity_code || activity.code) && (
                             <Badge variant="outline" className="ml-2">
-                              {activity.activity_code}
+                              {activity.activity_code || activity.code}
                             </Badge>
                           )}
                         </div>
                         
-                        {activity.required_docs && (
+                        {(activity.required_docs || activity.requirements) && (
                           <Popover>
                             <PopoverTrigger asChild>
                               <Button size="icon" variant="ghost" className="h-8 w-8">
@@ -205,7 +205,7 @@ export default function BusinessActivityStep({
                               <div className="space-y-2">
                                 <h4 className="font-medium leading-none">Requirements</h4>
                                 <p className="text-sm text-muted-foreground">
-                                  {activity.required_docs}
+                                  {activity.required_docs || activity.requirements}
                                 </p>
                               </div>
                             </PopoverContent>
@@ -220,17 +220,17 @@ export default function BusinessActivityStep({
                       )}
                       
                       <div className="flex flex-wrap gap-2 text-sm">
-                        {activity.approval_requirements && (
+                        {(activity.approval_requirements || activity.approvalRequirements) && (
                           <Badge variant="outline" className="flex gap-1 items-center">
                             <CheckCircle2 className="h-3 w-3" />
-                            Approval: {activity.approval_requirements}
+                            Approval: {activity.approval_requirements || activity.approvalRequirements}
                           </Badge>
                         )}
                         
-                        {activity.category_id && (
+                        {(activity.category_id || activity.categoryId) && (
                           <Badge variant="outline" className="flex gap-1 items-center">
                             <Tag className="h-3 w-3" />
-                            Category ID: {activity.category_id}
+                            Category ID: {activity.category_id || activity.categoryId}
                           </Badge>
                         )}
                       </div>
