@@ -5,24 +5,31 @@
  * It should be run after deployment with: railway run node railway-setup.js
  */
 
-console.log('Starting Railway database migration...');
+import { exec as execCallback } from 'child_process';
+import { promisify } from 'util';
 
-// Run the database migration
-const { exec } = require('child_process');
+const exec = promisify(execCallback);
+
+console.log('Starting Railway database migration...');
 
 // Set production environment
 process.env.NODE_ENV = 'production';
 
-exec('npm run db:push', (error, stdout, stderr) => {
-  if (error) {
+// Run the database migration using async/await with ES modules
+async function runMigration() {
+  try {
+    const { stdout, stderr } = await exec('npm run db:push');
+    
+    if (stderr) {
+      console.error(`Migration stderr: ${stderr}`);
+    }
+    
+    console.log(`Migration stdout: ${stdout}`);
+    console.log('Database migration completed successfully!');
+  } catch (error) {
     console.error(`Error during migration: ${error.message}`);
-    return;
   }
-  
-  if (stderr) {
-    console.error(`Migration stderr: ${stderr}`);
-  }
-  
-  console.log(`Migration stdout: ${stdout}`);
-  console.log('Database migration completed successfully!');
-});
+}
+
+// Execute the migration
+runMigration();
