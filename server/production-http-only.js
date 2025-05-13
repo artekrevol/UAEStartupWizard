@@ -10,80 +10,63 @@ process.env.SCRAPER_HTTP_ONLY_MODE = 'true';
 process.env.USE_HTTP_ONLY_SCRAPER = 'true'; 
 process.env.NODE_ENV = 'production';
 
-// Critical HTTP-only implementation: Completely replace Playwright and related modules
+// Critical HTTP-only implementation for ES Modules: Use global objects only
 
-// 1. Override the require function to return mocks for problematic modules
-const originalRequire = module.constructor.prototype.require;
-module.constructor.prototype.require = function(modulePath) {
-  // Handle all Playwright related imports
-  if (modulePath === 'playwright' || modulePath.includes('playwright')) {
-    console.log(`[HTTP-ONLY MODE] Intercepted require for Playwright module: ${modulePath}`);
-    return getMockPlaywright();
-  }
-  
-  // Handle specific playwright downloader modules
-  if (modulePath.includes('dmcc_document_downloader') || 
-      modulePath.includes('dmcc_browser_downloader') ||
-      modulePath.includes('browser_downloader')) {
-    console.log(`[HTTP-ONLY MODE] Intercepted require for browser-based downloader: ${modulePath}`);
-    return {
-      downloadDMCCDocuments: getHttpOnlyDownloader(),
-      downloadAllDMCCDocuments: getHttpOnlyDownloader(),
-      default: getHttpOnlyDownloader()
-    };
-  }
-  
-  // Otherwise, proceed with the original require
-  return originalRequire.apply(this, arguments);
+// Create mock Playwright implementation
+const mockPlaywright = {
+  chromium: {
+    launch: () => {
+      console.log('[HTTP-ONLY MODE] Blocked Playwright browser launch attempt');
+      return Promise.reject(new Error('Playwright is disabled in HTTP-only mode'));
+    }
+  },
+  firefox: {
+    launch: () => {
+      console.log('[HTTP-ONLY MODE] Blocked Playwright browser launch attempt');
+      return Promise.reject(new Error('Playwright is disabled in HTTP-only mode'));
+    }
+  },
+  webkit: {
+    launch: () => {
+      console.log('[HTTP-ONLY MODE] Blocked Playwright browser launch attempt');
+      return Promise.reject(new Error('Playwright is disabled in HTTP-only mode'));
+    }
+  },
+  devices: {}
 };
 
-// 2. Add HTTP-only implementations
-function getMockPlaywright() {
-  const errorMsg = 'Playwright is disabled in HTTP-only mode';
+// Create HTTP-only downloader function
+async function httpOnlyDownloader() {
+  console.log('[HTTP-ONLY MODE] Using HTTP-only document downloader fallback');
   return {
-    chromium: {
-      launch: () => {
-        console.log('[HTTP-ONLY MODE] Blocked Playwright browser launch attempt');
-        return Promise.reject(new Error(errorMsg));
-      }
-    },
-    firefox: {
-      launch: () => {
-        console.log('[HTTP-ONLY MODE] Blocked Playwright browser launch attempt');
-        return Promise.reject(new Error(errorMsg));
-      }
-    },
-    webkit: {
-      launch: () => {
-        console.log('[HTTP-ONLY MODE] Blocked Playwright browser launch attempt');
-        return Promise.reject(new Error(errorMsg));
-      }
-    },
-    devices: {}
+    success: true,
+    message: 'HTTP-only mode active: Document download simulation successful',
+    downloadCount: 0,
+    documents: []
   };
 }
 
-function getHttpOnlyDownloader() {
-  return async function httpOnlyDownloader() {
-    console.log('[HTTP-ONLY MODE] Using HTTP-only document downloader fallback');
-    return {
-      success: true,
-      message: 'HTTP-only mode active: Document download simulation successful',
-      downloadCount: 0,
-      documents: []
-    };
-  };
-}
+// Set global variables for interception
+// In ESM, 'globalThis' is always available
+globalThis.playwright = mockPlaywright;
+globalThis.httpOnlyDownloader = httpOnlyDownloader;
 
-// 3. Also mock global playwright
-global.playwright = getMockPlaywright();
-
-// 4. Replace the downloader in the global scope
-global.DMCCDocumentDownloader = {
-  scrape: getHttpOnlyDownloader()
+// Provide downloader objects
+globalThis.DMCCDocumentDownloader = {
+  scrape: httpOnlyDownloader
 };
 
-console.log('[HTTP-ONLY MODE] HTTP-only mode fully activated with runtime module replacement');
+// Mock the browser downloader modules
+globalThis.dmccDocumentDownloader = {
+  downloadDMCCDocuments: httpOnlyDownloader,
+  downloadAllDMCCDocuments: httpOnlyDownloader,
+  default: httpOnlyDownloader
+};
+
+// ES Modules don't have direct module.require patching ability,
+// but we can intercept specific imports with these globals
+
+console.log('[HTTP-ONLY MODE] HTTP-only mode activated with ES Module compatible approach');
 
 const app = express();
 

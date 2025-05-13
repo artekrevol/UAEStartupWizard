@@ -1,1 +1,1 @@
-web: cross-env NODE_ENV=production SCRAPER_HTTP_ONLY_MODE=true node dist/production-http-only.js
+web: node --import=./runtime-patch.js dist/production-http-only.js
