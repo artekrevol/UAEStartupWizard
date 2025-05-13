@@ -1,1 +1,1 @@
-web: node --import=./runtime-patch.js dist/production-http-only.js
+web: node --no-warnings --import=./runtime-patch.js start-wrapper.js
