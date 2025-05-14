@@ -1,0 +1,57 @@
+\[\]\[\]\[\]~/workspace\[\]$ \[\]./deploy-to-railway.sh
+================================================
+Railway Deployment - UAE Business Setup Assistant
+================================================
+Railway CLI found. Continuing...
+Logging in to Railway...
+> Open the browser? No
+Browserless Login
+Please visit:
+  https://railway.com/cli-login?d=d29yZENvZGU9cmFtYnVuY3Rpb3VzLXdpbmR5LWFmcmFpZC1iZWRyb29tJmhvc3RuYW1lPWMyOWYwZmY3YmQyYw==
+Your pairing code is: rambunctious-windy-afraid-bedroom
+Logged in as abeer@tekrevol.com
+Checking Railway projects...
+Projects found. Please select a project to deploy to:
+> Select a workspace artekrevol's Projects
+> Select a project UAEStartupWizard
+> Select an environment production
+? Select a service <esc to skip> <cancelled>
+
+Project UAEStartupWizard linked successfully! 🎉
+Setting up environment variables...
+error: unrecognized subcommand 'vars'
+
+Usage: railway [OPTIONS] [COMMAND]
+
+For more information, try '--help'.
+
+error: unrecognized subcommand 'vars'
+
+Usage: railway [OPTIONS] [COMMAND]
+
+For more information, try '--help'.
+
+Do you want to set up your OpenAI API key? (y/n)
+n
+Checking for PostgreSQL database...
+PostgreSQL not found. Adding PostgreSQL database...
+error: unexpected argument '--plugin' found
+
+Usage: railway add [OPTIONS]
+
+For more information, try '--help'.
+
+PostgreSQL database added.
+Deploying application to Railway...
+> Select a service web
+  Indexed                                                                                
+  Compressed [====================] 100%                                                 /home/runner/workspace/.config/pulse/3ba305642e47-runtime: IO error for operation on /home/runner/workspace/.config/pulse/3ba305642e47-runtime: No such file or directory (os error 2)
+================================================
+Deployment complete! Your application is now available at:
+Domains already exists on the service:
+🚀 https://web-production-1e695.up.railway.app
+
+Next steps:
+1. Check your deployment using the verify-railway-deployment.js script
+2. Migrate your database schema using 'railway run npm run db:push'
+3. Monitor your deployment in the Railway dashboard

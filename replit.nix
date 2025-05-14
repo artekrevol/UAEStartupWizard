@@ -1,5 +1,6 @@
 {pkgs}: {
   deps = [
+    pkgs.firefox-esr
     pkgs.udev
     pkgs.libxkbcommon
     pkgs.xorg.libxcb

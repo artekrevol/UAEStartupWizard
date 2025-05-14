@@ -3,6 +3,9 @@
  * 
  * This module provides configuration settings for all scrapers
  * with special handling for production environments
+ * 
+ * RAILWAY DEPLOYMENT: This file has been modified to enable full functionality
+ * in Railway production environments by detecting deployment environment.
  */
 
 import { fileURLToPath } from 'url';
@@ -16,11 +19,13 @@ const __dirname = dirname(__filename);
 // Determine environment
 const isProduction = process.env.NODE_ENV === 'production';
 const forceHTTPOnly = process.env.SCRAPER_HTTP_ONLY_MODE === 'true';
+const isRailway = process.env.RAILWAY_ENVIRONMENT === 'true';
 
 // Configuration object
 const config = {
-  // Always use HTTP-only mode in deployments
-  httpOnlyMode: true,
+  // Default to HTTP-only mode, but enable full features for Railway deployments
+  // This ensures Playwright functionality works in Railway production environment
+  httpOnlyMode: isRailway ? false : (forceHTTPOnly || true),
 
   // Base URLs
   baseURLs: {
@@ -95,7 +100,12 @@ config.ensureDirectoriesExist();
 
 // Log configuration mode
 console.log(`[Scraper Manager] Running in ${config.httpOnlyMode ? 'HTTP-only' : 'browser-based'} mode`);
-if (config.httpOnlyMode) {
+
+// Additional Railway-specific logging
+if (isRailway) {
+  console.log('[Scraper Manager] RAILWAY DEPLOYMENT DETECTED - Enabling full features');
+  console.log('[Scraper Manager] Playwright-based scrapers enabled for Railway deployment');
+} else if (config.httpOnlyMode) {
   console.log('[Scraper Manager] Running in HTTP-only mode, browser-based scrapers disabled');
 }
 

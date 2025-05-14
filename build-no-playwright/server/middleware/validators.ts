@@ -14,15 +14,40 @@ const passwordSchema = z.string()
 const userRegisterSchema = z.object({
   username: z.string().min(3).max(50)
     .refine(username => /^[a-zA-Z0-9_-]+$/.test(username), "Username can only contain letters, numbers, underscore, and hyphen"),
+  email: z.string().email("Please enter a valid email address"),
   password: passwordSchema,
+  first_name: z.string().min(1, "First name is required").max(100),
+  last_name: z.string().min(1, "Last name is required").max(100),
   company_name: z.string().max(200).optional(),
-  role: z.enum(['user', 'admin']).optional().default('user'),
+  terms_accepted: z.boolean().refine(val => val === true, "You must accept the terms and conditions"),
+  role: z.enum(['user', 'premium_user', 'admin', 'super_admin']).optional().default('user'),
 });
 
 // Login schema
 const userLoginSchema = z.object({
-  username: z.string(),
+  email: z.string().email("Please enter a valid email address"),
   password: z.string(),
+  remember_me: z.boolean().optional().default(false),
+});
+
+// Email verification schema
+export const emailVerificationSchema = z.object({
+  token: z.string().min(1, "Verification token is required"),
+});
+
+// Password reset request schema
+export const passwordResetRequestSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+});
+
+// Password reset schema
+export const passwordResetSchema = z.object({
+  token: z.string().min(1, "Reset token is required"),
+  password: passwordSchema,
+  password_confirmation: z.string().min(1, "Password confirmation is required"),
+}).refine(data => data.password === data.password_confirmation, {
+  message: "Passwords do not match",
+  path: ["password_confirmation"]
 });
 
 /**
@@ -79,4 +104,80 @@ export function createValidator<T>(schema: z.ZodSchema<T>) {
       next(error);
     }
   };
+}
+
+/**
+ * Middleware to validate email verification requests
+ */
+export function validateEmailVerification(req: Request, res: Response, next: NextFunction) {
+  try {
+    emailVerificationSchema.parse(req.body);
+    next();
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ 
+        message: 'Validation error', 
+        errors: error.errors 
+      });
+    }
+    next(error);
+  }
+}
+
+/**
+ * Middleware to validate password reset request
+ */
+export function validatePasswordResetRequest(req: Request, res: Response, next: NextFunction) {
+  try {
+    passwordResetRequestSchema.parse(req.body);
+    next();
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ 
+        message: 'Validation error', 
+        errors: error.errors 
+      });
+    }
+    next(error);
+  }
+}
+
+/**
+ * Middleware to validate password reset
+ */
+export function validatePasswordReset(req: Request, res: Response, next: NextFunction) {
+  try {
+    passwordResetSchema.parse(req.body);
+    next();
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ 
+        message: 'Validation error', 
+        errors: error.errors 
+      });
+    }
+    next(error);
+  }
+}
+
+/**
+ * Middleware to validate JWT refresh token request
+ */
+export const refreshTokenSchema = z.object({
+  refreshToken: z.string().min(1, "Refresh token is required"),
+});
+
+export function validateRefreshToken(req: Request, res: Response, next: NextFunction) {
+  try {
+    refreshTokenSchema.parse(req.body);
+    next();
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ 
+        message: 'Validation error', 
+        errors: error.errors 
+      });
+    }
+    next(error);
+  }
 }

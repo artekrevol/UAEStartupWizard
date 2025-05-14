@@ -68,8 +68,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const categories = await db
         .select()
-        .from(businessCategories)
-        .where(eq(businessCategories.isActive, true));
+        .from(businessActivityCategories)
+        .where(eq(businessActivityCategories.isActive, true));
       res.json(categories);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -104,8 +104,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // This is a fallback to handle ISIC activities which don't have a category assigned
       const category = await db
         .select()
-        .from(businessCategories)
-        .where(eq(businessCategories.id, categoryId))
+        .from(businessActivityCategories)
+        .where(eq(businessActivityCategories.id, categoryId))
         .limit(1);
         
       if (!category || category.length === 0) {
@@ -133,11 +133,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (industryKeywords.length > 0) {
         const conditions = industryKeywords.map(keyword => 
-          sql`${businessActivities.industryGroup} ILIKE ${'%' + keyword + '%'}`
+          sql`${businessActivities.description} ILIKE ${'%' + keyword + '%'}`
+        );
+        
+        // We can also check the name as fallback
+        const nameConditions = industryKeywords.map(keyword => 
+          sql`${businessActivities.name} ILIKE ${'%' + keyword + '%'}`
         );
         
         // Combine with OR
-        query = query.where(sql`${conditions.join(' OR ')}`);
+        query = query.where(sql`(${conditions.join(' OR ')}) OR (${nameConditions.join(' OR ')})`);
       }
       
       const matchedActivities = await query.limit(20);
@@ -296,45 +301,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (searchQuery) {
         query = query.where(
           sql`${businessActivities.name} ILIKE ${'%' + searchQuery + '%'} OR 
-              ${businessActivities.activityCode} ILIKE ${'%' + searchQuery + '%'}`
+              ${businessActivities.code} ILIKE ${'%' + searchQuery + '%'}`
         );
       }
       
       if (industryGroup) {
-        query = query.where(
-          sql`${businessActivities.industryGroup} ILIKE ${'%' + industryGroup + '%'}`
-        );
+        // Use the categoryId to filter by industry group 
+        const industryGroupId = parseInt(industryGroup) || 0;
+        query = query.where(eq(businessActivities.categoryId, industryGroupId));
       }
       
-      // Get count for pagination
-      const countQuery = db.select({ count: sql`count(*)` }).from(businessActivities);
-      
-      // Apply the same filters to count query
-      if (searchQuery) {
-        countQuery.where(
-          sql`${businessActivities.name} ILIKE ${'%' + searchQuery + '%'} OR 
-              ${businessActivities.activityCode} ILIKE ${'%' + searchQuery + '%'}`
-        );
-      }
-      
-      if (industryGroup) {
-        countQuery.where(
-          sql`${businessActivities.industryGroup} ILIKE ${'%' + industryGroup + '%'}`
-        );
-      }
-      
-      const [countResult] = await countQuery;
-      const totalCount = Number(countResult?.count || 0);
+      // Get count for pagination using raw SQL
+      const countResult = await db.execute(sql`
+        SELECT COUNT(*) as count
+        FROM business_activities
+        WHERE ${industryGroup ? sql`category_id = ${parseInt(industryGroup) || 0}` : sql`1=1`}
+        ${searchQuery ? sql`AND (name ILIKE ${'%' + searchQuery + '%'} OR description ILIKE ${'%' + searchQuery + '%'})` : sql``}
+      `);
+      const totalCount = Number(countResult.rows[0]?.count || 0);
       
       // Get the activities with pagination
-      const activities = await query
-        .limit(limit)
-        .offset(offset)
-        .orderBy(businessActivities.name);
+      // Using raw SQL to handle the column name differences
+      const activities = await db.execute(sql`
+        SELECT 
+          id, 
+          name, 
+          description, 
+          category_id as "categoryId", 
+          activity_code as code
+        FROM business_activities
+        WHERE ${industryGroup ? sql`category_id = ${parseInt(industryGroup) || 0}` : sql`1=1`}
+        ${searchQuery ? sql`AND (name ILIKE ${'%' + searchQuery + '%'} OR description ILIKE ${'%' + searchQuery + '%'})` : sql``}
+        ORDER BY name
+        LIMIT ${limit}
+        OFFSET ${offset}
+      `);
       
       // Return with pagination metadata
       res.json({
-        activities,
+        activities: activities.rows || [],
         pagination: {
           total: totalCount,
           page,

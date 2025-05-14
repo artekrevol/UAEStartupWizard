@@ -105,6 +105,12 @@ export const businessActivities = pgTable('business_activities', {
   restrictions: text('restrictions'),
   approvalTime: text('approval_time'),
   approvalRequirements: text('approval_requirements'),
+  industry_group: text('industry_group'),
+  minimum_capital: text('minimum_capital'),
+  fees: text('fees'),
+  name_arabic: text('name_arabic'),
+  description_arabic: text('description_arabic'),
+  isic_activity: boolean('isic_activity').default(false),
 });
 
 // Business Activity Categories

@@ -6,6 +6,105 @@ import { freeZones } from "@shared/schema";
 import { sql } from "drizzle-orm";
 import { log } from "./vite";
 import https from "https";
+import { constants } from "crypto";
+import { execSync } from "child_process";
+import fs from "fs";
+import path from "path";
+
+// Cache directory for storing fetched data
+const CACHE_DIR = path.join(process.cwd(), 'cache');
+
+// Ensure cache directory exists
+try {
+  if (!fs.existsSync(CACHE_DIR)) {
+    fs.mkdirSync(CACHE_DIR, { recursive: true });
+    log(`Created cache directory at ${CACHE_DIR}`, "scraper");
+  }
+} catch (err) {
+  const errorMessage = err instanceof Error ? err.message : String(err);
+  log(`Error creating cache directory: ${errorMessage}`, "scraper");
+}
+
+/**
+ * Save data to cache for future use
+ * @param key Unique identifier for the cached data
+ * @param data HTML content to cache
+ * @returns True if caching was successful
+ */
+function saveCachedData(key: string, data: string): boolean {
+  try {
+    const cachePath = path.join(CACHE_DIR, `${key}.html`);
+    const metaData = {
+      timestamp: new Date().toISOString(),
+      source: key,
+      size: data.length
+    };
+    
+    // Save the data and metadata
+    fs.writeFileSync(cachePath, data);
+    fs.writeFileSync(path.join(CACHE_DIR, `${key}.meta.json`), JSON.stringify(metaData, null, 2));
+    
+    log(`Cached data for ${key} (${data.length} bytes)`, "scraper");
+    return true;
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    log(`Error caching data for ${key}: ${errorMessage}`, "scraper");
+    return false;
+  }
+}
+
+/**
+ * Load cached data
+ * @param key Unique identifier for the cached data
+ * @returns Cached HTML content or null if not found/expired
+ */
+function loadCachedData(key: string): string | null {
+  try {
+    const cachePath = path.join(CACHE_DIR, `${key}.html`);
+    const metaPath = path.join(CACHE_DIR, `${key}.meta.json`);
+    
+    if (!fs.existsSync(cachePath) || !fs.existsSync(metaPath)) {
+      return null;
+    }
+    
+    // Check cache expiration (24 hours)
+    const metaData = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
+    const cacheTime = new Date(metaData.timestamp).getTime();
+    const now = new Date().getTime();
+    const cacheDuration = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+    
+    if (now - cacheTime > cacheDuration) {
+      log(`Cache expired for ${key}`, "scraper");
+      return null;
+    }
+    
+    const data = fs.readFileSync(cachePath, 'utf-8');
+    log(`Loaded cached data for ${key} (${data.length} bytes, age: ${Math.round((now - cacheTime) / (60 * 60 * 1000))} hours)`, "scraper");
+    return data;
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    log(`Error loading cached data for ${key}: ${errorMessage}`, "scraper");
+    return null;
+  }
+}
+
+// Try to use a different approach for the MOEC website by using curl when we absolutely need to bypass TLS issues
+function execCurlRequest(url: string): string | null {
+  try {
+    log(`Attempting curl request to ${url}`, "scraper");
+    // Execute curl with options to ignore SSL errors and use a specific user agent
+    const result = execSync(
+      `curl -k -L --insecure --max-time 60 -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.0.0 Safari/537.36" "${url}"`,
+      { encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 }
+    );
+    log(`Successfully fetched ${url} with curl`, "scraper");
+    return result;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    log(`Curl request failed: ${errorMessage}`, "scraper");
+    return null;
+  }
+}
 
 // Mock data functions for development when MOEC website can't be accessed
 function mockFreeZonesData(): string {
@@ -188,25 +287,126 @@ const MOEC_BASE_URL = "https://www.moec.gov.ae";
 const FREE_ZONES_URL = `${MOEC_BASE_URL}/en/free-zones`;
 const ESTABLISHING_COMPANIES_URL = `${MOEC_BASE_URL}/en/establishing-companies`;
 
-// Configure axios with more robust SSL settings
+// Configure axios with robust SSL settings - now with legacy renegotiation explicitly enabled
 const axiosInstance = axios.create({
   httpsAgent: new https.Agent({
     rejectUnauthorized: false,
-    // For SSL/TLS negotiation issues
-    minVersion: "TLSv1.2",
+    minVersion: "TLSv1", // Support older TLS versions
     maxVersion: "TLSv1.3",
-    ciphers: "DEFAULT:@SECLEVEL=1" // Lower security level to be compatible with more servers
+    ciphers: "ALL", // Allow all ciphers for maximum compatibility
+    honorCipherOrder: false, // Let server choose preferred cipher
+    // Use SSL_OP_LEGACY_SERVER_CONNECT to explicitly allow legacy server connections
+    secureOptions: constants.SSL_OP_LEGACY_SERVER_CONNECT,
+    // Additional options that might help
+    ALPNProtocols: ['http/1.1']
   }),
-  timeout: 30000, // 30 seconds timeout
+  timeout: 45000, // 45 seconds timeout
+  maxRedirects: 10, // Handle more redirects
   headers: {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+    // Try older browser user agent
+    'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64; Trident/7.0; AS; rv:11.0) like Gecko',
+    'Accept': '*/*', // Accept all content types
     'Accept-Language': 'en-US,en;q=0.5',
+    'Accept-Encoding': 'gzip, deflate, br',
     'Connection': 'keep-alive',
     'Upgrade-Insecure-Requests': '1',
-    'Cache-Control': 'max-age=0'
+    'Cache-Control': 'no-cache',
+    'Pragma': 'no-cache'
+  },
+  validateStatus: function (status) {
+    return status >= 200 && status < 500; // Accept all non-server errors
   }
 });
+
+// Direct HTTPS request using native Node.js HTTPS module with enhanced SSL handling
+const makeDirectHttpsRequest = (url: string): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    log(`Making direct HTTPS request to ${url}`, "scraper");
+    
+    // Process URL
+    const urlObj = new URL(url);
+    
+    // Create a super permissive custom agent with explicit legacy server support
+    const customAgent = new https.Agent({
+      rejectUnauthorized: false,
+      // Use SSL_OP_LEGACY_SERVER_CONNECT to explicitly allow legacy server connections
+      secureOptions: constants.SSL_OP_LEGACY_SERVER_CONNECT,
+      ciphers: 'ALL', // All ciphers allowed
+      honorCipherOrder: false,
+      minVersion: 'TLSv1', // Minimum TLS version
+      maxVersion: 'TLSv1.2' // Maximum TLS version (avoid 1.3 which might have stricter requirements)
+    });
+    
+    // More complete request options
+    const options = {
+      hostname: urlObj.hostname,
+      port: urlObj.port || 443,
+      path: urlObj.pathname + urlObj.search,
+      method: 'GET',
+      agent: customAgent,
+      headers: {
+        // Very old User-Agent that some legacy sites expect
+        'User-Agent': 'Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1)',
+        'Accept': '*/*',
+        'Accept-Encoding': 'identity', // No compression for simplicity
+        'Accept-Language': 'en',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Connection': 'close' // Don't keep connection alive
+      }
+    };
+    
+    try {
+      log(`Configuring HTTPS request with custom options`, "scraper");
+      
+      const req = https.request(options, (res) => {
+        let data = '';
+        
+        // Handle redirects manually
+        if (res.statusCode && (res.statusCode >= 300 && res.statusCode < 400)) {
+          const redirectUrl = res.headers.location;
+          if (redirectUrl) {
+            log(`Following redirect to ${redirectUrl}`, "scraper");
+            // Create absolute URL if relative
+            const absoluteUrl = redirectUrl.startsWith('http') 
+              ? redirectUrl 
+              : new URL(redirectUrl, url).toString();
+            makeDirectHttpsRequest(absoluteUrl).then(resolve).catch(reject);
+            return;
+          }
+        }
+        
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+        
+        res.on('end', () => {
+          log(`Successfully received direct HTTPS response from ${url} (status: ${res.statusCode})`, "scraper");
+          resolve(data);
+        });
+      });
+      
+      req.on('error', (error) => {
+        log(`Error in direct HTTPS request: ${error.message}`, "scraper");
+        reject(error);
+      });
+      
+      req.on('timeout', () => {
+        log(`Direct HTTPS request timed out`, "scraper");
+        req.destroy();
+        reject(new Error('Request timed out'));
+      });
+      
+      // Apply a long timeout (2 minutes)
+      req.setTimeout(120000);
+      req.end();
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      log(`Exception setting up HTTPS request: ${errorMessage}`, "scraper");
+      reject(err);
+    }
+  });
+};
 
 async function fetchPage(url: string): Promise<string | null> {
   try {
@@ -221,20 +421,34 @@ async function fetchPage(url: string): Promise<string | null> {
     // Try with a different axios configuration
     try {
       log(`Retrying ${url} with different configuration`, "scraper");
-      // Create a new axios instance with more permissive settings
+      // Create a new axios instance with extremely permissive settings
       const fallbackAxios = axios.create({
         httpsAgent: new https.Agent({
-          rejectUnauthorized: false,
-          maxVersion: "TLSv1.2",
-          minVersion: "TLSv1",
+          rejectUnauthorized: false, // Accept all SSL certificates
+          // Don't set secureProtocol, as it conflicts with min/max version settings
+          maxVersion: "TLSv1.2", // Cap at TLS 1.2 for better compatibility
+          minVersion: "TLSv1", // Support very old TLS
+          ciphers: "ALL", // Allow all ciphers
+          // Use SSL_OP_LEGACY_SERVER_CONNECT to explicitly allow legacy server connections
+          secureOptions: constants.SSL_OP_LEGACY_SERVER_CONNECT,
+          // Additional options to try to work around renegotiation issues
+          ALPNProtocols: ['http/1.1', 'http/1.0'],
+          ecdhCurve: 'auto' // Use auto curve selection
         }),
-        timeout: 60000, // Longer timeout
+        timeout: 120000, // Very long timeout (2 minutes)
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36',
+          // Try IE 6 user agent - often works with legacy sites
+          'User-Agent': 'Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1)',
           'Accept': '*/*',
-          'Connection': 'close'
+          'Accept-Language': 'en',
+          'Connection': 'close',
+          'Pragma': 'no-cache'
         },
-        maxRedirects: 10,
+        maxRedirects: 15, // Handle more redirects
+        decompress: true, // Handle compression
+        validateStatus: function (status) {
+          return status >= 200 && status < 600; // Accept ALL status codes to debug
+        }
       });
       
       const response = await fallbackAxios.get(url);
@@ -244,13 +458,67 @@ async function fetchPage(url: string): Promise<string | null> {
       const retryErrorMessage = retryError instanceof Error ? retryError.message : String(retryError);
       log(`Failed with alternative approach: ${retryErrorMessage}`, "scraper");
       
-      // Last resort - create a mock based on the URL for development purposes
-      log(`Using mock data for ${url} due to connectivity issues`, "scraper");
-      if (url.includes("free-zones")) {
-        return mockFreeZonesData();
-      } else if (url.includes("establishing-companies")) {
-        return mockEstablishmentData();
+      // Try with direct HTTPS request as last resort
+      try {
+        log(`Making last attempt with direct HTTPS request to ${url}`, "scraper");
+        const html = await makeDirectHttpsRequest(url);
+        if (html) {
+          log(`Successfully fetched ${url} with direct HTTPS request`, "scraper");
+          return html;
+        }
+      } catch (directError: unknown) {
+        const directErrorMessage = directError instanceof Error ? directError.message : String(directError);
+        log(`Failed with direct HTTPS request: ${directErrorMessage}`, "scraper");
       }
+      
+      // Try with curl as a last resort - this method bypasses Node's TLS stack entirely
+      try {
+        log(`Attempting to use curl as a last resort for ${url}`, "scraper");
+        const html = execCurlRequest(url);
+        if (html) {
+          log(`Successfully fetched ${url} with curl`, "scraper");
+          return html;
+        }
+      } catch (curlError: unknown) {
+        const curlErrorMessage = curlError instanceof Error ? curlError.message : String(curlError);
+        log(`Failed with curl approach: ${curlErrorMessage}`, "scraper");
+      }
+      
+      // Last resort - use cached data or mock data if nothing else works
+      if (url.includes("free-zones")) {
+        // Try to load cached data first
+        const cachedData = loadCachedData('free-zones');
+        if (cachedData) {
+          log(`Using cached data for ${url}`, "scraper");
+          return cachedData;
+        }
+        
+        // Fall back to mock data
+        log(`Using mock data for ${url} due to connectivity issues`, "scraper");
+        const mockData = mockFreeZonesData();
+        
+        // Try to cache the mock data for future use
+        saveCachedData('free-zones', mockData);
+        
+        return mockData;
+      } else if (url.includes("establishing-companies")) {
+        // Try to load cached data first
+        const cachedData = loadCachedData('establishing-companies');
+        if (cachedData) {
+          log(`Using cached data for ${url}`, "scraper");
+          return cachedData;
+        }
+        
+        // Fall back to mock data
+        log(`Using mock data for ${url} due to connectivity issues`, "scraper");
+        const mockData = mockEstablishmentData();
+        
+        // Try to cache the mock data for future use
+        saveCachedData('establishing-companies', mockData);
+        
+        return mockData;
+      }
+      
       return null;
     }
   }

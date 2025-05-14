@@ -1,23 +1,22 @@
-
 #!/bin/bash
-# Pre-deployment setup script
+# Pre-deployment script for the UAE Business Setup Assistant
 
-echo "Configuring for HTTP-only mode..."
+echo "================================================="
+echo "  UAE Business Setup Assistant - Pre-deployment"
+echo "================================================="
+echo ""
+echo "Setting up environment for deployment..."
 
-# Ensure dist directory exists
+# Set environment variables
+export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+export SCRAPER_HTTP_ONLY_MODE=true
+export NODE_ENV=production
+
+# Create necessary directories
 mkdir -p dist
 
-# Create production HTTP-only entry point
-cat > dist/production-http-only.js << 'EOF'
-import { app } from './index.js';
+# Copy server/index-http-only.js to dist/production-http-only.js for deployment
+echo "📦 Preparing deployment files..."
+cp server/index-http-only.js dist/production-http-only.js
 
-const HOST = '0.0.0.0';
-const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, HOST, () => {
-  console.log(`Production server running on ${HOST}:${PORT}`);
-});
-EOF
-
-echo "✅ Created production HTTP-only entry point"
-echo "✅ Pre-deployment configuration complete"
+echo "✅ Pre-deployment setup complete!"
