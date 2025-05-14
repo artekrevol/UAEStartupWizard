@@ -21,7 +21,6 @@ import { registerAIProductManagerRoutes } from "./ai-product-manager/register-ro
 import { registerDocumentFetcherRoutes } from "./document-fetcher-routes";
 import enrichmentRoutes from "./enrichment-routes";
 import userInteractionRoutes from "./routes/userInteractionRoutes";
-import aiResearchRoutes from "./routes/ai-research-routes";
 import { captureApiInteractions } from "./middleware/userInteractionMiddleware";
 
 // Middleware to check if user is admin
@@ -63,9 +62,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Register User Interaction routes
   app.use('/api/user-interactions', userInteractionRoutes);
-  
-  // Register AI Research routes
-  app.use('/api/ai-research', aiResearchRoutes);
 
   // Fetch business categories
   app.get("/api/business-categories", async (req, res) => {
@@ -300,14 +296,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (searchQuery) {
         query = query.where(
           sql`${businessActivities.name} ILIKE ${'%' + searchQuery + '%'} OR 
-              ${businessActivities.description} ILIKE ${'%' + searchQuery + '%'}`
+              ${businessActivities.activityCode} ILIKE ${'%' + searchQuery + '%'}`
         );
       }
       
       if (industryGroup) {
-        // Use the industry_group column directly without the property access dot notation
         query = query.where(
-          sql`${businessActivities.industry_group} ILIKE ${'%' + industryGroup + '%'}`
+          sql`${businessActivities.industryGroup} ILIKE ${'%' + industryGroup + '%'}`
         );
       }
       
@@ -318,14 +313,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (searchQuery) {
         countQuery.where(
           sql`${businessActivities.name} ILIKE ${'%' + searchQuery + '%'} OR 
-              ${businessActivities.description} ILIKE ${'%' + searchQuery + '%'}`
+              ${businessActivities.activityCode} ILIKE ${'%' + searchQuery + '%'}`
         );
       }
       
       if (industryGroup) {
-        // Use the industry_group column directly
         countQuery.where(
-          sql`${businessActivities.industry_group} ILIKE ${'%' + industryGroup + '%'}`
+          sql`${businessActivities.industryGroup} ILIKE ${'%' + industryGroup + '%'}`
         );
       }
       
@@ -750,7 +744,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Endpoint to get a specific free zone by ID (Removed duplicate endpoint)
+  // Endpoint to get all free zones
+  app.get("/api/free-zones", async (req, res) => {
+    try {
+      const allFreeZones = await db.select().from(freeZones);
+      res.json(allFreeZones);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("Error fetching free zones:", error);
+      res.status(500).json({ message });
+    }
+  });
+
+  // Endpoint to get a specific free zone by ID
   app.get("/api/free-zones/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id, 10);

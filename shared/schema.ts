@@ -59,15 +59,6 @@ export const users = pgTable('users', {
   email: text('email').notNull(),
   password: text('password').notNull(),
   role: userRolesEnum('role').default('user'),
-  email_verified: boolean('email_verified').default(false),
-  email_verification_token: text('email_verification_token'),
-  email_verification_expires: timestamp('email_verification_expires'),
-  reset_password_token: text('reset_password_token'),
-  reset_password_expires: timestamp('reset_password_expires'),
-  terms_accepted: boolean('terms_accepted').default(false),
-  terms_accepted_at: timestamp('terms_accepted_at'),
-  remember_me: boolean('remember_me').default(false),
-  refresh_token: text('refresh_token'),
   company_name: text('company_name'),
   first_name: text('first_name'),
   last_name: text('last_name'),
@@ -189,28 +180,14 @@ export const templateSubmissions = pgTable('template_submissions', {
 export const businessSetup = pgTable('business_setup', {
   id: serial('id').primaryKey(),
   userId: integer('user_id').notNull().references(() => users.id),
-  // Introduction & primary goal fields
-  primaryGoal: text('primary_goal'),
-  
-  // Core business fields
   businessType: text('business_type'),
   businessName: text('business_name'),
   businessActivity: text('business_activity'),
-  
-  // Location fields
-  educationComplete: boolean('education_complete').default(false),
-  locationPreference: text('location_preference'),
-  locationPriorities: jsonb('location_priorities').default([]),
-  locationRecommendation: text('location_recommendation'),
   selectedFreeZone: integer('selected_free_zone').references(() => freeZones.id),
-  
-  // Additional fields
-  legalStructure: text('legal_structure'),
   budget: text('budget'),
   timeline: text('timeline'),
   requirements: jsonb('requirements').default({}),
   progress: jsonb('progress').default({}),
-  lastCompletedStep: integer('last_completed_step').default(0),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });

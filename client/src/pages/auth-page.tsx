@@ -150,16 +150,14 @@ function LoginForm({
 function RegisterForm({
   onSubmit,
 }: {
-  onSubmit: (data: { username: string; email: string; password: string; companyName?: string; terms_accepted: boolean }) => void;
+  onSubmit: (data: { username: string; password: string; companyName?: string }) => void;
 }) {
   const form = useForm({
     resolver: zodResolver(insertUserSchema),
     defaultValues: {
       username: "",
-      email: "",
       password: "",
       companyName: "",
-      terms_accepted: true,
     },
   });
 
@@ -174,20 +172,6 @@ function RegisterForm({
               <Label>Username</Label>
               <FormControl>
                 <Input {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        <FormField
-          control={form.control}
-          name="email"
-          render={({ field }) => (
-            <FormItem>
-              <Label>Email</Label>
-              <FormControl>
-                <Input type="email" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -218,29 +202,6 @@ function RegisterForm({
                 <Input {...field} />
               </FormControl>
               <FormMessage />
-            </FormItem>
-          )}
-        />
-        
-        <FormField
-          control={form.control}
-          name="terms_accepted"
-          render={({ field }) => (
-            <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-              <FormControl>
-                <input
-                  type="checkbox"
-                  checked={field.value}
-                  onChange={field.onChange}
-                  className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                />
-              </FormControl>
-              <div className="space-y-1 leading-none">
-                <Label>
-                  I accept the <a href="#" className="text-primary">Terms and Conditions</a>
-                </Label>
-                <FormMessage />
-              </div>
             </FormItem>
           )}
         />

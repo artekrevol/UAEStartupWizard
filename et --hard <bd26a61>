@@ -1,0 +1,475 @@
+[33m3560cfa[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m HEAD@{0}: checkout: moving from replit-agent to main
+[33m057b492[m[33m ([m[1;32mreplit-agent[m[33m)[m HEAD@{1}: checkout: moving from main to replit-agent
+[33m3560cfa[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m HEAD@{2}: commit: Incorporate a new basic login form allowing users to access the platform
+[33m2348716[m HEAD@{3}: commit: Enable direct user login via a simplified authentication page
+[33m3a445b5[m HEAD@{4}: commit: Improve user login process by addressing authentication errors
+[33mc4e0872[m HEAD@{5}: commit: Investigate and resolve ongoing problems with platform functionality
+[33m50b3128[m HEAD@{6}: commit: Improve user login process and provide a default admin user
+[33m902ba99[m HEAD@{7}: commit: Improve login process by adding email login and enhanced error handling
+[33m9b701bc[m HEAD@{8}: commit: Improve deployment process and streamline setup configurations
+[33mdb274b2[m HEAD@{9}: commit: Add account management features like finding, creating, and updating users
+[33m5a449ec[m HEAD@{10}: commit: Set up initial admin account with default credentials for the application
+[33me9261b2[m HEAD@{11}: commit: Enhance deployment stability and streamline build process on Replit
+[33m42bf3a0[m HEAD@{12}: commit: Enable reliable access by using web requests instead of browser automation
+[33mde04ee6[m HEAD@{13}: commit: Assistant checkpoint: Convert fix-cheerio-import.js to ES modules
+[33mbd286cf[m HEAD@{14}: commit: Assistant checkpoint: Fix ES Module exports and imports
+[33m30a0f6e[m HEAD@{15}: commit: Assistant checkpoint: Fix cheerio import conflicts and rebuild application
+[33m8a10d6b[m HEAD@{16}: commit: Checkpoint before assistant change: Improve deployment reliability with database fallbacks and Cheerio fixes
+[33ma3ab849[m HEAD@{17}: commit: Improve application reliability by adding database fallback mechanisms
+[33m501095d[m HEAD@{18}: commit: Improve issue logging reliability by adding fallback mechanisms
+[33mc79c2c5[m HEAD@{19}: commit: Enable HTTP-only mode for deployments that avoid browser-based scraping
+[33m9bd55d1[m HEAD@{20}: commit: Improve database reliability by adding fallback mechanism when offline
+[33mf136a84[m HEAD@{21}: commit: Improve deployment reliability with automated troubleshooting and fixes
+[33m597be8f[m HEAD@{22}: commit: Add in-memory database functionality when the main database is unavailable
+[33m5b4cab5[m HEAD@{23}: commit: Integrate document processing features and enhance deployment process
+[33m6557a7e[m HEAD@{24}: commit: Assistant checkpoint: Fix type errors and imports across server files
+[33m889f1eb[m HEAD@{25}: commit: Assistant checkpoint: Fix TypeScript syntax and query execution
+[33ma6c856a[m HEAD@{26}: commit: Assistant checkpoint: Fix TypeScript syntax and import errors
+[33mf49f64c[m HEAD@{27}: commit: Assistant checkpoint: Fix TypeScript syntax and import errors
+[33m0847755[m HEAD@{28}: commit: Assistant checkpoint: Fix TypeScript errors and imports
+[33mdce51e5[m HEAD@{29}: commit: Assistant checkpoint: Fix TypeScript and syntax errors in server files
+[33mc598196[m HEAD@{30}: commit: Assistant checkpoint: Fix TypeScript syntax error in storage.ts
+[33m4ec6bb5[m HEAD@{31}: commit: Assistant checkpoint: Fix deployment syntax errors and database operations
+[33m4f3267e[m HEAD@{32}: commit: Assistant checkpoint: Fix deployment issues: ports, DB queries, error handling
+[33m2374fa8[m HEAD@{33}: commit: Checkpoint before assistant change: Ensure the website builds correctly for deployment and functions as intended
+[33m4bc5fbe[m HEAD@{34}: commit: Assistant checkpoint: Fix cheerio import and update deployment configuration
+[33m2677cb0[m HEAD@{35}: commit: Assistant checkpoint: Configure Node.js environment and run application
+[33m2a77f1c[m HEAD@{36}: commit: Assistant checkpoint: Convert fix-cheerio-imports.js to ES module syntax
+[33mcb8e775[m HEAD@{37}: commit: Assistant checkpoint: Fix cheerio module import syntax
+[33m4cb650a[m HEAD@{38}: commit: Improve application deployment on Replit using a streamlined HTTP approach
+[33mf219df7[m HEAD@{39}: commit: Replace Playwright with HTTP requests to fix deployment issues
+[33meee03f8[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m HEAD@{40}: commit: Enhance application stability by disabling browser and improving error handling
+[33m5e17d1e[m HEAD@{41}: commit: Enable HTTP-only mode to prevent browser-based scraping errors
+[33m6d92a59[m HEAD@{42}: commit: Enable HTTP-only mode by simulating browser downloads for document scraping
+[33me9f1daa[m HEAD@{43}: commit: Add instructions and script to deploy the application on Railway
+[33m74d3635[m HEAD@{44}: commit: Add tools to streamline deployment and management of the cloud infrastructure
+[33mfd0437d[m HEAD@{45}: commit: Enable website scraping using direct HTTP requests instead of a browser
+[33mf6d23e4[m HEAD@{46}: commit: Prepare the platform for launch by updating deployment configurations
+[33m7e918f9[m HEAD@{47}: commit: Improve reliability of user interaction tracking and data retrieval
+[33m6d50908[m HEAD@{48}: commit: Initialize core infrastructure for UAE business establishment platform
+[33m51627e4[m HEAD@{49}: commit: Improve deployment reliability and verification process significantly
+[33m152f6be[m HEAD@{50}: commit: Improve deployment process with bug fixes and enhanced scripting
+[33m2376edf[m HEAD@{51}: commit: Improve the platform's deployment process to be more robust and flexible
+[33m8c7389e[m HEAD@{52}: commit: Improve document downloading by skipping browser downloads during deployment
+[33m0ba699c[m HEAD@{53}: commit: Improve setup process and database integration for smoother deployment
+[33m2cd65eb[m HEAD@{54}: commit: Improve deployment verification and automate the deployment process
+[33m99ec6b7[m HEAD@{55}: commit: Improve deployment process and ensure application reliability on Railway
+[33md4da299[m HEAD@{56}: commit: Improve application deployment by handling missing database connection gracefully
+[33ma0f6a6f[m HEAD@{57}: commit: Ensure the database connection is properly configured during deployment
+[33m50f1824[m HEAD@{58}: commit: Update database setup process to work with updated deployment environment
+[33m1db82cd[m HEAD@{59}: commit: Improve web scraping reliability by fixing errors with external data library
+[33m6f6b065[m HEAD@{60}: commit: Improve application deployment process and fix common errors on Railway
+[33m8e2ce00[m HEAD@{61}: commit: Resolve error preventing successful app startup after deployment
+[33m0b2ee35[m HEAD@{62}: commit: Remove health check configuration to address deployment issues
+[33m3bcce4a[m HEAD@{63}: commit: Ensure service restarts automatically for continuous availability
+[33m184f01e[m HEAD@{64}: commit: Improve deployment process and documentation for reliable application hosting
+[33m7e5d23d[m HEAD@{65}: commit: Fixed health check endpoint for Railway deployment
+[33mfa9cfd3[m HEAD@{66}: commit: Assistant checkpoint: Fix health check and server configuration
+[33m5693d44[m HEAD@{67}: commit: Checkpoint before assistant change: Improve application deployment and ensure health check functionality
+[33m6abcc43[m HEAD@{68}: commit: Update the AI functionality by upgrading the OpenAI library
+[33m1d8e76f[m HEAD@{69}: commit: Assistant checkpoint: Add port conflict handling and clear existing process
+[33mf3da273[m HEAD@{70}: commit: Improve app reliability with enhanced startup and health check configurations
+[33m0eec2a9[m HEAD@{71}: commit: Enable full web scraping functionality when deploying to Railway
+[33mc244195[m HEAD@{72}: commit: Enable Railway deployment with Playwright and verification script
+[33mbdc1ae9[m HEAD@{73}: commit: Configure application deployment to Railway for production environment
+[33m4d49a4f[m HEAD@{74}: commit: Improve deployment process by streamlining dependencies and build steps
+[33md7d0330[m HEAD@{75}: commit: Fix errors that prevent correct website operation on the live server
+[33m4b5ea98[m HEAD@{76}: commit: Assistant checkpoint: Fix deployment build configuration and scripts
+[33m7d9e5fe[m HEAD@{77}: commit: Checkpoint before assistant change: Update deployment process to improve website stability and reliability
+[33m92273c5[m HEAD@{78}: commit: Enhance platform with business wizard, analytics, and account features
+[33m11af38d[m HEAD@{79}: commit: Enable deployment without browser automation for production environments
+[33md685926[m HEAD@{80}: commit: Started building your app
+[33m45cef06[m HEAD@{81}: commit: Show user the selected free zone and business activity on the final step
+[33mf8ae04c[m HEAD@{82}: commit: Save the selected free zone's name for display throughout the application
+[33m52ad384[m HEAD@{83}: commit: Enhance business setup wizard with selection persistence and navigation
+[33mec0729c[m HEAD@{84}: commit: Give users control to proceed through the business setup wizard steps
+[33m7043eab[m HEAD@{85}: commit: Prevent automatic advancement in business setup wizard after activity selected
+[33m9672c23[m HEAD@{86}: commit: Stop automatically advancing the setup wizard, require user confirmation
+[33m4ca1e2d[m HEAD@{87}: commit: Take users to document center after login instead of redirecting to login
+[33m98b41fc[m HEAD@{88}: commit: Ensure users are logged in before accessing key areas after setup wizard
+[33mb1e7703[m HEAD@{89}: commit: Enhance display of business activity details and add new properties
+[33m7c0a746[m HEAD@{90}: commit: Improve the accuracy of activity suggestions during business setup
+[33mb84f9f8[m HEAD@{91}: commit: Improve business setup wizard to show accurate results based on selections
+[33m7bebdcb[m HEAD@{92}: commit: Show relevant business activities based on selected industry
+[33mbf54bf7[m HEAD@{93}: commit: Update visuals to address user feedback and improve the application's look
+[33ma430c75[m HEAD@{94}: commit: Improve the process of finding the right business activities
+[33me78bd02[m HEAD@{95}: commit: Improve the business search function within the setup wizard
+[33mb659979[m HEAD@{96}: commit: Correctly filter business activities by industry group in setup wizard
+[33m7f802b6[m HEAD@{97}: commit: Enable automated browser testing during development and deployment
+[33m2607323[m HEAD@{98}: commit: Enable users to compare business setup options and estimate costs
+[33m97337b5[m HEAD@{99}: commit: Provide users with an estimate of the costs involved in establishing business
+[33mb23ad46[m HEAD@{100}: commit: Configure application to run without Playwright on Replit deployments
+[33m00ff93a[m HEAD@{101}: commit: Improve application security by limiting the number of requests made by users
+[33m2c5bac5[m HEAD@{102}: commit: Enable deployment with HTTP-only scraper for production environments
+[33mbd26a61[m HEAD@{103}: commit: Enhance business setup wizard with visual improvements and refined steps
+[33m262dd24[m HEAD@{104}: commit: Improve the display of business activities and refine search functionality
+[33mfa098fa[m HEAD@{105}: commit: Improve the accuracy of freezone recommendations and remove duplicate API endpoint
+[33mfc872bf[m HEAD@{106}: commit: Introduce onboarding flow for guiding users through business setup process
+[33m653c57d[m HEAD@{107}: commit: Enhance business setup wizard with goal setting and location education
+[33ma0b2815[m HEAD@{108}: commit: Improve business setup process to work seamlessly even with API issues
+[33mf1897e0[m HEAD@{109}: commit: Enhance business setup wizard with a guided, conversational user experience
+[33m2286400[m HEAD@{110}: commit: Enhance business setup wizard with interactive flow and progress tracking
+[33mfd85739[m HEAD@{111}: commit: Enable users to research business setup topics using an AI-powered tool
+[33md5dce57[m HEAD@{112}: commit: Enable users to research business setup options using an AI assistant
+[33m31e245b[m HEAD@{113}: commit: Require users to accept terms and conditions during account registration
+[33m8b90a49[m HEAD@{114}: commit: Allow users to register on the platform using their email address
+[33ma518d0d[m HEAD@{115}: commit: Fix a problem that prevents new users from creating accounts successfully
+[33mc92a175[m HEAD@{116}: commit: Resolve issue preventing new users from completing the registration process
+[33m99aaa49[m HEAD@{117}: commit: Improve how user choices are tracked during the business setup process
+[33mffb67af[m HEAD@{118}: commit: Improve tracking of user actions when setting up their business
+[33m27a178e[m HEAD@{119}: commit: Refine user interaction tracking throughout the business setup wizard
+[33m2a261ca[m HEAD@{120}: commit: Refine tracking and display of options within the business setup wizard
+[33me28acbd[m HEAD@{121}: commit: Improve tracking of user actions across the business setup process
+[33m5bbf2a0[m HEAD@{122}: commit: Improve tracking of user interactions during the business setup process
+[33m762d807[m HEAD@{123}: commit: Use a more accurate name for tracking user actions in setup wizard
+[33m208272a[m HEAD@{124}: commit: Refine how user interactions are monitored throughout the setup process
+[33m58dc13d[m HEAD@{125}: commit: Create an interactive guide for streamlined business setup in the UAE
+[33m4b3d47b[m HEAD@{126}: commit: Introduce interactive wizard to guide users through business setup
+[33m2ff8cc7[m HEAD@{127}: commit: Enhance user authentication with JWT tokens for improved security
+[33m5d5b3f1[m HEAD@{128}: commit: Enable account verification and password recovery via email service
+[33m444a445[m HEAD@{129}: commit: Enhance data management and tracking across the entire platform
+[33mbfad023[m HEAD@{130}: commit: Improve user data management and add admin features for enhanced control
+[33m1939fd3[m HEAD@{131}: commit: Add admin dashboard to monitor how users interact with the platform
+[33m018ce95[m HEAD@{132}: commit: Add user interaction tracking and admin dashboard for monitoring
+[33m6486c04[m HEAD@{133}: commit: Add features to monitor user activity and ensure secure access to the platform
+[33m6362f9d[m HEAD@{134}: commit: Track user actions to gain insights and improve the overall platform experience
+[33me6cf005[m HEAD@{135}: commit: Enable document retrieval and enhance real-time notification features
+[33m5218a0b[m HEAD@{136}: commit: Add ability for administrators to send important system-wide announcements
+[33mddea932[m HEAD@{137}: commit: Inform users about the status of their document uploads and modifications
+[33m1b95b9a[m HEAD@{138}: commit: Inform users of business setup creation and updates via notifications
+[33md201b70[m HEAD@{139}: commit: Enable real-time updates and alerts for users inside the application
+[33m07f59f0[m HEAD@{140}: commit: Add real-time notification feature to keep users informed of new events
+[33m98067f5[m HEAD@{141}: commit: Enable real-time updates and notifications within the platform interface
+[33md70932b[m HEAD@{142}: commit: Improve platform stability by automatically tracking unexpected system errors
+[33mfc23aa9[m HEAD@{143}: commit: Improve platform stability through ongoing quality assurance testing
+[33mf02cb12[m HEAD@{144}: commit: Add automated testing framework to enhance application reliability
+[33m95a5848[m HEAD@{145}: commit: Ensure accurate display of product recommendations and analysis results
+[33mfc5eff7[m HEAD@{146}: commit: Avoid naming conflicts by renaming the search icon for clarity
+[33m9b1fe3d[m HEAD@{147}: commit: Refine testing processes and enhance API integration tests for free zones
+[33mb5e7fd3[m HEAD@{148}: commit: Improve business information validation and add performance test setup
+[33m8d364c1[m HEAD@{149}: commit: Set up automated testing framework to ensure code quality and application stability
+[33m709a80c[m HEAD@{150}: commit: Set up initial tests to ensure the application's core functionality works
+[33m082b07e[m HEAD@{151}: commit: Improve testing by adding mock API and shared validation functions
+[33meb57f3a[m HEAD@{152}: commit: Establish quality assurance framework to ensure a reliable platform
+[33mbf9040f[m HEAD@{153}: commit: Add testing capabilities to ensure application stability and reliability
+[33m840d1a8[m HEAD@{154}: commit: Add website information for free zones and verify data scraper coverage
+[33mfaf8e59[m HEAD@{155}: commit: Add checks and tests to ensure all free zone data is being scraped correctly
+[33m7f9b84f[m HEAD@{156}: commit: Improve compatibility when gathering free zone company information
+[33me44b4f0[m HEAD@{157}: commit: Test cache loading for scraper system using unique identifiers
+[33ma7bf5db[m HEAD@{158}: commit: Implement data caching to improve scraping reliability and speed
+[33ma9ead19[m HEAD@{159}: commit: Improve data fetching reliability from external government websites
+[33m687353a[m HEAD@{160}: commit: Improve ability to retrieve information from government websites
+[33m4008227[m HEAD@{161}: commit: Improve data retrieval reliability with a direct connection fallback
+[33mec54ef0[m HEAD@{162}: commit: Improve data gathering from websites and handle errors more effectively
+[33m88af115[m HEAD@{163}: commit: Started building your app
+[33m473a6f7[m HEAD@{164}: commit: Assistant checkpoint: Configure deployment to skip Playwright and use HTTP-only mode
+[33meffc0e0[m HEAD@{165}: commit: Assistant checkpoint: Fix deployment configuration and entry point
+[33m5193f36[m HEAD@{166}: commit: Checkpoint before assistant change: Improve the deployment process by simplifying build steps for better reliability
+[33mf8fd330[m HEAD@{167}: commit: Assistant checkpoint: Fix deployment configuration and HTTP-only mode setup
+[33m7b29f5f[m HEAD@{168}: commit: Checkpoint before assistant change: Improve build process by skipping unnecessary browser downloads
+[33m1beb691[m HEAD@{169}: commit: Assistant checkpoint: Configure HTTP-only mode and disable Playwright
+[33m78218a0[m HEAD@{170}: commit: Assistant checkpoint: Configure deployment for HTTP-only mode
+[33m327ba21[m HEAD@{171}: commit: Assistant checkpoint: Update deployment configuration for HTTP-only mode
+[33ma875f05[m HEAD@{172}: commit: Checkpoint before assistant change: Improve website deployment process and ensure reliable operation in production
+[33ma4725c6[m HEAD@{173}: commit: Assistant checkpoint: Configure HTTP-only deployment mode
+[33m5932d70[m HEAD@{174}: commit: Assistant checkpoint: Configure deployment for HTTP-only mode
+[33md40c785[m HEAD@{175}: commit: Checkpoint before assistant change: Improve the application deployment and enhance data enrichment
+[33mcbf0325[m HEAD@{176}: commit: Assistant checkpoint: Switch to HTTP-only mode for deployment
+[33m1a31d76[m HEAD@{177}: commit: Checkpoint before assistant change: Ensure the application builds correctly in environments without browsers
+[33mdfcd89f[m HEAD@{178}: commit: Assistant checkpoint: Configure HTTP-only mode for deployment
+[33me3110f3[m HEAD@{179}: commit: Create streamlined deployment for use on Replit without browser issues
+[33m88f98d8[m HEAD@{180}: commit: Establish a basic server setup to ensure that the platform remains accessible
+[33m7d3c8d3[m HEAD@{181}: commit: Make the application compatible with the Replit deployment environment
+[33m594c33e[m HEAD@{182}: commit: Replace web scraping tool to avoid deployment issues with Replit
+[33m5380fed[m HEAD@{183}: commit: Enable deployment by removing browser automation dependencies
+[33m80107ac[m HEAD@{184}: commit: Add instructions and scripts to deploy without browser dependencies
+[33m0a5874d[m HEAD@{185}: commit: Started building your app
+[33m2259231[m HEAD@{186}: commit: Assistant checkpoint: Configure HTTP-only mode for production deployment
+[33m641a031[m HEAD@{187}: commit: Checkpoint before assistant change: Update the project's deployment process to build successfully on Replit
+[33mcb5cb32[m HEAD@{188}: commit: Assistant checkpoint: Configure HTTP-only mode and skip Playwright installation
+[33m188f3f6[m HEAD@{189}: commit: Improve deployment process to address build failures and scraper issues
+[33m355f7db[m HEAD@{190}: commit: Enhance platform performance, security, and deployment reliability
+[33m9f3b47a[m HEAD@{191}: commit: Improve platform reliability and fix deployment issues for production
+[33mc51282d[m HEAD@{192}: commit: Improve deployment reliability and scraper configuration in production
+[33mece727b[m HEAD@{193}: commit: Improve deployment reliability and application configuration handling
+[33m90f39e6[m HEAD@{194}: commit: Improve deployment reliability by configuring scraper fallbacks and env vars
+[33m578c143[m HEAD@{195}: commit: Improve deployment stability with updated libraries and error handling
+[33m9dafd30[m HEAD@{196}: commit: Assistant checkpoint: Fix duplicate export in saif_zone_scraper.js
+[33mf4a032b[m HEAD@{197}: commit: Checkpoint before assistant change: Start the web application using the production environment settings
+[33mbcb1406[m HEAD@{198}: commit: Assistant checkpoint: Fix deployment configuration and module imports
+[33mcb93c08[m HEAD@{199}: commit: Assistant checkpoint: Fix remaining deployment configuration issues
+[33m6253002[m HEAD@{200}: commit: Assistant checkpoint: Update Playwright configuration for cloud deployment
+[33m8f7b76b[m HEAD@{201}: commit: Improve website performance by enabling request monitoring and response caching
+[33m8c7bf47[m HEAD@{202}: commit: Add cache management and performance monitoring to improve platform efficiency
+[33m39412e7[m HEAD@{203}: commit: Enable faster access to free zone data and improve overall system performance
+[33mde7e572[m HEAD@{204}: commit: Improve platform performance with caching and compression enhancements
+[33m88c6c91[m HEAD@{205}: commit: Improve platform speed by adding robust caching and data compression
+[33m7bdd2b7[m HEAD@{206}: commit: Connect key platform functions to the main page for easier access
+[33m62018a7[m HEAD@{207}: commit: Strengthen the platform's defenses against common cyber threats
+[33m5d28987[m HEAD@{208}: commit: Enhance security across platform services and protect user information
+[33m479329b[m HEAD@{209}: commit: Improve error handling and add tools to manage asynchronous requests
+[33meec12df[m HEAD@{210}: commit: Enhance user management with login security and refined data handling
+[33m2b91e33[m HEAD@{211}: commit: Improve user management and secure database connections in the system
+[33m853d5c7[m HEAD@{212}: commit: Enhance user authentication and authorization across the platform
+[33m28c2d32[m HEAD@{213}: commit: Enhance user security and improve user management capabilities
+[33md37161a[m HEAD@{214}: commit: Enhance user authentication and improve service endpoint management
+[33m2f6ff70[m HEAD@{215}: commit: Separate user management into its own service for better organization
+[33m92c2831[m HEAD@{216}: commit: Create independent user management service with secure data handling
+[33m9554c55[m HEAD@{217}: commit: Set up database structure for storing and managing information about free zones
+[33mdc63302[m HEAD@{218}: commit: Isolate free zone data into a dedicated microservice for better scalability
+[33mb52c108[m HEAD@{219}: commit: Create a dedicated service to manage free zone data independently
+[33macd836b[m HEAD@{220}: commit: Enhance user service with event handling and service discovery features
+[33ma0dba61[m HEAD@{221}: commit: Enhance document security and track changes throughout the document lifecycle
+[33m31cb2e4[m HEAD@{222}: commit: Expose document statistics, processing, and user document routes
+[33m886c312[m HEAD@{223}: commit: Implement document statistics, processing, and search functionalities
+[33ma77c7dd[m HEAD@{224}: commit: Initial checkpoint
+[33m7ca6474[m HEAD@{225}: commit: Improve web research tool by tracking conversation details better
+[33m1c6b7d8[m HEAD@{226}: commit: Improve AI assistant with better responses and conversation tracking
+[33m9c6e204[m HEAD@{227}: commit: Improve error handling and logging for AI assistant functions
+[33m22a9ec4[m HEAD@{228}: commit: Improve AI research service with robust logging and database handling
+[33mfeabfea[m HEAD@{229}: commit: Extract AI research functionality into a separate microservice
+[33ma5146fb[m HEAD@{230}: commit: Enhance service communication for improved reliability and priority handling
+[33m2bb8ff7[m HEAD@{231}: commit: Improve inter-service communication and enhance scraping capabilities
+[33mc3b1ca0[m HEAD@{232}: commit: Enable communication between different parts of our platform services
+[33mdee6e61[m HEAD@{233}: commit: Enable services to talk to each other and handle communication errors
+[33m2b56eec[m HEAD@{234}: commit: Enable automated collection of free zone data and improve service status
+[33me7bdd11[m HEAD@{235}: commit: Integrate a new scraper service with the API gateway for data extraction
+[33m55dffed[m HEAD@{236}: commit: Revamp authentication and service routing for improved efficiency
+[33me6ffede[m HEAD@{237}: commit: Implement core features, enabling free zone data management and retrieval
+[33mbcab7e5[m HEAD@{238}: commit: Implement document management service with enhanced functionality
+[33m6a811ca[m HEAD@{239}: commit: Enhance user security and error handling across all services
+[33m1f84ad7[m HEAD@{240}: commit: Implement core user authentication and profile management features
+[33ma09ed41[m HEAD@{241}: commit: Secure the API by adding user authentication and role-based access control
+[33m285b6a9[m HEAD@{242}: commit: Automate startup and document system architecture for better management
+[33m4baa886[m HEAD@{243}: commit: Integrate security measures and enhance service communication infrastructure
+[33med69b0c[m HEAD@{244}: commit: Establish core microservices and shared components for the platform
+[33m3bff314[m HEAD@{245}: commit: Establish core microservices and standardized shared components
+[33m5954bd2[m HEAD@{246}: commit: Improve the way errors are tracked, making them easier to understand
+[33m9b13750[m HEAD@{247}: commit: Improve file handling, add new file types, and enhance error tracking
+[33m17010c6[m HEAD@{248}: commit: Improve file handling by expanding supported formats and sanitizing names
+[33m3155b3d[m HEAD@{249}: commit: Improve document handling and input validation for enhanced system security
+[33m9d7748a[m HEAD@{250}: commit: Add file validation to ensure uploaded documents are safe and acceptable
+[33m1c3f125[m HEAD@{251}: commit: Enhance security and input validation across user authentication and AI features
+[33ma0dbe63[m HEAD@{252}: commit: Enhance system security measures and improve user authentication process
+[33mcb1eace[m HEAD@{253}: commit: Enhance application security and reliability through rate limiting and error handling
+[33m8bdca94[m HEAD@{254}: commit: Improve application security and reliability for production deployment
+[33me1f55fc[m HEAD@{255}: commit: Fix issue preventing users from properly executing enrichment tasks
+[33m72b1036[m HEAD@{256}: commit: Resolve issue preventing users from successfully executing enrichment tasks
+[33m96859ff[m HEAD@{257}: commit: Organize enrichment tasks into groups for easier management and visualization
+[33mb67280c[m HEAD@{258}: commit: Initialize the core system with AI-driven document enrichment features
+[33m1ec33a6[m HEAD@{259}: commit: Create foundational structure for intelligent business setup platform
+[33md5ce251[m HEAD@{260}: commit: Add support for storing and managing forms specific to SAIF Zone
+[33m739ab11[m HEAD@{261}: commit: Establish the core structure of a smart system for UAE business setup
+[33m883dc33[m HEAD@{262}: commit: Initialize project structure with core modules and configuration files
+[33m0b97462[m HEAD@{263}: commit: Improve task processing with confirmation and batch size limits
+[33m7ba80a7[m HEAD@{264}: commit: Improve task generation logic for document enrichment workflows
+[33m99864a3[m HEAD@{265}: commit: Improve processing efficiency and reliability for enrichment tasks
+[33m64df8bc[m HEAD@{266}: commit: Initialize the AI-powered platform for UAE business establishment
+[33m5ec7e19[m HEAD@{267}: commit: Improve task processing to prevent enrichment processes from getting stuck
+[33ma11b778[m HEAD@{268}: commit: Update icons for clarity and improve visual consistency across the application
+[33mb6a7992[m HEAD@{269}: commit: Add global selection options to manage all tasks at once easily
+[33meef9488[m HEAD@{270}: commit: Allow users to select all enrichment tasks without quantity limitations
+[33m3211c76[m HEAD@{271}: commit: Improve the enrichment process by skipping fields that are already complete
+[33m45e49d1[m HEAD@{272}: commit: Improve task management by filtering out failed tasks from the workflow
+[33mf522961[m HEAD@{273}: commit: Show only tasks that are not completed when displaying enrichment tasks
+[33m1f49aca[m HEAD@{274}: commit: Add test suite to confirm web assistant search functions work as intended
+[33m8b2f82b[m HEAD@{275}: commit: Improve document search by adding more specific filtering capabilities
+[33ma1835de[m HEAD@{276}: commit: Improve handling of free zone data and ensure data consistency
+[33mb0419af[m HEAD@{277}: commit: Improve the way information is extracted from free zone documents
+[33m32b417f[m HEAD@{278}: commit: Improve AI enrichment performance metrics and error handling capabilities
+[33m84a4fc1[m HEAD@{279}: commit: Improve the way search results are ordered and ensure data consistency
+[33m9516024[m HEAD@{280}: commit: Improve error messages for AI-driven data analysis and task management
+[33m307be89[m HEAD@{281}: commit: Refactor code for clarity in how task groups are rendered on the webpage
+[33mfff82d7[m HEAD@{282}: commit: Improve the platform to fix and prevent bugs for a better user experience
+[33mb8df85a[m HEAD@{283}: commit: Improve platform stability by addressing existing software bugs and errors
+[33m8094dda[m HEAD@{284}: commit: Initialize core AI document processing engine for business setup tasks
+[33mf33a8da[m HEAD@{285}: commit: Improve data retrieval and fix errors in document processing and task management
+[33m0fe848b[m HEAD@{286}: commit: Adjust how the system determines whether document processing is complete
+[33m1b890ae[m HEAD@{287}: commit: Create a document listing all errors found during development and testing
+[33m0b8113b[m HEAD@{288}: commit: Enhance AI enrichment tasks by tracking completion status in the database
+[33m4a02ce6[m HEAD@{289}: commit: Improve task completion and reporting accuracy for business workflows
+[33m504975e[m HEAD@{290}: commit: Ensure enrichment tasks respect batch size when executing workflows
+[33m3d51c5f[m HEAD@{291}: commit: Prioritize existing tasks, reducing redundant enrichment analyses
+[33m2f46995[m HEAD@{292}: commit: Improve data insertion for Dubai Internet City documents and freezone data
+[33m832f262[m HEAD@{293}: commit: Add important details about Dubai Internet City directly to database
+[33m82b020e[m HEAD@{294}: commit: Establish a system to automatically generate and manage document tasks
+[33mf0c6b4a[m HEAD@{295}: commit: Improve how the system handles and organizes documentation tasks
+[33mcbe4682[m HEAD@{296}: commit: Improve reliability of document analysis by updating database queries
+[33m9e5dc4c[m HEAD@{297}: commit: Fix error when new tasks are created using a Dubai freezone DIC
+[33mb668ec5[m HEAD@{298}: commit: Add ability to select and deselect all tasks for each free zone
+[33m4bb4f1e[m HEAD@{299}: commit: Enable selection of all tasks for a specific free zone within the audit grid
+[33m651c3c8[m HEAD@{300}: commit: Improve audit process to identify and prevent creation of duplicate data
+[33m2cd523a[m HEAD@{301}: commit: Improve task creation and audit processing for better system performance
+[33md420a7b[m HEAD@{302}: commit: Improve automatic data enrichment and fix processing workflow issues
+[33m8a4ef4e[m HEAD@{303}: commit: Allow the system to handle much larger files during document analysis
+[33md824ff4[m HEAD@{304}: commit: Improve task creation by sending less data to the server
+[33m9f698f1[m HEAD@{305}: commit: Add ability to quickly select and clear all missing fields in deep audit
+[33me19415d[m HEAD@{306}: commit: Improve the way missing fields are displayed for easier selection
+[33md05006e[m HEAD@{307}: commit: Improve appearance of selectable fields in the document workflow interface
+[33m230fea4[m HEAD@{308}: commit: Checkpoint
+[33m494ccc8[m HEAD@{309}: commit: Update the missing field indicators to ensure they are visible to users
+[33m9a0ee97[m HEAD@{310}: commit: Improve the task selection process and auto-enrichment functionality
+[33m5d654fd[m HEAD@{311}: commit: Add functionality to audit and improve data completeness across free zones
+[33mb642811[m HEAD@{312}: commit: Enable deep audit on all free zones and streamline task creation
+[33m7928729[m HEAD@{313}: commit: Show links to the AI assistant and product manager in the main dashboard
+[33m67255a4[m HEAD@{314}: commit: Checkpoint
+[33m2084ade[m HEAD@{315}: commit: Checkpoint
+[33m7aa809d[m HEAD@{316}: commit: Improve the accuracy of information displayed after the enrichment process
+[33me673c35[m HEAD@{317}: commit: Improve data handling on the enrichment workflow page for uninterrupted use
+[33m01bc5ac[m HEAD@{318}: commit: Improve AI task execution by streamlining data transfer to the backend
+[33m8000b67[m HEAD@{319}: commit: Inform users how to access the platform and begin their free zone setup
+[33ma2aa035[m HEAD@{320}: commit: Add automated document enrichment process to enhance business insights
+[33meacae7c[m HEAD@{321}: commit: Checkpoint
+[33m2657d4b[m HEAD@{322}: commit: Improve data handling and accuracy when processing free zone information
+[33m3e2c31e[m HEAD@{323}: commit: Add an interface to initiate and monitor document enrichment processes
+[33mb07aa72[m HEAD@{324}: commit: Improve completeness of Ajman Free Zone business setup information
+[33m81e90ce[m HEAD@{325}: commit: Improve the system to achieve one hundred percent data completeness
+[33mc4571e9[m HEAD@{326}: commit: Check document completeness for Ajman Free Zone and compare against DMCC
+[33m698b945[m HEAD@{327}: commit: Improve document categorization and add AI audit for Ajman Free Zone
+[33m64225de[m HEAD@{328}: commit: Add initial documentation and a script for Ajman Free Zone data import
+[33m5d26623[m HEAD@{329}: commit: Improve document processing and fetching for free zone information
+[33m969927b[m HEAD@{330}: commit: Prepare system for upcoming DMCC freezone data comparison and testing
+[33m8bea64b[m HEAD@{331}: commit: Add ability to retrieve documents from specific free zone websites
+[33m82ab964[m HEAD@{332}: commit: Enable fetching of documents directly from various free zone websites
+[33md460d65[m HEAD@{333}: commit: Improve the way the system extracts key information from documents
+[33mbbab3f5[m HEAD@{334}: commit: Improve search by adding free zone prioritization and enhanced data extraction
+[33mf911b8e[m HEAD@{335}: commit: Improve data extraction for comprehensive free zone information retrieval
+[33ma28c7fb[m HEAD@{336}: commit: Enhance data retrieval for the AI by adding comprehensive FAQ support
+[33m3fe5ddd[m HEAD@{337}: commit: Add comprehensive information for SAIF Zone businesses in the database
+[33m77f6a97[m HEAD@{338}: commit: Add detailed documentation for the Dubai Multi Commodities Centre
+[33mbd49162[m HEAD@{339}: commit: Improve AI's ability to analyze information about UAE free zones
+[33m3ae6e0d[m HEAD@{340}: commit: Improve data processing with additional business establishment information
+[33m619a428[m HEAD@{341}: commit: Initialize the platform for streamlining business setup in the UAE
+[33m2c20a08[m HEAD@{342}: commit: Initialize project structure for intelligent business setup platform
+[33ma7ac57e[m HEAD@{343}: commit: Improve reliability of data updates in free zones using AI insights
+[33mabf1a8f[m HEAD@{344}: commit: Add enhanced content formatting for key free zone data elements
+[33ma3d52a6[m HEAD@{345}: commit: Ensure front end reflects the most current available system data
+[33m19e0cd1[m HEAD@{346}: commit: Improve DMCC data completeness score by addressing identified gaps
+[33mf67ac90[m HEAD@{347}: commit: Enhance DMCC data to achieve complete and accurate business setup information
+[33m89709ab[m HEAD@{348}: commit: Test business details enrichment functionality for DMCC companies
+[33m0d39010[m HEAD@{349}: commit: Add a command-line tool that shows a list of available free zones
+[33mf324065[m HEAD@{350}: commit: Improve website data analysis and add API to retrieve the latest test
+[33mc0d2e59[m HEAD@{351}: commit: Improve free zone data gathering by ensuring website addresses are valid
+[33m4b1a9ae[m HEAD@{352}: commit: Checkpoint
+[33mc391fe0[m HEAD@{353}: commit: Add a test endpoint to check in-depth system audit functionality
+[33me69c7d4[m HEAD@{354}: commit: Improve website analysis with updated Playwright and error handling
+[33m847498d[m HEAD@{355}: commit: Add support for browser automation and testing within the application
+[33mb2bdc87[m HEAD@{356}: commit: Update the appearance and interactive elements of the user interface
+[33m83258d7[m HEAD@{357}: commit: Initialize core project structure and configure essential dependencies
+[33m71dd9eb[m HEAD@{358}: commit: Initialize project structure and core dependencies for business platform
+[33m4018690[m HEAD@{359}: commit: Checkpoint
+[33m6b9501d[m HEAD@{360}: commit: Checkpoint
+[33m0a42ed0[m HEAD@{361}: commit: Initialize core platform infrastructure and essential project configurations
+[33m97c2a77[m HEAD@{362}: commit: Prepare the codebase for upcoming changes and enhancements
+[33m286b14c[m HEAD@{363}: commit: Initialize core structure for AI-powered business setup platform
+[33m447ab9d[m HEAD@{364}: commit: Initialize the core project structure for the business setup platform
+[33m493385d[m HEAD@{365}: commit: Prepare the foundation for an AI-powered business setup platform
+[33m4f321c4[m HEAD@{366}: commit: Improve overall stability and address minor issues across the platform
+[33m8571939[m HEAD@{367}: commit: Improve how AI gathers business insights by accessing relevant document data
+[33m04c9a4f[m HEAD@{368}: commit: Checkpoint
+[33m91296bb[m HEAD@{369}: commit: Checkpoint
+[33m4e27a05[m HEAD@{370}: commit: Add logging ability to track and monitor actions within the platform
+[33mc6c3f94[m HEAD@{371}: commit: Improve activity logging and add ability to clear logs for better tracking
+[33mcad2ad4[m HEAD@{372}: commit: Improve task handling and provide enrichment performance data for the AI
+[33m164dae6[m HEAD@{373}: commit: Add deep data audit feature and improve data enrichment processes
+[33m1cfa6dc[m HEAD@{374}: commit: Implement comprehensive audits to improve free zone data accuracy
+[33m54cb4f1[m HEAD@{375}: commit: Add link to enrichment workflow directly on the AI Product Manager page
+[33m24e350d[m HEAD@{376}: commit: Improve data enrichment process and navigation within the platform
+[33me1b3105[m HEAD@{377}: commit: Add a new data enrichment process to improve AI data processing
+[33m6664a78[m HEAD@{378}: commit: Automate process to improve data quality by enriching missing information
+[33m1b292e3[m HEAD@{379}: commit: Improve data completeness calculations and ensure proper recommendations
+[33mffa2eed[m HEAD@{380}: commit: Improve free zone data analysis and document completeness score reliability
+[33mb3eeb51[m HEAD@{381}: commit: Improve document analysis for business setup completeness scoring
+[33m4947dec[m HEAD@{382}: commit: Improve AI analysis when key information is missing from initial results
+[33maadab78[m HEAD@{383}: commit: Improve AI analysis by ensuring correct data format and error handling
+[33m018f69f[m HEAD@{384}: commit: Remove user login session from saved cookies to improve user security
+[33mfadd0ac[m HEAD@{385}: commit: Improve data completeness display with enhanced progress indicators
+[33m4590694[m HEAD@{386}: commit: Improve the accuracy of data analysis in the AI Product Manager
+[33m7a2ad2e[m HEAD@{387}: commit: Investigate data analysis inaccuracies and improve reporting on AI Product Manager
+[33mb720e85[m HEAD@{388}: commit: Improve AI assistant by remembering user conversations and API configuration
+[33m308aa39[m HEAD@{389}: commit: Make the chatbot smarter by improving how it answers user questions
+[33m0514000[m HEAD@{390}: commit: Checkpoint
+[33m127bb38[m HEAD@{391}: commit: Add smart suggestions to the business assistant's quick test feature
+[33mecfb5d9[m HEAD@{392}: commit: Improve response times by using pre-written answers for common questions
+[33md0dfc33[m HEAD@{393}: commit: Provide a lightweight test endpoint for quick business setup information
+[33m55fc3e2[m HEAD@{394}: commit: Improve AI assistant's responses with concise knowledge and message history
+[33m16b6423[m HEAD@{395}: commit: Improve AI responses by using the newest and fastest OpenAI model
+[33md7faebc[m HEAD@{396}: commit: Checkpoint
+[33m84c2f44[m HEAD@{397}: commit: Ensure retrieval of messages in a conversation remains consistent
+[33m70dd39a[m HEAD@{398}: commit: Update the way messages are stored and retrieved within conversations
+[33mec049c6[m HEAD@{399}: commit: Checkpoint
+[33mb501bea[m HEAD@{400}: commit: Track user interactions and their history within the business platform
+[33macbbef1[m HEAD@{401}: commit: Add a field to store document content and clarify user relation
+[33md3b7cb7[m HEAD@{402}: commit: Improve document and free zone search using a more consistent approach
+[33m8b78e67[m HEAD@{403}: commit: Add script to create a test admin user for API endpoint testing
+[33mf457bb4[m HEAD@{404}: commit: Improve creation of activity logs and initial database setup process
+[33m68de849[m HEAD@{405}: commit: Add system to track user actions and internal processes for debugging
+[33me61654f[m HEAD@{406}: commit: Improve the accuracy of search results across various platform features
+[33m9c567b1[m HEAD@{407}: commit: Improve search functionality to locate documents and free zones more accurately
+[33m2b45833[m HEAD@{408}: commit: Add an AI tool to analyze and improve free zone data for business insights
+[33m10c6784[m HEAD@{409}: commit: Enhance AI chatbot with product manager capabilities and data enrichment
+[33mc90f4a6[m HEAD@{410}: commit: Prepare the platform for a thorough round of quality assurance testing
+[33m5825962[m HEAD@{411}: commit: Check for and resolve potential errors within the application code
+[33m214ba85[m HEAD@{412}: commit: Improve stability and fix some potential issues identified in the application
+[33m2f830b3[m HEAD@{413}: commit: Fixes a document processing error
+[33md967c4d[m HEAD@{414}: commit: Fixes a document loading error
+[33mca65c78[m HEAD@{415}: commit: Fixed a display issue
+[33m8d1d100[m HEAD@{416}: commit: Added database tables for business setup
+[33m5b9098f[m HEAD@{417}: commit: Improves app startup
+[33m841e42e[m HEAD@{418}: commit: Improves error handling
+[33md26f652[m HEAD@{419}: commit: Adds database setup
+[33mb039b69[m HEAD@{420}: commit: Improved the business setup process
+[33maeb8448[m HEAD@{421}: commit: Fixes a display issue
+[33m2265ea7[m HEAD@{422}: commit: Checkpoint
+[33mc859060[m HEAD@{423}: commit: Improved document filtering
+[33m0d0bf43[m HEAD@{424}: commit: Improved document and user experience
+[33m7c89915[m HEAD@{425}: commit: Fixed a problem on the admin page
+[33m1817517[m HEAD@{426}: commit: Added a premium assistant
+[33m32c75d1[m HEAD@{427}: commit: Adds more tests for premium features
+[33ma491619[m HEAD@{428}: commit: Adds a faster way to get business info
+[33m95b0584[m HEAD@{429}: commit: Improved business insights response time
+[33m3e556e5[m HEAD@{430}: commit: Improved AI assistant's startup
+[33m00c73db[m HEAD@{431}: commit: Added a smarter AI assistant
+[33m6b394d5[m HEAD@{432}: commit: Improved the business setup assistant
+[33maa722dd[m HEAD@{433}: commit: Checkpoint
+[33mf5a5463[m HEAD@{434}: commit: Added a web research tool
+[33m8efa37e[m HEAD@{435}: commit: Added new AI assistant features
+[33m1f281f5[m HEAD@{436}: commit: Improved AI-powered business insights
+[33m096b371[m HEAD@{437}: commit: Improves error handling
+[33mb0d192a[m HEAD@{438}: commit: Adds system for tracking user errors and crashes
+[33m144c500[m HEAD@{439}: commit: Added a system for tracking user issues
+[33m70ad6c7[m HEAD@{440}: commit: Fixed a few bugs
+[33ma20b2ea[m HEAD@{441}: commit: Fixes a redirect problem
+[33ma81fcea[m HEAD@{442}: commit: Add AI-powered conversation features to the business setup process
+[33m5b73d8a[m HEAD@{443}: commit: Initial checkpoint
+[33m8a44a02[m HEAD@{444}: commit: Update SAIF Zone business setup documentation with improved structure and content.
+[33me83f051[m HEAD@{445}: commit: Add SAIF Zone business setup data scraper and database schema
+[33m04d59e2[m HEAD@{446}: commit: Add Saif Zone business setup data to the database
+[33m4920cfc[m HEAD@{447}: commit: Add SAIF Zone document processing and API endpoint. This commit adds functionality to process and categorize documents from the SAIF Zone, making them searchable via a new API endpoint.
+[33mbe30029[m HEAD@{448}: commit: Add SAIF Zone forms management functionality
+[33mcf4724f[m HEAD@{449}: commit: Add document management feature with automated downloading and processing
+[33mfd356b8[m HEAD@{450}: commit: Add document statistics API endpoints and DMCC document processing scripts.
+[33md52636a[m HEAD@{451}: commit: Add test documents categorized by business setup, financial, and compliance for improved testing.
+[33mdf11f05[m HEAD@{452}: commit: Checkpoint
+[33me26ef56[m HEAD@{453}: commit: Improve DMCC document processing: Enhance error handling and provide detailed results. Adds a new public API endpoint for document processing.
+[33m076cb14[m HEAD@{454}: commit: Initial checkpoint
+[33m5c8182e[m HEAD@{455}: commit: Add admin panel and DMCC document import functionality.
+[33md52fa64[m HEAD@{456}: commit: Add document management functionality
+[33m9044922[m HEAD@{457}: commit: Update freezone landing page with improved SEO and metadata
+[33m9e85eb5[m HEAD@{458}: commit: Enhance business activity search and freezone details display.
+[33mef89435[m HEAD@{459}: commit: Fix data display issues on free zone details page
+[33macd457a[m HEAD@{460}: commit: Fix data type handling for Free Zone details to prevent runtime errors
+[33m4afe051[m HEAD@{461}: commit: Checkpoint
+[33m1fa242d[m HEAD@{462}: commit: Enhance free zone data scraper with detailed logging and new API endpoints.
+[33m5c286b2[m HEAD@{463}: commit: Enhance free zone data scraping by adding detailed page URLs for more comprehensive information.
+[33mef60cb7[m HEAD@{464}: commit: Add free zone details pages and enhanced scraping functionality
+[33me36b182[m HEAD@{465}: commit: Improve business setup recommendations by refining industry selection and activity fetching.
+[33m2ec3296[m HEAD@{466}: commit: Increase the limit of displayed business activities from 50 to 100.
+[33m052d2cf[m HEAD@{467}: commit: Update business activity data fetching and add scheduled data scraping.
+[33m20856f7[m HEAD@{468}: commit: Add business activity data and API endpoint. This includes database schema changes, data import, and a new API route to fetch business activities.
+[33m5a8819e[m HEAD@{469}: commit: Improve data scraping robustness by implementing a scraper manager and adding error handling.
+[33m6a63256[m HEAD@{470}: commit: Enhance database with free zone data by scraping and integrating data from uaefreezones.com.
+[33mb25a92a[m HEAD@{471}: commit: Add AI-powered business setup assistant and data scraping functionality. This includes a new API endpoint and enhanced OpenAI integration for improved user experience.
+[33md636a5c[m HEAD@{472}: commit: Initial checkpoint
+[33mbc4d867[m HEAD@{473}: reset: moving to bc4d867bcf159f978fa8954f14f79e384e69ab21
+[33m8af3851[m HEAD@{474}: commit: Checkpoint before revert - Build the initial prototype
